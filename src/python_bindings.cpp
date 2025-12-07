@@ -671,20 +671,17 @@ py::array_t<uint16_t> yuv10_to_rgb_uint16(py::array_t<uint8_t> yuv_array, int wi
                     bf = yf + 1.8556f * cbf;
                 }
 
-                rf = std::max(0.0f, std::min(1.0f, rf));
-                gf = std::max(0.0f, std::min(1.0f, gf));
-                bf = std::max(0.0f, std::min(1.0f, bf));
-
+                // Allow super-whites (values > 1.0), but clamp after scaling to prevent uint16_t overflow
                 uint16_t r16, g16, b16;
 
                 if (output_narrow_range) {
-                    r16 = (uint16_t)(rf * 876.0f * 64.0f + 64.0f * 64.0f);
-                    g16 = (uint16_t)(gf * 876.0f * 64.0f + 64.0f * 64.0f);
-                    b16 = (uint16_t)(bf * 876.0f * 64.0f + 64.0f * 64.0f);
+                    r16 = (uint16_t)std::max(0.0f, std::min(65535.0f, rf * 876.0f * 64.0f + 64.0f * 64.0f));
+                    g16 = (uint16_t)std::max(0.0f, std::min(65535.0f, gf * 876.0f * 64.0f + 64.0f * 64.0f));
+                    b16 = (uint16_t)std::max(0.0f, std::min(65535.0f, bf * 876.0f * 64.0f + 64.0f * 64.0f));
                 } else {
-                    r16 = (uint16_t)(rf * 65535.0f);
-                    g16 = (uint16_t)(gf * 65535.0f);
-                    b16 = (uint16_t)(bf * 65535.0f);
+                    r16 = (uint16_t)std::max(0.0f, std::min(65535.0f, rf * 65535.0f));
+                    g16 = (uint16_t)std::max(0.0f, std::min(65535.0f, gf * 65535.0f));
+                    b16 = (uint16_t)std::max(0.0f, std::min(65535.0f, bf * 65535.0f));
                 }
 
                 int pixel_idx = (y * width + x + i) * 3;
@@ -790,10 +787,7 @@ py::array_t<float> yuv10_to_rgb_float(py::array_t<uint8_t> yuv_array, int width,
                     bf = yf + 1.8556f * cbf;
                 }
 
-                rf = std::max(0.0f, std::min(1.0f, rf));
-                gf = std::max(0.0f, std::min(1.0f, gf));
-                bf = std::max(0.0f, std::min(1.0f, bf));
-
+                // Allow super-whites: values > 1.0 are valid for super-white content
                 int pixel_idx = (y * width + x + i) * 3;
                 dst[pixel_idx + 0] = rf;
                 dst[pixel_idx + 1] = gf;
@@ -978,15 +972,11 @@ py::array_t<uint16_t> yuv8_to_rgb_uint16(py::array_t<uint8_t> yuv_array, int wid
             double g0 = y0 + g_factor;
             double b0 = y0 + b_factor;
 
-            // Clamp and scale
-            r0 = std::max(0.0, std::min(1.0, r0));
-            g0 = std::max(0.0, std::min(1.0, g0));
-            b0 = std::max(0.0, std::min(1.0, b0));
-
+            // Allow super-whites, but clamp after scaling to prevent uint16_t overflow
             int pixel0_idx = (y * width + x) * 3;
-            rgb_dst[pixel0_idx] = static_cast<uint16_t>(r0 * out_range + out_min);
-            rgb_dst[pixel0_idx + 1] = static_cast<uint16_t>(g0 * out_range + out_min);
-            rgb_dst[pixel0_idx + 2] = static_cast<uint16_t>(b0 * out_range + out_min);
+            rgb_dst[pixel0_idx] = static_cast<uint16_t>(std::max(0.0, std::min(65535.0, r0 * out_range + out_min)));
+            rgb_dst[pixel0_idx + 1] = static_cast<uint16_t>(std::max(0.0, std::min(65535.0, g0 * out_range + out_min)));
+            rgb_dst[pixel0_idx + 2] = static_cast<uint16_t>(std::max(0.0, std::min(65535.0, b0 * out_range + out_min)));
 
             // Second pixel (if exists)
             if (x + 1 < width) {
@@ -994,14 +984,10 @@ py::array_t<uint16_t> yuv8_to_rgb_uint16(py::array_t<uint8_t> yuv_array, int wid
                 double g1 = y1 + g_factor;
                 double b1 = y1 + b_factor;
 
-                r1 = std::max(0.0, std::min(1.0, r1));
-                g1 = std::max(0.0, std::min(1.0, g1));
-                b1 = std::max(0.0, std::min(1.0, b1));
-
                 int pixel1_idx = (y * width + x + 1) * 3;
-                rgb_dst[pixel1_idx] = static_cast<uint16_t>(r1 * out_range + out_min);
-                rgb_dst[pixel1_idx + 1] = static_cast<uint16_t>(g1 * out_range + out_min);
-                rgb_dst[pixel1_idx + 2] = static_cast<uint16_t>(b1 * out_range + out_min);
+                rgb_dst[pixel1_idx] = static_cast<uint16_t>(std::max(0.0, std::min(65535.0, r1 * out_range + out_min)));
+                rgb_dst[pixel1_idx + 1] = static_cast<uint16_t>(std::max(0.0, std::min(65535.0, g1 * out_range + out_min)));
+                rgb_dst[pixel1_idx + 2] = static_cast<uint16_t>(std::max(0.0, std::min(65535.0, b1 * out_range + out_min)));
             }
         }
     }
@@ -1085,11 +1071,7 @@ py::array_t<float> yuv8_to_rgb_float(py::array_t<uint8_t> yuv_array, int width, 
             double g0 = y0 + g_factor;
             double b0 = y0 + b_factor;
 
-            // Clamp to 0.0-1.0
-            r0 = std::max(0.0, std::min(1.0, r0));
-            g0 = std::max(0.0, std::min(1.0, g0));
-            b0 = std::max(0.0, std::min(1.0, b0));
-
+            // Allow super-whites: values > 1.0 are valid for super-white content
             int pixel0_idx = (y * width + x) * 3;
             rgb_dst[pixel0_idx] = static_cast<float>(r0);
             rgb_dst[pixel0_idx + 1] = static_cast<float>(g0);
@@ -1100,10 +1082,6 @@ py::array_t<float> yuv8_to_rgb_float(py::array_t<uint8_t> yuv_array, int width, 
                 double r1 = y1 + r_factor;
                 double g1 = y1 + g_factor;
                 double b1 = y1 + b_factor;
-
-                r1 = std::max(0.0, std::min(1.0, r1));
-                g1 = std::max(0.0, std::min(1.0, g1));
-                b1 = std::max(0.0, std::min(1.0, b1));
 
                 int pixel1_idx = (y * width + x + 1) * 3;
                 rgb_dst[pixel1_idx] = static_cast<float>(r1);
@@ -1573,19 +1551,14 @@ py::array_t<uint16_t> rgb10_to_uint16(py::array_t<uint8_t> rgb_array, int width,
                 dst[pixel_idx + 1] = g10 << 6;
                 dst[pixel_idx + 2] = b10 << 6;
             } else {
-                // Convert to output range
+                // Convert to output range (allow super-whites, clamp after scaling)
                 double r_norm = (r10 - in_min) / in_range;
                 double g_norm = (g10 - in_min) / in_range;
                 double b_norm = (b10 - in_min) / in_range;
 
-                // Clamp to 0.0-1.0
-                r_norm = std::max(0.0, std::min(1.0, r_norm));
-                g_norm = std::max(0.0, std::min(1.0, g_norm));
-                b_norm = std::max(0.0, std::min(1.0, b_norm));
-
-                dst[pixel_idx] = static_cast<uint16_t>(r_norm * out_range + out_min);
-                dst[pixel_idx + 1] = static_cast<uint16_t>(g_norm * out_range + out_min);
-                dst[pixel_idx + 2] = static_cast<uint16_t>(b_norm * out_range + out_min);
+                dst[pixel_idx] = static_cast<uint16_t>(std::max(0.0, std::min(65535.0, r_norm * out_range + out_min)));
+                dst[pixel_idx + 1] = static_cast<uint16_t>(std::max(0.0, std::min(65535.0, g_norm * out_range + out_min)));
+                dst[pixel_idx + 2] = static_cast<uint16_t>(std::max(0.0, std::min(65535.0, b_norm * out_range + out_min)));
             }
         }
     }
@@ -1631,16 +1604,12 @@ py::array_t<float> rgb10_to_float(py::array_t<uint8_t> rgb_array, int width, int
             uint16_t g10 = (word >> 12) & 0x3FF;
             uint16_t b10 = (word >> 2) & 0x3FF;
 
-            // Convert to 0.0-1.0
+            // Convert to 0.0-1.0 (allow super-whites > 1.0)
             double r_norm = (r10 - in_min) / in_range;
             double g_norm = (g10 - in_min) / in_range;
             double b_norm = (b10 - in_min) / in_range;
 
-            // Clamp to 0.0-1.0
-            r_norm = std::max(0.0, std::min(1.0, r_norm));
-            g_norm = std::max(0.0, std::min(1.0, g_norm));
-            b_norm = std::max(0.0, std::min(1.0, b_norm));
-
+            // Allow super-whites: values > 1.0 are valid for super-white content
             int pixel_idx = (y * width + x) * 3;
             dst[pixel_idx] = static_cast<float>(r_norm);
             dst[pixel_idx + 1] = static_cast<float>(g_norm);
@@ -1789,17 +1758,14 @@ py::array_t<uint16_t> rgb12_to_uint16(py::array_t<uint8_t> rgb_array, int width,
                     dst[pixel_idx + 1] = g[i] << 4;
                     dst[pixel_idx + 2] = b[i] << 4;
                 } else {
+                    // Allow super-whites, clamp after scaling to prevent uint16_t overflow
                     double r_norm = (r[i] - in_min) / in_range;
                     double g_norm = (g[i] - in_min) / in_range;
                     double b_norm = (b[i] - in_min) / in_range;
 
-                    r_norm = std::max(0.0, std::min(1.0, r_norm));
-                    g_norm = std::max(0.0, std::min(1.0, g_norm));
-                    b_norm = std::max(0.0, std::min(1.0, b_norm));
-
-                    dst[pixel_idx] = static_cast<uint16_t>(r_norm * out_range + out_min);
-                    dst[pixel_idx + 1] = static_cast<uint16_t>(g_norm * out_range + out_min);
-                    dst[pixel_idx + 2] = static_cast<uint16_t>(b_norm * out_range + out_min);
+                    dst[pixel_idx] = static_cast<uint16_t>(std::max(0.0, std::min(65535.0, r_norm * out_range + out_min)));
+                    dst[pixel_idx + 1] = static_cast<uint16_t>(std::max(0.0, std::min(65535.0, g_norm * out_range + out_min)));
+                    dst[pixel_idx + 2] = static_cast<uint16_t>(std::max(0.0, std::min(65535.0, b_norm * out_range + out_min)));
                 }
             }
         }
@@ -1879,16 +1845,13 @@ py::array_t<float> rgb12_to_float(py::array_t<uint8_t> rgb_array, int width, int
             g[7] = (group[8] >> 8) & 0xFFF;
             b[7] = (group[8] >> 20) & 0xFFF;
 
-            // Convert to 0.0-1.0
+            // Convert to 0.0-1.0 (allow super-whites > 1.0)
             for (int i = 0; i < 8 && (x + i) < width; i++) {
                 double r_norm = (r[i] - in_min) / in_range;
                 double g_norm = (g[i] - in_min) / in_range;
                 double b_norm = (b[i] - in_min) / in_range;
 
-                r_norm = std::max(0.0, std::min(1.0, r_norm));
-                g_norm = std::max(0.0, std::min(1.0, g_norm));
-                b_norm = std::max(0.0, std::min(1.0, b_norm));
-
+                // Allow super-whites: values > 1.0 are valid for super-white content
                 int pixel_idx = (y * width + x + i) * 3;
                 dst[pixel_idx] = static_cast<float>(r_norm);
                 dst[pixel_idx + 1] = static_cast<float>(g_norm);
