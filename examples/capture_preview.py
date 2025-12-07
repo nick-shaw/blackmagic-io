@@ -47,7 +47,7 @@ def capture_high_quality_frame(input_device, narrow_range=False):
     rgb_float = frame_with_metadata['rgb']
 
     if narrow_range:
-        # Narrow range: 0.0-1.0 maps to 16-235 in 8-bit, or 4096-60160 in 16-bit
+        # Narrow range: 0.0-1.0 maps to 64-940 in 10-bit, or 4096-60160 in 16-bit
         rgb_uint16 = (rgb_float * (60160 - 4096) + 4096).astype(np.uint16)
         range_str = "narrow"
     else:

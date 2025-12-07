@@ -51,6 +51,8 @@ minimum-version = "0.3.3"
 build-dir = "build/{wheel_tag}"
 # Include vendor directory in sdist
 sdist.include = ["_vendor/**"]
+# Ensure Python packages are included in wheel
+wheel.packages = ["src/blackmagic_io"]
 
 [dependency-groups]
 dev = [
