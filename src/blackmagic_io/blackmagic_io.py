@@ -1170,7 +1170,8 @@ class BlackmagicInput:
                     frame_data, width, height,
                     matrix=captured_frame.colorspace,
                     input_narrow_range=input_narrow_range,
-                    output_narrow_range=False
+                    output_narrow_range=False,
+                    row_bytes=captured_frame.row_bytes
                 )
                 return (rgb_uint16 >> 8).astype(np.uint8)
 
@@ -1179,7 +1180,8 @@ class BlackmagicInput:
                     frame_data, width, height,
                     matrix=captured_frame.colorspace,
                     input_narrow_range=input_narrow_range,
-                    output_narrow_range=False
+                    output_narrow_range=False,
+                    row_bytes=captured_frame.row_bytes
                 )
                 return (rgb_uint16 >> 8).astype(np.uint8)
 
@@ -1187,7 +1189,8 @@ class BlackmagicInput:
                 rgb_uint16 = _decklink.rgb10_to_uint16(
                     frame_data, width, height,
                     input_narrow_range=input_narrow_range,
-                    output_narrow_range=False
+                    output_narrow_range=False,
+                    row_bytes=captured_frame.row_bytes
                 )
                 return (rgb_uint16 >> 8).astype(np.uint8)
 
@@ -1195,7 +1198,8 @@ class BlackmagicInput:
                 rgb_uint16 = _decklink.rgb12_to_uint16(
                     frame_data, width, height,
                     input_narrow_range=input_narrow_range,
-                    output_narrow_range=False
+                    output_narrow_range=False,
+                    row_bytes=captured_frame.row_bytes
                 )
                 return (rgb_uint16 >> 8).astype(np.uint8)
 
@@ -1235,26 +1239,30 @@ class BlackmagicInput:
                 return _decklink.yuv8_to_rgb_float(
                     frame_data, width, height,
                     matrix=captured_frame.colorspace,
-                    input_narrow_range=input_narrow_range
+                    input_narrow_range=input_narrow_range,
+                    row_bytes=captured_frame.row_bytes
                 )
 
             elif pixel_format == _decklink.PixelFormat.YUV10:
                 return _decklink.yuv10_to_rgb_float(
                     frame_data, width, height,
                     matrix=captured_frame.colorspace,
-                    input_narrow_range=input_narrow_range
+                    input_narrow_range=input_narrow_range,
+                    row_bytes=captured_frame.row_bytes
                 )
 
             elif pixel_format == _decklink.PixelFormat.RGB10:
                 return _decklink.rgb10_to_float(
                     frame_data, width, height,
-                    input_narrow_range=input_narrow_range
+                    input_narrow_range=input_narrow_range,
+                    row_bytes=captured_frame.row_bytes
                 )
 
             elif pixel_format == _decklink.PixelFormat.RGB12:
                 return _decklink.rgb12_to_float(
                     frame_data, width, height,
-                    input_narrow_range=input_narrow_range
+                    input_narrow_range=input_narrow_range,
+                    row_bytes=captured_frame.row_bytes
                 )
 
             elif pixel_format == _decklink.PixelFormat.BGRA:

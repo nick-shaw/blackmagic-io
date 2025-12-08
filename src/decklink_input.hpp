@@ -24,6 +24,7 @@ public:
         std::vector<uint8_t> data;
         int width;
         int height;
+        int rowBytes;
         PixelFormat format;
         DisplayMode mode;
         Gamut colorspace;

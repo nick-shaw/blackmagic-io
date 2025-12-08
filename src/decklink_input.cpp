@@ -257,6 +257,7 @@ void DeckLinkInput::onFrameArrived(IDeckLinkVideoInputFrame* videoFrame)
 
     tempFrame.width = videoFrame->GetWidth();
     tempFrame.height = videoFrame->GetHeight();
+    tempFrame.rowBytes = videoFrame->GetRowBytes();
     tempFrame.format = static_cast<PixelFormat>(videoFrame->GetPixelFormat());
     tempFrame.mode = m_currentSettings.mode;
 
