@@ -208,6 +208,10 @@ bool DeckLinkInput::startCapture(PixelFormat format)
         return false;
     }
 
+    // Set format detected to true after starting streams
+    // Format detection callback may not fire if incoming signal matches initial mode
+    m_formatDetected = true;
+
     return true;
 }
 
