@@ -886,6 +886,12 @@ class BlackmagicInput:
                 - 'colorspace': Matrix name (Rec.601/709/2020)
                 - 'eotf': Eotf name (SDR/PQ/HLG)
                 - 'input_narrow_range': bool (what was used for conversion)
+                - 'timecode': dict with timecode (if present):
+                    - 'hours': int (0-23)
+                    - 'minutes': int (0-59)
+                    - 'seconds': int (0-59)
+                    - 'frames': int (frame number within second)
+                    - 'is_drop_frame': bool (True for drop frame timecode)
                 - 'hdr_metadata': dict with HDR metadata (if present):
                     - 'display_primaries': dict with 'red', 'green', 'blue' (each with 'x', 'y')
                     - 'white_point': dict with 'x', 'y'
@@ -926,6 +932,15 @@ class BlackmagicInput:
             'eotf': eotf.name,
             'input_narrow_range': input_narrow_range
         }
+
+        if captured_frame.has_timecode:
+            result['timecode'] = {
+                'hours': captured_frame.timecode_hours,
+                'minutes': captured_frame.timecode_minutes,
+                'seconds': captured_frame.timecode_seconds,
+                'frames': captured_frame.timecode_frames,
+                'is_drop_frame': captured_frame.timecode_is_drop_frame
+            }
 
         hdr_metadata = {}
 
@@ -1019,6 +1034,12 @@ class BlackmagicInput:
                 - 'colorspace': Matrix (Rec.601/709/2020)
                 - 'eotf': Eotf (SDR/PQ/HLG)
                 - 'input_narrow_range': bool (what was used for conversion)
+                - 'timecode': dict with timecode (if present):
+                    - 'hours': int (0-23)
+                    - 'minutes': int (0-59)
+                    - 'seconds': int (0-59)
+                    - 'frames': int (frame number within second)
+                    - 'is_drop_frame': bool (True for drop frame timecode)
                 - 'hdr_metadata': dict with HDR metadata (if present):
                     - 'display_primaries': dict with 'red', 'green', 'blue' (each with 'x', 'y')
                     - 'white_point': dict with 'x', 'y'
@@ -1059,6 +1080,15 @@ class BlackmagicInput:
             'eotf': eotf.name,
             'input_narrow_range': input_narrow_range
         }
+
+        if captured_frame.has_timecode:
+            result['timecode'] = {
+                'hours': captured_frame.timecode_hours,
+                'minutes': captured_frame.timecode_minutes,
+                'seconds': captured_frame.timecode_seconds,
+                'frames': captured_frame.timecode_frames,
+                'is_drop_frame': captured_frame.timecode_is_drop_frame
+            }
 
         hdr_metadata = {}
 

@@ -100,6 +100,7 @@ DeckLinkInput::DeckLinkInput()
     m_lastFrame.hasMasteringLuminance = false;
     m_lastFrame.hasMaxCLL = false;
     m_lastFrame.hasMaxFALL = false;
+    m_lastFrame.hasTimecode = false;
 }
 
 DeckLinkInput::~DeckLinkInput()
@@ -273,6 +274,7 @@ void DeckLinkInput::onFrameArrived(IDeckLinkVideoInputFrame* videoFrame)
     tempFrame.hasMasteringLuminance = false;
     tempFrame.hasMaxCLL = false;
     tempFrame.hasMaxFALL = false;
+    tempFrame.hasTimecode = false;
 
     IDeckLinkVideoFrameMetadataExtensions* metadataExt = nullptr;
     if (videoFrame->QueryInterface(IID_IDeckLinkVideoFrameMetadataExtensions, (void**)&metadataExt) == S_OK) {
@@ -340,6 +342,20 @@ void DeckLinkInput::onFrameArrived(IDeckLinkVideoInputFrame* videoFrame)
         }
 
         metadataExt->Release();
+    }
+
+    IDeckLinkTimecode* timecode = nullptr;
+    if (videoFrame->GetTimecode(bmdTimecodeRP188Any, &timecode) == S_OK && timecode != nullptr) {
+        uint8_t hours, minutes, seconds, frames;
+        if (timecode->GetComponents(&hours, &minutes, &seconds, &frames) == S_OK) {
+            tempFrame.hasTimecode = true;
+            tempFrame.timecodeHours = hours;
+            tempFrame.timecodeMinutes = minutes;
+            tempFrame.timecodeSeconds = seconds;
+            tempFrame.timecodeFrames = frames;
+            tempFrame.timecodeIsDropFrame = (timecode->GetFlags() & bmdTimecodeIsDropFrame) != 0;
+        }
+        timecode->Release();
     }
 
     void* frameBytes;

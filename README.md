@@ -23,6 +23,7 @@ Written by Nick Shaw, www.antlerpost.com, with a lot of help from [Claude Code](
 - **Automatic Format Conversion**: Convert all DeckLink pixel formats to RGB float
 - **Format Detection**: Automatic detection of input signal format (resolution, frame rate, colorspace, EOTF)
 - **Metadata Access**: Access to format metadata (pixel format, colorspace, EOTF, source range)
+- **Timecode Capture**: Automatic extraction of embedded timecode (RP188 VITC/LTC/HFRTC)
 
 ### General
 - **Cross-Platform**: Works on Windows, macOS, and Linux (this is in theory – only macOS build fully tested so far)
@@ -151,6 +152,12 @@ with BlackmagicInput() as input_device:
         print(f"Colorspace: {frame_data['colorspace']}")
         print(f"EOTF: {frame_data['eotf']}")
         print(f"Narrow range source: {frame_data['input_narrow_range']}")
+
+        # Access timecode if present
+        if 'timecode' in frame_data:
+            tc = frame_data['timecode']
+            separator = ';' if tc['is_drop_frame'] else ':'
+            print(f"Timecode: {tc['hours']:02d}:{tc['minutes']:02d}:{tc['seconds']:02d}{separator}{tc['frames']:02d}")
 
         # Access HDR metadata if present
         if 'hdr_metadata' in frame_data:
@@ -592,6 +599,14 @@ class CapturedFrame:
     eotf: Eotf                        # Transfer function (SDR/PQ/HLG)
     has_metadata: bool                # Whether metadata is present
 
+    # Timecode (if present)
+    has_timecode: bool                # Whether timecode is present
+    timecode_hours: int               # Timecode hours (0-23)
+    timecode_minutes: int             # Timecode minutes (0-59)
+    timecode_seconds: int             # Timecode seconds (0-59)
+    timecode_frames: int              # Timecode frames (frame number within second)
+    timecode_is_drop_frame: bool      # True for drop frame timecode
+
     # HDR metadata (if present)
     display_primaries_red_x: float
     display_primaries_red_y: float
@@ -616,7 +631,7 @@ class CapturedFrame:
     has_max_fall: bool
 ```
 
-Used by the low-level `DeckLinkInput.capture_frame()` method. Contains raw frame data plus all detected metadata including HDR information.
+Used by the low-level `DeckLinkInput.capture_frame()` method. Contains raw frame data plus all detected metadata including timecode and HDR information.
 
 ### Low-Level API: DeckLinkInput Class
 

@@ -23,6 +23,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Content light levels (MaxCLL and MaxFALL in cd/m²)
   - All metadata fields are optional and only included when present in the signal
   - Accessible via `'hdr_metadata'` dictionary key in returned frame data
+- **Timecode capture**: Input API now captures timecode from incoming video signals
+  - Automatically extracts timecode from RP188 VITC, LTC, or high frame rate timecode sources
+  - Accessible via `'timecode'` dictionary key in `capture_frame_with_metadata()` and `capture_frame_as_uint8_with_metadata()`
+  - Includes hours, minutes, seconds, frames, and drop frame flag
+  - Low-level API exposes timecode through `CapturedFrame` struct fields
 
 ### Changed
 - **BREAKING**: Library renamed from `blackmagic-output` to `blackmagic-io` to reflect input/output support

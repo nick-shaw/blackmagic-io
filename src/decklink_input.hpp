@@ -53,6 +53,13 @@ public:
 
         double maxFrameAverageLightLevel;
         bool hasMaxFALL;
+
+        bool hasTimecode;
+        uint8_t timecodeHours;
+        uint8_t timecodeMinutes;
+        uint8_t timecodeSeconds;
+        uint8_t timecodeFrames;
+        bool timecodeIsDropFrame;
     };
 
     DeckLinkInput();

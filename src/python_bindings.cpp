@@ -2410,7 +2410,13 @@ PYBIND11_MODULE(decklink_io, m) {
         .def_readonly("max_content_light_level", &DeckLinkInput::CapturedFrame::maxContentLightLevel)
         .def_readonly("has_max_cll", &DeckLinkInput::CapturedFrame::hasMaxCLL)
         .def_readonly("max_frame_average_light_level", &DeckLinkInput::CapturedFrame::maxFrameAverageLightLevel)
-        .def_readonly("has_max_fall", &DeckLinkInput::CapturedFrame::hasMaxFALL);
+        .def_readonly("has_max_fall", &DeckLinkInput::CapturedFrame::hasMaxFALL)
+        .def_readonly("has_timecode", &DeckLinkInput::CapturedFrame::hasTimecode)
+        .def_readonly("timecode_hours", &DeckLinkInput::CapturedFrame::timecodeHours)
+        .def_readonly("timecode_minutes", &DeckLinkInput::CapturedFrame::timecodeMinutes)
+        .def_readonly("timecode_seconds", &DeckLinkInput::CapturedFrame::timecodeSeconds)
+        .def_readonly("timecode_frames", &DeckLinkInput::CapturedFrame::timecodeFrames)
+        .def_readonly("timecode_is_drop_frame", &DeckLinkInput::CapturedFrame::timecodeIsDropFrame);
 
     // Input - DeckLinkInput class
     py::class_<DeckLinkInput>(m, "DeckLinkInput")
