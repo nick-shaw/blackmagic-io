@@ -69,8 +69,6 @@ bool DeckLinkOutput::setupOutput(const VideoSettings& settings)
         return false;
     }
 
-    m_currentSettings = settings;
-
     IDeckLinkDisplayModeIterator* displayModeIterator = nullptr;
     if (m_deckLinkOutput->GetDisplayModeIterator(&displayModeIterator) != S_OK) {
         std::cerr << "Could not get display mode iterator" << std::endl;
@@ -110,6 +108,8 @@ bool DeckLinkOutput::setupOutput(const VideoSettings& settings)
         m_deckLinkOutput->DisableVideoOutput();
         m_outputEnabled = false;
     }
+
+    m_currentSettings = settings;
 
     if (!m_outputEnabled) {
         if (m_deckLinkOutput->EnableVideoOutput(static_cast<BMDDisplayMode>(settings.mode),
