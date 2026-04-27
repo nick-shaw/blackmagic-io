@@ -1,5 +1,7 @@
 # Blackmagic DeckLink Python I/O Library
 
+*Continuation of [blackmagic-output](https://github.com/nick-shaw/blackmagic-output) (now archived) with input/capture support added; the package was renamed in 0.16.0b0 to reflect the broader scope.*
+
 A Python library for video I/O with Blackmagic DeckLink devices using the official DeckLink SDK. This library provides a simple interface for displaying static frames, solid colors, and dynamic content from NumPy arrays, as well as for capturing frames to NumPy arrays.
 
 Written by Nick Shaw, www.antlerpost.com, with a lot of help from [Claude Code](https://www.claude.com/product/claude-code)!
