@@ -168,11 +168,11 @@ enum class InputConnection {
 };
 
 struct VideoSettings {
-    DisplayMode mode;
-    PixelFormat format;
-    int width;
-    int height;
-    double framerate;
+    DisplayMode mode = DisplayMode::HD1080p25;
+    PixelFormat format = PixelFormat::Format10BitYUV;
+    int width = 1920;
+    int height = 1080;
+    double framerate = 25.0;
     Gamut colorimetry = Gamut::Rec709;
     Eotf eotf = Eotf::SDR;
 };
