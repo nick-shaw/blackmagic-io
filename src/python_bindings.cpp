@@ -2232,9 +2232,21 @@ PYBIND11_MODULE(decklink_io, m) {
         .def("is_pixel_format_supported", &DeckLinkOutput::isPixelFormatSupported,
              "Check if pixel format is supported for given display mode",
              py::arg("mode"), py::arg("format"))
-        .def("set_hdr_metadata", &DeckLinkOutput::setHdrMetadata, "Set HDR metadata with default values",
+        .def("set_hdr_metadata", &DeckLinkOutput::setHdrMetadata,
+             "Set HDR metadata with default values. Stores the values; the next "
+             "display_frame() call attaches them to the emitted frame. HDMI note: "
+             "BMD's HDMI driver caches the HDR Static Metadata InfoFrame, so a "
+             "subsequent display_frame() call is required for HDMI consumers to "
+             "see updated values mid-stream. SDI carries metadata per-frame and "
+             "updates on the next frame without any extra step.",
              py::arg("colorimetry"), py::arg("eotf"))
-        .def("set_hdr_metadata_custom", &DeckLinkOutput::setHdrMetadataCustom, "Set HDR metadata with custom values",
+        .def("set_hdr_metadata_custom", &DeckLinkOutput::setHdrMetadataCustom,
+             "Set HDR metadata with custom values. Stores the values; the next "
+             "display_frame() call attaches them to the emitted frame. HDMI note: "
+             "BMD's HDMI driver caches the HDR Static Metadata InfoFrame, so a "
+             "subsequent display_frame() call is required for HDMI consumers to "
+             "see updated values mid-stream. SDI carries metadata per-frame and "
+             "updates on the next frame without any extra step.",
              py::arg("colorimetry"), py::arg("eotf"), py::arg("custom"))
         .def("clear_hdr_metadata", &DeckLinkOutput::clearHdrMetadata, "Clear HDR metadata and reset to SDR")
         .def("get_current_output_info", &DeckLinkOutput::getCurrentOutputInfo, "Get current output configuration info")

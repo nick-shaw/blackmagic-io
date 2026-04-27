@@ -28,6 +28,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Capture buffer alignment: `DeckLinkInput` now uses `IDeckLinkVideoFrame::GetRowBytes()` rather than computing row size from width and pixel format, so capture buffers correctly account for any driver-applied row padding.
 - Output range preservation: super-whites (above the narrow-range maximum) and sub-blacks (below the narrow-range minimum) are no longer clamped to the legal range during float-to-integer conversion.
 
+### Documentation
+- Documented HDMI vs SDI behaviour when changing HDR static metadata mid-stream: SDI carries metadata per-frame in the VPID and updates immediately on the next frame, but the HDMI HDR Static Metadata InfoFrame is sticky and does not refresh until new video data is sent. Consumers updating metadata mid-stream over HDMI must call `display_frame()` again (the same frame contents are sufficient) for the new metadata to reach the sink. Captured in the `set_hdr_metadata*()` docstrings and the README.
+
 ### Notes
 - Verified end-to-end on the SDI and HDMI metadata loopback tests: SDR, PQ Rec.2020, PQ Rec.709, and HLG Rec.2020 round-trip correctly. The HDR Traditional Gamma case fails on test hardware — likely a BMD/source signalling limitation rather than a library issue.
 - 8-bit BGRA / 8-bit YUV cases in `tests/test_loopback.py` show higher conversion error than the 10/12-bit cases. This appears to be a pre-existing precision/quantisation characteristic of the 8-bit pipeline, not a regression introduced in this release.

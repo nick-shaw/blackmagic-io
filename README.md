@@ -491,6 +491,8 @@ Set HDR metadata with custom values. Must be called before `setup_output()`.
 **`clear_hdr_metadata()`**
 Clear HDR metadata and reset to SDR. Call before `setup_output()` if you want to ensure no HDR metadata is present.
 
+**HDMI vs SDI when changing HDR metadata mid-stream:** SDI carries metadata per-frame in the VPID, so SDI consumers see updated metadata on the very next frame after a `set_hdr_metadata*()` call. On HDMI, the HDR Static Metadata InfoFrame is sticky — it does not update until new video data is sent — so after changing metadata mid-stream you must call `display_frame()` again for HDMI consumers to see the new values. The frame contents do not need to change; pushing the same frame is enough to refresh the InfoFrame.
+
 **`setup_output(settings: VideoSettings) -> bool`**
 Setup output with detailed settings.
 

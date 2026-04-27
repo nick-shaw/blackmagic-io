@@ -57,6 +57,13 @@ public:
     std::vector<std::string> getDeviceList();
     VideoSettings getVideoSettings(DisplayMode mode);
     bool isPixelFormatSupported(DisplayMode mode, PixelFormat format);
+
+    // Set HDR static metadata. Stores the values; the next displayFrame()
+    // call attaches them to the emitted frame. HDMI note: BMD's HDMI driver
+    // caches the HDR Static Metadata InfoFrame; calling displayFrame() again
+    // (with updated metadata) is required for HDMI consumers to see the new
+    // values. SDI carries metadata per-frame so SDI consumers see updates
+    // immediately on the next frame without any extra step.
     void setHdrMetadata(Gamut colorimetry, Eotf eotf);
     void setHdrMetadataCustom(Gamut colorimetry, Eotf eotf, const HdrMetadataCustom& custom);
     void clearHdrMetadata();
