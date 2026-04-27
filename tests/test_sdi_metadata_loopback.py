@@ -66,9 +66,9 @@ TEST_CASES = [
         False,
     ),
     (
-        "HDR Traditional Gamma Rec.709",
-        decklink_io.Gamut.Rec709,
-        decklink_io.Eotf.HDR_Traditional,
+        "SDR Rec.2020 (matrix signalling without HDR EOTF)",
+        decklink_io.Gamut.Rec2020,
+        decklink_io.Eotf.SDR,
         None,
         False,
     ),
@@ -111,7 +111,7 @@ TEST_CASES = [
 
 
 def configure_output_metadata(output_device, gamut, eotf, custom_kwargs):
-    if eotf == decklink_io.Eotf.SDR:
+    if eotf == decklink_io.Eotf.SDR and gamut == decklink_io.Gamut.Rec709:
         output_device.clear_hdr_metadata()
         return None
 
@@ -149,7 +149,7 @@ def verify_metadata(case_name, gamut, eotf, custom_kwargs, expect_full_mastering
     if frame.eotf != eotf:
         failures.append(f"EOTF mismatch: expected {eotf}, got {frame.eotf}")
 
-    if eotf != decklink_io.Eotf.SDR and frame.colorspace != gamut:
+    if frame.colorspace != gamut:
         failures.append(f"Colorspace mismatch: expected {gamut}, got {frame.colorspace}")
 
     if expect_full_mastering:
