@@ -140,7 +140,7 @@ if(CMAKE_SYSTEM_NAME STREQUAL "Darwin")
     target_compile_options(decklink_io PRIVATE -framework CoreFoundation)
     target_link_options(decklink_io PRIVATE -framework CoreFoundation)
 elseif(CMAKE_SYSTEM_NAME STREQUAL "Windows")
-    target_compile_definitions(decklink_io PRIVATE WIN32_LEAN_AND_MEAN)
+    target_compile_definitions(decklink_io PRIVATE WIN32_LEAN_AND_MEAN NOMINMAX)
 endif()
 
 # Install the module

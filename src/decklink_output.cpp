@@ -5,6 +5,8 @@
 
 #ifdef __APPLE__
     #include <CoreFoundation/CoreFoundation.h>
+#elif defined(_WIN32)
+    #include <comutil.h>
 #endif
 
 DeckLinkOutput::DeckLinkOutput()
