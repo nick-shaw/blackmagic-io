@@ -23,10 +23,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Default HDMI input EDID**: now advertises `SDR | HDR Static PQ | HDR Static HLG`, expanding the SDK default of `SDR | HDR Static PQ`. Existing consumers gain correct HLG detection without code changes; HDR-aware HDMI sources may now transmit HDR Static Metadata for HLG signals where they previously stripped it.
 
 ### Fixed
+- **Capture returning BMD no-signal placeholder frames**: `onFrameArrived` now checks the `bmdFrameHasNoInputSource` flag on each incoming frame and skips placeholder frames entirely, signalling format-detection on the first real-signal frame. This replaces an earlier workaround that set the format-detected flag unconditionally after `StartStreams()`, which caused `captureFrame()` to return uniform-black placeholder frames when called before BMD had locked onto the source. The new approach also fixes the original "format-detected callback never fires when the signal mode matches the initial enable mode" timeout bug that the workaround was trying to address.
 - Mode change detection in `DeckLinkOutput::setupOutput()`: the `m_currentSettings = settings` assignment was being made before the `m_currentSettings.mode != settings.mode` comparison, so the comparison was always equal and the output was never disabled/re-enabled when the display mode changed. Assignment is now made after the comparison.
-- Format detection timeout when the input signal matches the initial mode: the format-changed callback does not fire in this case, so `captureFrame()` could time out waiting for format detection. The detected flag is now set unconditionally after `StartStreams()`.
 - Capture buffer alignment: `DeckLinkInput` now uses `IDeckLinkVideoFrame::GetRowBytes()` rather than computing row size from width and pixel format, so capture buffers correctly account for any driver-applied row padding.
 - Output range preservation: super-whites (above the narrow-range maximum) and sub-blacks (below the narrow-range minimum) are no longer clamped to the legal range during float-to-integer conversion.
+
+### Notes
+- Verified end-to-end on the SDI and HDMI metadata loopback tests: SDR, PQ Rec.2020, PQ Rec.709, and HLG Rec.2020 round-trip correctly. The HDR Traditional Gamma case fails on test hardware — likely a BMD/source signalling limitation rather than a library issue.
+- 8-bit BGRA / 8-bit YUV cases in `tests/test_loopback.py` show higher conversion error than the 10/12-bit cases. This appears to be a pre-existing precision/quantisation characteristic of the 8-bit pipeline, not a regression introduced in this release.
 
 ## [0.16.0b0] - 2025-12-03
 

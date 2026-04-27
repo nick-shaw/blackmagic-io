@@ -2421,8 +2421,16 @@ PYBIND11_MODULE(decklink_io, m) {
     // Input - DeckLinkInput class
     py::class_<DeckLinkInput>(m, "DeckLinkInput")
         .def(py::init<>())
-        .def("initialize", &DeckLinkInput::initialize, "Initialize DeckLink device for input",
-             py::arg("device_index") = 0, py::arg("input_connection") = nullptr)
+        .def("initialize",
+             [](DeckLinkInput& self, int device_index, py::object input_connection) {
+                 if (input_connection.is_none()) {
+                     return self.initialize(device_index, nullptr);
+                 }
+                 auto conn = input_connection.cast<DeckLinkInput::InputConnection>();
+                 return self.initialize(device_index, &conn);
+             },
+             "Initialize DeckLink device for input",
+             py::arg("device_index") = 0, py::arg("input_connection") = py::none())
         .def("start_capture", &DeckLinkInput::startCapture, "Start capturing with specified or auto-detected format",
              py::arg("format") = DeckLink::PixelFormat::Format10BitYUV)
         .def("capture_frame", &DeckLinkInput::captureFrame, "Capture a single frame",

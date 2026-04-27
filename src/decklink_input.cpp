@@ -218,10 +218,6 @@ bool DeckLinkInput::startCapture(PixelFormat format)
         return false;
     }
 
-    // Set format detected to true after starting streams
-    // Format detection callback may not fire if incoming signal matches initial mode
-    m_formatDetected = true;
-
     return true;
 }
 
@@ -267,6 +263,12 @@ bool DeckLinkInput::captureFrame(CapturedFrame& frame, int timeoutMs)
 
 void DeckLinkInput::onFrameArrived(IDeckLinkVideoInputFrame* videoFrame)
 {
+    if (videoFrame->GetFlags() & bmdFrameHasNoInputSource) {
+        return;
+    }
+
+    m_formatDetected = true;
+
     CapturedFrame tempFrame;
 
     tempFrame.width = videoFrame->GetWidth();
