@@ -2435,7 +2435,14 @@ PYBIND11_MODULE(decklink_io, m) {
         .def("get_available_input_connections", &DeckLinkInput::getAvailableInputConnections,
              "Get available input connections for a device", py::arg("device_index") = 0)
         .def("get_video_settings", &DeckLinkInput::getVideoSettings, "Get video settings for display mode")
-        .def("get_supported_display_modes", &DeckLinkInput::getSupportedDisplayModes, "Get list of supported display modes");
+        .def("get_supported_display_modes", &DeckLinkInput::getSupportedDisplayModes, "Get list of supported display modes")
+        .def("set_hdmi_input_dynamic_ranges", &DeckLinkInput::setHDMIInputDynamicRanges,
+             "Set HDMI EDID advertised BMDDynamicRange bitmask. Default is "
+             "SDR | HDR Static PQ | HDR Static HLG. Pass any combination of "
+             "BMDDynamicRange bits as int64. May be called before or after "
+             "initialize(); no effect on non-HDMI connections or hardware "
+             "lacking IDeckLinkHDMIInputEDID.",
+             py::arg("dynamic_range_mask"));
 
     // Version info
     m.attr("__version__") = "0.16.0b0";

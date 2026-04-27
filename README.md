@@ -24,6 +24,7 @@ Written by Nick Shaw, www.antlerpost.com, with a lot of help from [Claude Code](
 - **Format Detection**: Automatic detection of input signal format (resolution, frame rate, colorspace, EOTF)
 - **Metadata Access**: Access to format metadata (pixel format, colorspace, EOTF, source range)
 - **Timecode Capture**: Automatic extraction of embedded timecode (RP188 VITC/LTC/HFRTC)
+- **HDMI EDID Configuration**: Advertises SDR, HDR PQ, and HDR HLG support over HDMI by default so HDR sources transmit HDR Static Metadata (the SDK default omits HLG); the advertised bitmask is configurable via `set_hdmi_input_dynamic_ranges()`
 
 ### General
 - **Cross-Platform**: Works on Windows, macOS, and Linux (this is in theory – only macOS build fully tested so far)
@@ -683,6 +684,13 @@ Get video settings for a display mode.
 
 **`get_supported_display_modes() -> List[DisplayModeInfo]`**
 Get list of supported display modes for the initialized device.
+
+**`set_hdmi_input_dynamic_ranges(dynamic_range_mask: int) -> bool`**
+Set the BMDDynamicRange bitmask advertised in the HDMI input EDID. Sources read this to decide which transfer functions they may transmit. Pass any combination of BMDDynamicRange bits as a single int — values are passed through to the SDK so newer SDKs adding additional bits work without library changes.
+- `dynamic_range_mask`: Bitwise OR of `bmdDynamicRangeSDR` (0), `bmdDynamicRangeHDRStaticPQ` (1 << 29), and/or `bmdDynamicRangeHDRStaticHLG` (1 << 30)
+- Returns: True if the mask was stored or applied successfully
+
+The library defaults to advertising `SDR | HDR Static PQ | HDR Static HLG`. The SDK default omits HLG, which causes many HDMI sources to strip HDR Static Metadata when transmitting HLG; the library's default fixes that. May be called before or after `initialize()`. Has no effect on non-HDMI connections or on hardware that does not expose `IDeckLinkHDMIInputEDID` (older devices) — these cases soft-fail and capture proceeds normally. The library releases its EDID interface in `cleanup()`, which restores the default EDID per the SDK.
 
 **`cleanup()`**
 Cleanup and release resources.

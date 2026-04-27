@@ -71,6 +71,16 @@ public:
     bool stopCapture();
     void cleanup();
 
+    // Set the BMDDynamicRange bitmask advertised in the HDMI input EDID so
+    // sources know which transfer functions they may transmit. Default is
+    // bmdDynamicRangeSDR | bmdDynamicRangeHDRStaticPQ | bmdDynamicRangeHDRStaticHLG.
+    // Pass any combination of BMDDynamicRange bits as an int64_t. May be called
+    // before or after initialize(); if called before, the mask is applied at
+    // initialize() time. Has no effect on non-HDMI connections or on hardware
+    // that does not expose IDeckLinkHDMIInputEDID. The library releases its
+    // reference on cleanup, which restores the EDID to its default per the SDK.
+    bool setHDMIInputDynamicRanges(int64_t bmdDynamicRangeMask);
+
     VideoSettings getDetectedFormat();
     PixelFormat getDetectedPixelFormat();
 
@@ -85,7 +95,12 @@ private:
     IDeckLink* m_deckLink;
     IDeckLinkInput* m_deckLinkInput;
     IDeckLinkConfiguration* m_deckLinkConfiguration;
+    IDeckLinkHDMIInputEDID* m_hdmiInputEDID;
     DeckLinkInputCallback* m_callback;
+
+    int64_t m_hdmiInputDynamicRanges;
+
+    bool applyHDMIInputDynamicRanges();
 
     VideoSettings m_currentSettings;
     std::atomic<bool> m_inputEnabled;

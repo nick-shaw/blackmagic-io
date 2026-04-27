@@ -86,7 +86,9 @@ DeckLinkInput::DeckLinkInput()
     : m_deckLink(nullptr)
     , m_deckLinkInput(nullptr)
     , m_deckLinkConfiguration(nullptr)
+    , m_hdmiInputEDID(nullptr)
     , m_callback(nullptr)
+    , m_hdmiInputDynamicRanges(bmdDynamicRangeSDR | bmdDynamicRangeHDRStaticPQ | bmdDynamicRangeHDRStaticHLG)
     , m_inputEnabled(false)
     , m_frameReceived(false)
     , m_formatDetected(false)
@@ -142,6 +144,13 @@ bool DeckLinkInput::initialize(int deviceIndex, InputConnection* inputConnection
             std::cerr << "Could not set input connection" << std::endl;
             return false;
         }
+    }
+
+    int64_t activeConnection = 0;
+    if (m_deckLinkConfiguration->GetInt(bmdDeckLinkConfigVideoInputConnection,
+                                        &activeConnection) == S_OK
+        && activeConnection == bmdVideoConnectionHDMI) {
+        applyHDMIInputDynamicRanges();
     }
 
     if (m_deckLink->QueryInterface(IID_IDeckLinkInput, (void**)&m_deckLinkInput) != S_OK) {
@@ -449,6 +458,47 @@ bool DeckLinkInput::stopCapture()
     return true;
 }
 
+bool DeckLinkInput::setHDMIInputDynamicRanges(int64_t bmdDynamicRangeMask)
+{
+    m_hdmiInputDynamicRanges = bmdDynamicRangeMask;
+
+    if (!m_deckLink || !m_deckLinkConfiguration) {
+        return true;
+    }
+
+    int64_t activeConnection = 0;
+    if (m_deckLinkConfiguration->GetInt(bmdDeckLinkConfigVideoInputConnection,
+                                        &activeConnection) != S_OK
+        || activeConnection != bmdVideoConnectionHDMI) {
+        return true;
+    }
+
+    return applyHDMIInputDynamicRanges();
+}
+
+bool DeckLinkInput::applyHDMIInputDynamicRanges()
+{
+    if (!m_hdmiInputEDID) {
+        if (m_deckLink->QueryInterface(IID_IDeckLinkHDMIInputEDID,
+                                       (void**)&m_hdmiInputEDID) != S_OK) {
+            m_hdmiInputEDID = nullptr;
+            return true;
+        }
+    }
+
+    if (m_hdmiInputEDID->SetInt(bmdDeckLinkHDMIInputEDIDDynamicRange,
+                                m_hdmiInputDynamicRanges) != S_OK
+        || m_hdmiInputEDID->WriteToEDID() != S_OK) {
+        std::cerr << "Could not write HDMI input EDID for HDR — "
+                     "source may not send HDR metadata" << std::endl;
+        m_hdmiInputEDID->Release();
+        m_hdmiInputEDID = nullptr;
+        return false;
+    }
+
+    return true;
+}
+
 void DeckLinkInput::cleanup()
 {
     stopCapture();
@@ -466,6 +516,11 @@ void DeckLinkInput::cleanup()
     if (m_deckLinkConfiguration) {
         m_deckLinkConfiguration->Release();
         m_deckLinkConfiguration = nullptr;
+    }
+
+    if (m_hdmiInputEDID) {
+        m_hdmiInputEDID->Release();
+        m_hdmiInputEDID = nullptr;
     }
 
     if (m_deckLink) {

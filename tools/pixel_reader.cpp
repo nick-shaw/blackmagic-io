@@ -835,6 +835,7 @@ int main(int argc, char** argv)
     IDeckLink* deckLink = NULL;
     IDeckLinkInput* deckLinkInput = NULL;
     IDeckLinkConfiguration* deckLinkConfiguration = NULL;  // Keep this alive for the session
+    IDeckLinkHDMIInputEDID* hdmiInputEDID = NULL;  // Releasing restores default EDID per SDK
     NotificationCallback* notificationCallback = NULL;
 
     HRESULT result;
@@ -926,6 +927,30 @@ int main(int argc, char** argv)
         }
     }
 
+    // Advertise SDR + HDR PQ + HDR HLG in the HDMI EDID so HDMI sources transmit
+    // HDR static metadata. Default EDID omits HLG. HDMI-only; soft-fails on
+    // hardware that does not expose IDeckLinkHDMIInputEDID.
+    {
+        int64_t activeConnection = 0;
+        if (deckLinkConfiguration->GetInt(bmdDeckLinkConfigVideoInputConnection,
+                                          &activeConnection) == S_OK
+            && activeConnection == bmdVideoConnectionHDMI) {
+            if (deckLink->QueryInterface(IID_IDeckLinkHDMIInputEDID,
+                                         (void**)&hdmiInputEDID) == S_OK) {
+                const int64_t ranges = bmdDynamicRangeSDR
+                                     | bmdDynamicRangeHDRStaticPQ
+                                     | bmdDynamicRangeHDRStaticHLG;
+                if (hdmiInputEDID->SetInt(bmdDeckLinkHDMIInputEDIDDynamicRange, ranges) != S_OK
+                    || hdmiInputEDID->WriteToEDID() != S_OK) {
+                    fprintf(stderr, "Could not write HDMI input EDID for HDR — "
+                                    "source may not send HDR metadata\n");
+                    hdmiInputEDID->Release();
+                    hdmiInputEDID = NULL;
+                }
+            }
+        }
+    }
+
     // Obtain the input interface for the DeckLink device AFTER configuring input connection
     result = deckLink->QueryInterface(IID_IDeckLinkInput, (void**)&deckLinkInput);
     if (result != S_OK)
@@ -995,6 +1020,10 @@ bail:
     // Release the configuration interface
     if (deckLinkConfiguration != NULL)
         deckLinkConfiguration->Release();
+
+    // Release the HDMI input EDID interface (restores default EDID per SDK)
+    if (hdmiInputEDID != NULL)
+        hdmiInputEDID->Release();
 
     // Release the video input interface
     if (deckLinkInput != NULL)
