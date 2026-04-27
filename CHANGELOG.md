@@ -5,6 +5,29 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.17.0b0] - 2026-04-27
+
+### Added
+- **HDMI input EDID dynamic range advertisement**: The HDMI EDID now advertises the transfer functions the input is willing to receive, so HDR sources transmit HDR Static Metadata. The SDK default omits HLG, which causes many HDMI sources to strip HDR Static Metadata when transmitting HLG signals.
+  - New low-level method `DeckLinkInput::setHDMIInputDynamicRanges(int64_t bmdDynamicRangeMask)` (C++)
+  - New Python binding `DeckLinkInput.set_hdmi_input_dynamic_ranges(dynamic_range_mask)`
+  - Mask is a passthrough of `BMDDynamicRange` bits (`bmdDynamicRangeSDR | bmdDynamicRangeHDRStaticPQ | bmdDynamicRangeHDRStaticHLG`) so newer SDKs adding additional bits work without library changes
+  - May be called before or after `initialize()`; soft-fails on non-HDMI connections and on hardware that does not expose `IDeckLinkHDMIInputEDID`
+  - The library releases its EDID interface in `cleanup()`, restoring the default EDID per the SDK
+- `tools/pixel_reader` writes the same default EDID dynamic range mask when the active input is HDMI, so the diagnostic tool reports HLG correctly out of the box
+- New tests for HDR static metadata round-trip:
+  - `tests/test_hdmi_metadata_loopback.py` — exercises SDR, HDR Traditional, PQ Rec.2020, PQ Rec.709, and HLG Rec.2020 over an HDMI loopback
+  - `tests/test_sdi_metadata_loopback.py` — mirror over an SDI BNC loopback for transport-isolation diagnostics
+
+### Changed
+- **Default HDMI input EDID**: now advertises `SDR | HDR Static PQ | HDR Static HLG`, expanding the SDK default of `SDR | HDR Static PQ`. Existing consumers gain correct HLG detection without code changes; HDR-aware HDMI sources may now transmit HDR Static Metadata for HLG signals where they previously stripped it.
+
+### Fixed
+- Mode change detection in `DeckLinkOutput::setupOutput()`: the `m_currentSettings = settings` assignment was being made before the `m_currentSettings.mode != settings.mode` comparison, so the comparison was always equal and the output was never disabled/re-enabled when the display mode changed. Assignment is now made after the comparison.
+- Format detection timeout when the input signal matches the initial mode: the format-changed callback does not fire in this case, so `captureFrame()` could time out waiting for format detection. The detected flag is now set unconditionally after `StartStreams()`.
+- Capture buffer alignment: `DeckLinkInput` now uses `IDeckLinkVideoFrame::GetRowBytes()` rather than computing row size from width and pixel format, so capture buffers correctly account for any driver-applied row padding.
+- Output range preservation: super-whites (above the narrow-range maximum) and sub-blacks (below the narrow-range minimum) are no longer clamped to the legal range during float-to-integer conversion.
+
 ## [0.16.0b0] - 2025-12-03
 
 ### Added
