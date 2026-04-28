@@ -10,7 +10,7 @@ name = "blackmagic-io"
 version = "0.17.0b0"
 description = "Python library for video I/O with Blackmagic DeckLink devices"
 readme = "README.md"
-requires-python = ">=3.7"
+requires-python = ">=3.8"
 authors = [
     {name = "Nick Shaw", email = "nick@antlerpost.com"}
 ]
@@ -24,13 +24,13 @@ classifiers = [
     "Topic :: Multimedia :: Video",
     "Topic :: Software Development :: Libraries :: Python Modules",
     "Programming Language :: Python :: 3",
-    "Programming Language :: Python :: 3.7",
     "Programming Language :: Python :: 3.8",
     "Programming Language :: Python :: 3.9",
     "Programming Language :: Python :: 3.10",
     "Programming Language :: Python :: 3.11",
     "Programming Language :: Python :: 3.12",
     "Programming Language :: Python :: 3.13",
+    "Programming Language :: Python :: 3.14",
     "Programming Language :: C++",
     "Operating System :: OS Independent",
 ]

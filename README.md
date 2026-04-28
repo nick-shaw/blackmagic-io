@@ -34,7 +34,7 @@ Written by Nick Shaw, www.antlerpost.com, with a lot of help from [Claude Code](
 ## Requirements
 
 ### System Requirements
-- Python 3.7 or higher
+- Python 3.8 or higher
 - Blackmagic DeckLink device (DeckLink, UltraStudio, or Intensity series)
 - Blackmagic Desktop Video software installed
 
@@ -58,14 +58,26 @@ The build system (CMake + scikit-build-core) automatically uses the correct plat
 
 **⚠️ Important:** This library was built against SDK v14.1 to maintain compatibility with older macOS versions. If you need to download the SDK separately, ensure you get v14.1 from the [Blackmagic Design developer site](https://www.blackmagicdesign.com/developer/). Newer versions (v15.0+) may cause API compatibility issues and build failures.
 
-### 2. Build and Install the Library
+### 2. Install the Library
+
+**Option A (recommended for most users): from PyPI**
 
 ```bash
-# Clone or download the library files
+pip install blackmagic-io==0.17.0b0
+```
+
+The explicit version pin is required because this is a beta release and `pip` skips pre-releases by default. (Once a non-beta version is published, `pip install blackmagic-io` without the version will work.) Pre-built wheels are available for Python 3.8–3.14 on macOS, Linux, and Windows; pip falls back to a source build on unsupported Pythons (which requires a C++ compiler — Xcode Command Line Tools on macOS, build-essential on Linux, or MSVC on Windows).
+
+To use the library at runtime you also need Blackmagic Desktop Video installed on your system (separate from this Python package) — the runtime DeckLink driver and framework are provided by Desktop Video, available from [blackmagicdesign.com/support](https://www.blackmagicdesign.com/support).
+
+**Option B (for contributors or for modifying the source): from a clone**
+
+```bash
+# Clone the repository
 git clone https://github.com/nick-shaw/blackmagic-io.git
 cd blackmagic-io
 
-# Initialize submodules (required for advanced example using T-Pat test patterns)
+# Initialize submodules (required for the advanced T-Pat example only)
 git submodule update --init --recursive
 
 # Install in development mode (this also installs numpy and pybind11 dependencies)
