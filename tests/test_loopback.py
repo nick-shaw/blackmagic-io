@@ -10,7 +10,6 @@ import sys
 import decklink_io
 from blackmagic_io import create_test_pattern
 import numpy as np
-import matplotlib.pyplot as plt
 import pytest
 import time
 
@@ -327,6 +326,7 @@ def test_pixel_format(output_device, input_device, pixel_format, display_mode, f
 
     # Display side-by-side comparison (skipped in --no-display mode)
     if not no_display:
+        import matplotlib.pyplot as plt
         fig, (ax1, ax2, ax3) = plt.subplots(1, 3, figsize=(18, 6))
 
         ax1.imshow(rgb_pattern)
