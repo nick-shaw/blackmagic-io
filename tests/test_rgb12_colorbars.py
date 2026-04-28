@@ -9,11 +9,14 @@ in 12-bit RGB format (full range only).
 import os
 import sys
 import numpy as np
+import pytest
 import time
 from blackmagic_io import BlackmagicOutput, DisplayMode, PixelFormat
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from _helpers import parse_test_args, wait_or_advance
+
+pytestmark = pytest.mark.hardware
 
 
 def create_colorbars_float(width, height):
@@ -144,7 +147,10 @@ def test_rgb12_float(no_wait=False):
 
 
 def test_rgb12_uint16(no_wait=False):
-    """Test RGB12 output with uint16 data (bit-shifted)"""
+    """Test RGB12 output with uint16 data (bit-shifted)
+
+    Returns True on pass, False on fail, None if RGB12 isn't supported by the device.
+    """
     print("Test 2: RGB12 Color Bars - uint16 Input (bit-shifted 16→12)")
     print("=" * 70)
 
@@ -152,6 +158,10 @@ def test_rgb12_uint16(no_wait=False):
         if not output.initialize(device_index=0):
             print("Failed to initialize device")
             return False
+
+        if not output.is_pixel_format_supported(DisplayMode.HD1080p25, PixelFormat.RGB12):
+            print("— SKIP: RGB12 / HD1080p25 not supported by this device")
+            return None
 
         # Get display mode info
         mode_info = output.get_display_mode_info(DisplayMode.HD1080p25)
@@ -178,7 +188,10 @@ def test_rgb12_uint16(no_wait=False):
 
 
 def test_rgb12_comparison(no_wait=False):
-    """Compare RGB12 with RGB10 and YUV10 output"""
+    """Compare RGB12 with RGB10 and YUV10 output
+
+    Returns True on pass, False on fail, None if any required format isn't supported by the device.
+    """
     print("Test 3: Comparison - RGB12 vs RGB10 vs YUV10")
     print("=" * 70)
 
@@ -186,6 +199,11 @@ def test_rgb12_comparison(no_wait=False):
         if not output.initialize(device_index=0):
             print("Failed to initialize device")
             return False
+
+        for fmt in (PixelFormat.RGB12, PixelFormat.RGB10, PixelFormat.YUV10):
+            if not output.is_pixel_format_supported(DisplayMode.HD1080p25, fmt):
+                print(f"— SKIP: {fmt.name} / HD1080p25 not supported by this device")
+                return None
 
         # Get display mode info
         mode_info = output.get_display_mode_info(DisplayMode.HD1080p25)
@@ -276,24 +294,38 @@ def main():
             print("\n" + "=" * 70)
             print("Test Summary:")
             print("=" * 70)
+            fail_count = 0
             for name, result in results:
-                status = "✓ PASSED" if result else "✗ FAILED"
+                if result is None:
+                    status = "—  SKIP"
+                elif result:
+                    status = "✓ PASSED"
+                else:
+                    status = "✗ FAILED"
+                    fail_count += 1
                 print(f"{status}: {name}")
+            return 0 if fail_count == 0 else 1
 
         elif choice.isdigit() and 1 <= int(choice) <= len(tests):
             idx = int(choice) - 1
             name, test_func = tests[idx]
-            test_func(no_wait=args.no_wait)
+            result = test_func(no_wait=args.no_wait)
+            if result is None:
+                return 0  # skip
+            return 0 if result else 1
         else:
             print("Invalid choice")
+            return 1
 
     except KeyboardInterrupt:
         print("\n\nExiting...")
+        return 130
     except Exception as e:
         print(f"\nError: {e}")
         import traceback
         traceback.print_exc()
+        return 1
 
 
 if __name__ == "__main__":
-    main()
+    sys.exit(main())

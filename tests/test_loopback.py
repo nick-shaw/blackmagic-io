@@ -11,7 +11,10 @@ import decklink_io
 from blackmagic_io import create_test_pattern
 import numpy as np
 import matplotlib.pyplot as plt
+import pytest
 import time
+
+pytestmark = pytest.mark.hardware
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from _helpers import parse_test_args

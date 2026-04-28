@@ -11,7 +11,10 @@ Exit code: 0 if no failures (skips are fine), non-zero if any real failure.
 import sys
 import time
 import numpy as np
+import pytest
 from blackmagic_io import BlackmagicOutput, DisplayMode, PixelFormat
+
+pytestmark = pytest.mark.hardware
 
 
 TEST_MODES = [

@@ -49,6 +49,11 @@ jobs:
         run: |
           python -c "import blackmagic_io; print(f'Successfully imported version {blackmagic_io.__version__}')"
 
+      - name: Run non-hardware tests
+        run: |
+          pip install pytest
+          pytest tests/ -m "not hardware" -v
+
       - name: Upload build artifacts
         uses: actions/upload-artifact@v4
         with:

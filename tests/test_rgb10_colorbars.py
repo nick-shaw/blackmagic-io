@@ -9,11 +9,14 @@ in 10-bit RGB format with both video range and full range mappings.
 import os
 import sys
 import numpy as np
+import pytest
 import time
 from blackmagic_io import BlackmagicOutput, DisplayMode, PixelFormat
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from _helpers import parse_test_args, wait_or_advance
+
+pytestmark = pytest.mark.hardware
 
 
 def create_colorbars_float(width, height):

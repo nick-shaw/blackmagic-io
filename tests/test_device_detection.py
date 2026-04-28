@@ -6,8 +6,12 @@ Tests device enumeration and detection functionality.
 
 import sys
 import numpy as np
+import pytest
 from blackmagic_io import BlackmagicOutput, create_test_pattern
 import decklink_io
+
+pytestmark = pytest.mark.hardware
+
 
 def test_device_enumeration():
     """Test device enumeration"""

@@ -15,7 +15,10 @@ affect both transports.
 import decklink_io
 from blackmagic_io import create_test_pattern
 import numpy as np
+import pytest
 import time
+
+pytestmark = pytest.mark.hardware
 
 OUTPUT_DEVICE_INDEX = 0
 INPUT_DEVICE_INDEX = 0

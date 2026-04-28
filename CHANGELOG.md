@@ -10,6 +10,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 - `tests/_helpers.py` with shared `--no-wait` and `--no-display` CLI flags for hardware-dependent test scripts. With `--no-wait`, interactive Ctrl+C waits between phases auto-advance after a brief hold; with `--no-display`, `test_loopback.py` skips the matplotlib visual diff and reports pass/fail only. Lets the same scripts run interactively for visual confirmation and non-interactively for API smoke-testing.
 - `tests/run_all_tests.py` — single entry point that smoke-runs every hardware-dependent test script in non-interactive mode and aggregates pass/fail. Designed to catch API-shape regressions (like the stale `narrow_range=` argument fixed in 0.17.0b2) before tagging a release. Prompts to confirm SDI BNC and HDMI loopback cables are connected before running.
+- CI now runs the non-hardware test suite (`pytest tests/ -m "not hardware"`) on every push and PR, across macOS / Linux / Windows × Python 3.8–3.14. Hardware-dependent test files are tagged with `pytestmark = pytest.mark.hardware` so they're skipped automatically; previously, CI only confirmed that the wheel built and imported. `test_conversion_ranges.py` is the first non-hardware test exercised in CI.
+
+### Changed
+- Capability detection added to `test_resolutions.py`, `test_rgb10_colorbars.py`, and `test_rgb12_colorbars.py`: each test now checks `is_pixel_format_supported()` before attempting a mode/format combination and reports SKIP rather than FAIL if the device doesn't support it. Real failures still report FAIL. Test scripts now propagate exit codes correctly (`sys.exit(main())`) so `tests/run_all_tests.py` reflects the truth — previously these scripts always exited 0 regardless of internal failures.
+
+### Fixed
+- `[project.urls]` in `pyproject.toml` still pointed at the archived `blackmagic-output` repo. Updated to point at `blackmagic-io`. Affects the project page on PyPI.
 
 ## [0.17.0b2] - 2026-04-28
 
