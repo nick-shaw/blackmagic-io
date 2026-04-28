@@ -93,7 +93,10 @@ def create_colorbars_uint16(width, height):
 
 
 def test_rgb12_float(no_wait=False):
-    """Test RGB12 output with float data (full range 0-4095)"""
+    """Test RGB12 output with float data (full range 0-4095)
+
+    Returns True on pass, False on fail, None if RGB12 isn't supported by the device.
+    """
     print("Test 1: RGB12 Color Bars - Float Input, Full Range (0-4095)")
     print("=" * 70)
 
@@ -108,6 +111,10 @@ def test_rgb12_float(no_wait=False):
         if not output.initialize(device_index=0):
             print("Failed to initialize device")
             return False
+
+        if not output.is_pixel_format_supported(DisplayMode.HD1080p25, PixelFormat.RGB12):
+            print("— SKIP: RGB12 / HD1080p25 not supported by this device")
+            return None
 
         print("Device initialized successfully")
 

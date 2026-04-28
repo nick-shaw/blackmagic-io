@@ -96,7 +96,10 @@ def create_colorbars_uint16(width, height):
 
 
 def test_rgb10_narrow_range(no_wait=False):
-    """Test RGB10 output with float data in narrow range (64-940)"""
+    """Test RGB10 output with float data in narrow range (64-940)
+
+    Returns True on pass, False on fail, None if RGB10 isn't supported by the device.
+    """
     print("Test 1: RGB10 Color Bars - Float Input, Narrow Range (64-940)")
     print("=" * 70)
 
@@ -111,6 +114,10 @@ def test_rgb10_narrow_range(no_wait=False):
         if not output.initialize(device_index=0):
             print("Failed to initialize device")
             return False
+
+        if not output.is_pixel_format_supported(DisplayMode.HD1080p25, PixelFormat.RGB10):
+            print("— SKIP: RGB10 / HD1080p25 not supported by this device")
+            return None
 
         print("Device initialized successfully")
 
@@ -141,7 +148,10 @@ def test_rgb10_narrow_range(no_wait=False):
 
 
 def test_rgb10_full_range(no_wait=False):
-    """Test RGB10 output with float data in full range (0-1023)"""
+    """Test RGB10 output with float data in full range (0-1023)
+
+    Returns True on pass, False on fail, None if RGB10 isn't supported by the device.
+    """
     print("Test 2: RGB10 Color Bars - Float Input, Full Range (0-1023)")
     print("=" * 70)
 
@@ -149,6 +159,10 @@ def test_rgb10_full_range(no_wait=False):
         if not output.initialize(device_index=0):
             print("Failed to initialize device")
             return False
+
+        if not output.is_pixel_format_supported(DisplayMode.HD1080p25, PixelFormat.RGB10):
+            print("— SKIP: RGB10 / HD1080p25 not supported by this device")
+            return None
 
         # Get display mode info
         mode_info = output.get_display_mode_info(DisplayMode.HD1080p25)
@@ -176,7 +190,10 @@ def test_rgb10_full_range(no_wait=False):
 
 
 def test_rgb10_uint16(no_wait=False):
-    """Test RGB10 output with uint16 data (bit-shifted)"""
+    """Test RGB10 output with uint16 data (bit-shifted)
+
+    Returns True on pass, False on fail, None if RGB10 isn't supported by the device.
+    """
     print("Test 3: RGB10 Color Bars - uint16 Input (bit-shifted 16→10)")
     print("=" * 70)
 
@@ -184,6 +201,10 @@ def test_rgb10_uint16(no_wait=False):
         if not output.initialize(device_index=0):
             print("Failed to initialize device")
             return False
+
+        if not output.is_pixel_format_supported(DisplayMode.HD1080p25, PixelFormat.RGB10):
+            print("— SKIP: RGB10 / HD1080p25 not supported by this device")
+            return None
 
         # Get display mode info
         mode_info = output.get_display_mode_info(DisplayMode.HD1080p25)
@@ -210,7 +231,10 @@ def test_rgb10_uint16(no_wait=False):
 
 
 def test_rgb10_comparison(no_wait=False):
-    """Compare RGB10 with YUV10 output"""
+    """Compare RGB10 with YUV10 output
+
+    Returns True on pass, False on fail, None if either format isn't supported by the device.
+    """
     print("Test 4: Comparison - RGB10 vs YUV10")
     print("=" * 70)
 
@@ -218,6 +242,13 @@ def test_rgb10_comparison(no_wait=False):
         if not output.initialize(device_index=0):
             print("Failed to initialize device")
             return False
+
+        if not output.is_pixel_format_supported(DisplayMode.HD1080p25, PixelFormat.RGB10):
+            print("— SKIP: RGB10 / HD1080p25 not supported by this device")
+            return None
+        if not output.is_pixel_format_supported(DisplayMode.HD1080p25, PixelFormat.YUV10):
+            print("— SKIP: YUV10 / HD1080p25 not supported by this device")
+            return None
 
         # Get display mode info
         mode_info = output.get_display_mode_info(DisplayMode.HD1080p25)
@@ -297,24 +328,38 @@ def main():
             print("\n" + "=" * 70)
             print("Test Summary:")
             print("=" * 70)
+            fail_count = 0
             for name, result in results:
-                status = "✓ PASSED" if result else "✗ FAILED"
+                if result is None:
+                    status = "—  SKIP"
+                elif result:
+                    status = "✓ PASSED"
+                else:
+                    status = "✗ FAILED"
+                    fail_count += 1
                 print(f"{status}: {name}")
+            return 0 if fail_count == 0 else 1
 
         elif choice.isdigit() and 1 <= int(choice) <= len(tests):
             idx = int(choice) - 1
             name, test_func = tests[idx]
-            test_func(no_wait=args.no_wait)
+            result = test_func(no_wait=args.no_wait)
+            if result is None:
+                return 0  # skip
+            return 0 if result else 1
         else:
             print("Invalid choice")
+            return 1
 
     except KeyboardInterrupt:
         print("\n\nExiting...")
+        return 130
     except Exception as e:
         print(f"\nError: {e}")
         import traceback
         traceback.print_exc()
+        return 1
 
 
 if __name__ == "__main__":
-    main()
+    sys.exit(main())
