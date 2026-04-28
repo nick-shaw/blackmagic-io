@@ -33,7 +33,11 @@ jobs:
           CIBW_ARCHS_LINUX: x86_64
           CIBW_ARCHS_WINDOWS: AMD64
           CIBW_TEST_COMMAND: python -c "import blackmagic_io; print(blackmagic_io.__version__)"
-          CIBW_TEST_SKIP: "*-macosx_arm64"
+          # cp314-win_amd64 test is skipped because NumPy does not yet ship
+          # stable Windows wheels for Python 3.14 (experimental MINGW-W64
+          # builds crash on import). The wheel itself still builds; users
+          # can install it once NumPy releases proper MSVC cp314 wheels.
+          CIBW_TEST_SKIP: "*-macosx_arm64 cp314-win_amd64"
 
       - uses: actions/upload-artifact@v4
         with:

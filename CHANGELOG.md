@@ -5,6 +5,17 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.17.0b1] - 2026-04-28
+
+### Added
+- Pre-built wheels for Python 3.13 and 3.14 on macOS, Linux, and Windows. The Windows cp314 wheel is built but its in-CI self-test is skipped pending NumPy's release of stable Windows cp314 wheels (NumPy currently only ships an experimental MINGW-W64 build for that combination, which crashes on import). The wheel itself is functional and will be usable once NumPy releases proper MSVC cp314 wheels.
+
+### Changed
+- Bumped minimum supported Python from 3.7 to 3.8. PEP 440 metadata, README, and CI test matrix all updated to match. Python 3.7 reached end-of-life in June 2023 and was not in the wheel build matrix anyway.
+
+### Documentation
+- README installation section split into a recommended PyPI install option and a build-from-source option for contributors. Added explicit note that Blackmagic Desktop Video must be installed separately as the runtime DeckLink driver/framework — the SDK headers vendored in this repo are build-time only.
+
 ## [0.17.0b0] - 2026-04-27
 
 ### Added
