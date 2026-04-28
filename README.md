@@ -285,7 +285,7 @@ Display a static frame continuously.
 - `matrix`: Optional R'G'B' to Y'CbCr conversion matrix (`Matrix.Rec601`, `Matrix.Rec709` or `Matrix.Rec2020`). Only used with YUV10 format. If not specified, auto-detects based on resolution: SD modes (NTSC, PAL) use Rec.601, HD and higher use Rec.709
 - `hdr_metadata`: Optional HDR metadata dict with keys:
   - `'eotf'`: Eotf enum (SDR, PQ, or HLG)
-  - `'custom'`: Optional HdrMetadataCustom object for custom metadata values
+  - `'static_metadata'`: Optional HdrStaticMetadata object with explicit display primaries, white point, mastering luminance, and content light level fields
 - `input_narrow_range`: Whether to interpret integer `frame_data` as narrow range (float is always interpreted as full range). Default: False
 - `output_narrow_range`: Whether to output a narrow range signal. Default: True
 - Returns: True if successful
@@ -499,8 +499,8 @@ Get video settings object for a display mode.
 **`set_hdr_metadata(colorimetry: Gamut, eotf: Eotf)`**
 Set HDR metadata with default values. Must be called before `setup_output()`.
 
-**`set_hdr_metadata_custom(colorimetry: Gamut, eotf: Eotf, custom: HdrMetadataCustom)`**
-Set HDR metadata with custom values. Must be called before `setup_output()`.
+**`set_hdr_static_metadata(colorimetry: Gamut, eotf: Eotf, static_metadata: HdrStaticMetadata)`**
+Set HDR Static Metadata (per SMPTE ST 2086 / CEA-861.3 Type 1) with explicit display primaries, white point, mastering display luminance, and content light level fields. Must be called before `setup_output()`.
 
 **`clear_hdr_metadata()`**
 Clear HDR metadata and reset to SDR. Call before `setup_output()` if you want to ensure no HDR metadata is present.
@@ -547,9 +547,12 @@ class VideoSettings:
 
 **Note:** What the Blackmagic SDK refers to as the "color space" (BMDColorspace) is in fact the matrix used for R'G'B' to Y'CbCr conversion, not the gamut of the image data. For example, ARRI Wide Gamut data would typically be converted using a Rec.709 matrix.
 
-**`HdrMetadataCustom`**
+**`HdrStaticMetadata`**
+
+The fields described in SMPTE ST 2086 (mastering display) and CEA-861.3 (HDR Static Metadata Type 1 InfoFrame: MaxCLL, MaxFALL).
+
 ```python
-class HdrMetadataCustom:
+class HdrStaticMetadata:
     # Display primaries (xy chromaticity coordinates)
     display_primaries_red_x: float
     display_primaries_red_y: float
@@ -1443,13 +1446,13 @@ Max Frame Average Light Level: 50 nits
 from blackmagic_io import BlackmagicOutput, DisplayMode, PixelFormat, Matrix, Eotf
 import decklink_io as dl
 
-# Create custom metadata
-custom = dl.HdrMetadataCustom()
-custom.display_primaries_red_x = 0.708
-custom.display_primaries_red_y = 0.292
+# Build HDR Static Metadata for the source's mastering display
+static_metadata = dl.HdrStaticMetadata()
+static_metadata.display_primaries_red_x = 0.708
+static_metadata.display_primaries_red_y = 0.292
 # ... set other values ...
-custom.max_display_mastering_luminance = 1000.0
-custom.min_display_mastering_luminance = 0.0001
+static_metadata.max_display_mastering_luminance = 1000.0
+static_metadata.min_display_mastering_luminance = 0.0001
 
 # Use in simplified API
 with BlackmagicOutput() as output:
@@ -1459,42 +1462,42 @@ with BlackmagicOutput() as output:
         DisplayMode.HD1080p25,
         pixel_format=PixelFormat.YUV10,
         matrix=Matrix.Rec2020,
-        hdr_metadata={'eotf': Eotf.PQ, 'custom': custom}
+        hdr_metadata={'eotf': Eotf.PQ, 'static_metadata': static_metadata}
     )
     input("Press Enter to stop...")
 ```
 
 **Low-level API:**
 
-For precise control over HDR metadata with the low-level API, use `set_hdr_metadata_custom()`:
+For precise control over HDR Static Metadata with the low-level API, use `set_hdr_static_metadata()`:
 
 ```python
 import decklink_io as dl
 
-# Create custom metadata for specific mastering display
-custom = dl.HdrMetadataCustom()
+# Build HDR Static Metadata for the mastering display
+static_metadata = dl.HdrStaticMetadata()
 
 # Display primaries (chromaticity coordinates)
-custom.display_primaries_red_x = 0.708
-custom.display_primaries_red_y = 0.292
-custom.display_primaries_green_x = 0.170
-custom.display_primaries_green_y = 0.797
-custom.display_primaries_blue_x = 0.131
-custom.display_primaries_blue_y = 0.046
-custom.white_point_x = 0.3127
-custom.white_point_y = 0.3290
+static_metadata.display_primaries_red_x = 0.708
+static_metadata.display_primaries_red_y = 0.292
+static_metadata.display_primaries_green_x = 0.170
+static_metadata.display_primaries_green_y = 0.797
+static_metadata.display_primaries_blue_x = 0.131
+static_metadata.display_primaries_blue_y = 0.046
+static_metadata.white_point_x = 0.3127
+static_metadata.white_point_y = 0.3290
 
 # Mastering display luminance
-custom.max_display_mastering_luminance = 4000.0      # 4000 nits peak (e.g., for HDR10+ content)
-custom.min_display_mastering_luminance = 0.0005      # 0.0005 nits black level
+static_metadata.max_display_mastering_luminance = 4000.0      # 4000 nits peak (e.g., for HDR10+ content)
+static_metadata.min_display_mastering_luminance = 0.0005      # 0.0005 nits black level
 
 # Content light levels
-custom.max_content_light_level = 2000.0     # 2000 nits max content (MaxCLL)
-custom.max_frame_average_light_level = 400.0 # 400 nits average (MaxFALL)
+static_metadata.max_content_light_level = 2000.0     # 2000 nits max content (MaxCLL)
+static_metadata.max_frame_average_light_level = 400.0 # 400 nits average (MaxFALL)
 
 output = dl.DeckLinkOutput()
 output.initialize()
-output.set_hdr_metadata_custom(dl.Gamut.Rec2020, dl.Eotf.PQ, custom)
+output.set_hdr_static_metadata(dl.Gamut.Rec2020, dl.Eotf.PQ, static_metadata)
 ```
 
 ### Available HDR Metadata Fields:

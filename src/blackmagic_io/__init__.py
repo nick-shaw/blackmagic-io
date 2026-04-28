@@ -30,7 +30,7 @@ try:
         DeckLinkOutput,
         DeckLinkInput,
         VideoSettings,
-        HdrMetadataCustom,
+        HdrStaticMetadata,
         DisplayModeInfo,
         CapturedFrame,
         DeviceCapabilities,
@@ -459,7 +459,7 @@ except ImportError:
     # C++ extension not built yet
     pass
 
-__version__ = "0.17.0b1"
+__version__ = "0.17.0b2"
 __author__ = "Nick Shaw"
 
 __all__ = [
@@ -476,7 +476,7 @@ __all__ = [
     "DeckLinkOutput",
     "DeckLinkInput",
     "VideoSettings",
-    "HdrMetadataCustom",
+    "HdrStaticMetadata",
     "DisplayModeInfo",
     "CapturedFrame",
     "DeviceCapabilities",

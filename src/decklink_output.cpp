@@ -251,50 +251,50 @@ void DeckLinkOutput::setHdrMetadata(Gamut colorimetry, Eotf eotf)
 
     if (eotf == Eotf::PQ) {
         if (colorimetry == Gamut::Rec2020) {
-            m_hdrCustom.displayPrimariesRedX = 0.708;
-            m_hdrCustom.displayPrimariesRedY = 0.292;
-            m_hdrCustom.displayPrimariesGreenX = 0.170;
-            m_hdrCustom.displayPrimariesGreenY = 0.797;
-            m_hdrCustom.displayPrimariesBlueX = 0.131;
-            m_hdrCustom.displayPrimariesBlueY = 0.046;
+            m_hdrStaticMetadata.displayPrimariesRedX = 0.708;
+            m_hdrStaticMetadata.displayPrimariesRedY = 0.292;
+            m_hdrStaticMetadata.displayPrimariesGreenX = 0.170;
+            m_hdrStaticMetadata.displayPrimariesGreenY = 0.797;
+            m_hdrStaticMetadata.displayPrimariesBlueX = 0.131;
+            m_hdrStaticMetadata.displayPrimariesBlueY = 0.046;
         } else {
-            m_hdrCustom.displayPrimariesRedX = 0.64;
-            m_hdrCustom.displayPrimariesRedY = 0.33;
-            m_hdrCustom.displayPrimariesGreenX = 0.30;
-            m_hdrCustom.displayPrimariesGreenY = 0.60;
-            m_hdrCustom.displayPrimariesBlueX = 0.15;
-            m_hdrCustom.displayPrimariesBlueY = 0.06;
+            m_hdrStaticMetadata.displayPrimariesRedX = 0.64;
+            m_hdrStaticMetadata.displayPrimariesRedY = 0.33;
+            m_hdrStaticMetadata.displayPrimariesGreenX = 0.30;
+            m_hdrStaticMetadata.displayPrimariesGreenY = 0.60;
+            m_hdrStaticMetadata.displayPrimariesBlueX = 0.15;
+            m_hdrStaticMetadata.displayPrimariesBlueY = 0.06;
         }
 
-        m_hdrCustom.whitePointX = 0.3127;
-        m_hdrCustom.whitePointY = 0.3290;
+        m_hdrStaticMetadata.whitePointX = 0.3127;
+        m_hdrStaticMetadata.whitePointY = 0.3290;
 
-        m_hdrCustom.maxMasteringLuminance = 1000.0;
-        m_hdrCustom.minMasteringLuminance = 0.0001;
-        m_hdrCustom.maxContentLightLevel = 1000.0;
-        m_hdrCustom.maxFrameAverageLightLevel = 50.0;
+        m_hdrStaticMetadata.maxMasteringLuminance = 1000.0;
+        m_hdrStaticMetadata.minMasteringLuminance = 0.0001;
+        m_hdrStaticMetadata.maxContentLightLevel = 1000.0;
+        m_hdrStaticMetadata.maxFrameAverageLightLevel = 50.0;
     } else {
-        m_hdrCustom.displayPrimariesRedX = 0.0;
-        m_hdrCustom.displayPrimariesRedY = 0.0;
-        m_hdrCustom.displayPrimariesGreenX = 0.0;
-        m_hdrCustom.displayPrimariesGreenY = 0.0;
-        m_hdrCustom.displayPrimariesBlueX = 0.0;
-        m_hdrCustom.displayPrimariesBlueY = 0.0;
-        m_hdrCustom.whitePointX = 0.0;
-        m_hdrCustom.whitePointY = 0.0;
-        m_hdrCustom.maxMasteringLuminance = 0.0;
-        m_hdrCustom.minMasteringLuminance = 0.0;
-        m_hdrCustom.maxContentLightLevel = 0.0;
-        m_hdrCustom.maxFrameAverageLightLevel = 0.0;
+        m_hdrStaticMetadata.displayPrimariesRedX = 0.0;
+        m_hdrStaticMetadata.displayPrimariesRedY = 0.0;
+        m_hdrStaticMetadata.displayPrimariesGreenX = 0.0;
+        m_hdrStaticMetadata.displayPrimariesGreenY = 0.0;
+        m_hdrStaticMetadata.displayPrimariesBlueX = 0.0;
+        m_hdrStaticMetadata.displayPrimariesBlueY = 0.0;
+        m_hdrStaticMetadata.whitePointX = 0.0;
+        m_hdrStaticMetadata.whitePointY = 0.0;
+        m_hdrStaticMetadata.maxMasteringLuminance = 0.0;
+        m_hdrStaticMetadata.minMasteringLuminance = 0.0;
+        m_hdrStaticMetadata.maxContentLightLevel = 0.0;
+        m_hdrStaticMetadata.maxFrameAverageLightLevel = 0.0;
     }
 }
 
-void DeckLinkOutput::setHdrMetadataCustom(Gamut colorimetry, Eotf eotf, const HdrMetadataCustom& custom)
+void DeckLinkOutput::setHdrStaticMetadata(Gamut colorimetry, Eotf eotf, const HdrStaticMetadata& staticMetadata)
 {
     m_useHdrMetadata = true;
     m_hdrColorimetry = colorimetry;
     m_hdrEotf = eotf;
-    m_hdrCustom = custom;
+    m_hdrStaticMetadata = staticMetadata;
 }
 
 void DeckLinkOutput::clearHdrMetadata()
@@ -302,41 +302,41 @@ void DeckLinkOutput::clearHdrMetadata()
     m_useHdrMetadata = false;
     m_hdrColorimetry = Gamut::Rec709;
     m_hdrEotf = Eotf::SDR;
-    m_hdrCustom.displayPrimariesRedX = 0.0;
-    m_hdrCustom.displayPrimariesRedY = 0.0;
-    m_hdrCustom.displayPrimariesGreenX = 0.0;
-    m_hdrCustom.displayPrimariesGreenY = 0.0;
-    m_hdrCustom.displayPrimariesBlueX = 0.0;
-    m_hdrCustom.displayPrimariesBlueY = 0.0;
-    m_hdrCustom.whitePointX = 0.0;
-    m_hdrCustom.whitePointY = 0.0;
-    m_hdrCustom.maxMasteringLuminance = 0.0;
-    m_hdrCustom.minMasteringLuminance = 0.0;
-    m_hdrCustom.maxContentLightLevel = 0.0;
-    m_hdrCustom.maxFrameAverageLightLevel = 0.0;
+    m_hdrStaticMetadata.displayPrimariesRedX = 0.0;
+    m_hdrStaticMetadata.displayPrimariesRedY = 0.0;
+    m_hdrStaticMetadata.displayPrimariesGreenX = 0.0;
+    m_hdrStaticMetadata.displayPrimariesGreenY = 0.0;
+    m_hdrStaticMetadata.displayPrimariesBlueX = 0.0;
+    m_hdrStaticMetadata.displayPrimariesBlueY = 0.0;
+    m_hdrStaticMetadata.whitePointX = 0.0;
+    m_hdrStaticMetadata.whitePointY = 0.0;
+    m_hdrStaticMetadata.maxMasteringLuminance = 0.0;
+    m_hdrStaticMetadata.minMasteringLuminance = 0.0;
+    m_hdrStaticMetadata.maxContentLightLevel = 0.0;
+    m_hdrStaticMetadata.maxFrameAverageLightLevel = 0.0;
 }
 
 IDeckLinkVideoFrame* DeckLinkOutput::createHdrFrame(IDeckLinkMutableVideoFrame* frame)
 {
     HdrMetadata::ChromaticityCoordinates primaries = {
-        m_hdrCustom.displayPrimariesRedX,
-        m_hdrCustom.displayPrimariesRedY,
-        m_hdrCustom.displayPrimariesGreenX,
-        m_hdrCustom.displayPrimariesGreenY,
-        m_hdrCustom.displayPrimariesBlueX,
-        m_hdrCustom.displayPrimariesBlueY,
-        m_hdrCustom.whitePointX,
-        m_hdrCustom.whitePointY
+        m_hdrStaticMetadata.displayPrimariesRedX,
+        m_hdrStaticMetadata.displayPrimariesRedY,
+        m_hdrStaticMetadata.displayPrimariesGreenX,
+        m_hdrStaticMetadata.displayPrimariesGreenY,
+        m_hdrStaticMetadata.displayPrimariesBlueX,
+        m_hdrStaticMetadata.displayPrimariesBlueY,
+        m_hdrStaticMetadata.whitePointX,
+        m_hdrStaticMetadata.whitePointY
     };
 
     HdrMetadata metadata = HdrMetadata::custom(
         m_hdrColorimetry,
         m_hdrEotf,
         primaries,
-        m_hdrCustom.maxMasteringLuminance,
-        m_hdrCustom.minMasteringLuminance,
-        m_hdrCustom.maxContentLightLevel,
-        m_hdrCustom.maxFrameAverageLightLevel
+        m_hdrStaticMetadata.maxMasteringLuminance,
+        m_hdrStaticMetadata.minMasteringLuminance,
+        m_hdrStaticMetadata.maxContentLightLevel,
+        m_hdrStaticMetadata.maxFrameAverageLightLevel
     );
 
     return new DeckLinkHdrVideoFrame(frame, metadata);

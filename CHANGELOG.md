@@ -5,6 +5,41 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.17.0b2] - 2026-04-28
+
+### Changed
+- **BREAKING**: Renamed `HdrMetadataCustom` to `HdrStaticMetadata` and the corresponding setter method. The original "custom" name implied users could supply their own non-standard fields, which is misleading — the struct's fields are the fixed schema defined by SMPTE ST 2086 (mastering display) and CEA-861.3 (HDR Static Metadata Type 1 InfoFrame: MaxCLL, MaxFALL). The new name matches the standards' terminology and is consistent with Blackmagic's own use of "HDR Static" in `bmdDynamicRangeHDRStaticPQ` / `bmdDynamicRangeHDRStaticHLG`. Affected names:
+  - `HdrMetadataCustom` (Python and C++ class) → `HdrStaticMetadata`
+  - `set_hdr_metadata_custom()` (Python) / `setHdrMetadataCustom()` (C++) → `set_hdr_static_metadata()` / `setHdrStaticMetadata()`
+  - `'custom'` key in the high-level `hdr_metadata` dict → `'static_metadata'`
+
+### Migration
+
+Anyone using HDR static metadata with versions 0.16.0b0 / 0.17.0b0 / 0.17.0b1 needs to update three things:
+
+1. **Class name** — replace `HdrMetadataCustom()` with `HdrStaticMetadata()`. The fields are unchanged.
+
+   ```diff
+   - meta = decklink_io.HdrMetadataCustom()
+   + meta = decklink_io.HdrStaticMetadata()
+   ```
+
+2. **Low-level method** — replace `set_hdr_metadata_custom(...)` with `set_hdr_static_metadata(...)`. Argument list is unchanged.
+
+   ```diff
+   - output.set_hdr_metadata_custom(Gamut.Rec2020, Eotf.PQ, meta)
+   + output.set_hdr_static_metadata(Gamut.Rec2020, Eotf.PQ, meta)
+   ```
+
+3. **High-level dict key** — when calling `display_static_frame(...)` / `display_solid_color(...)` with `hdr_metadata`, the dict key changes from `'custom'` to `'static_metadata'`.
+
+   ```diff
+   - hdr_metadata={'eotf': Eotf.PQ, 'custom': meta}
+   + hdr_metadata={'eotf': Eotf.PQ, 'static_metadata': meta}
+   ```
+
+No fields, behaviour, or signatures change beyond the names.
+
 ## [0.17.0b1] - 2026-04-28
 
 ### Added

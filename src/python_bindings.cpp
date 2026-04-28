@@ -2158,21 +2158,21 @@ PYBIND11_MODULE(decklink_io, m) {
         .value("Composite", DeckLinkInput::InputConnection::Composite)
         .value("SVideo", DeckLinkInput::InputConnection::SVideo);
 
-    // HdrMetadataCustom struct
-    py::class_<DeckLinkOutput::HdrMetadataCustom>(m, "HdrMetadataCustom")
+    // HdrStaticMetadata struct
+    py::class_<DeckLinkOutput::HdrStaticMetadata>(m, "HdrStaticMetadata")
         .def(py::init<>())
-        .def_readwrite("display_primaries_red_x", &DeckLinkOutput::HdrMetadataCustom::displayPrimariesRedX)
-        .def_readwrite("display_primaries_red_y", &DeckLinkOutput::HdrMetadataCustom::displayPrimariesRedY)
-        .def_readwrite("display_primaries_green_x", &DeckLinkOutput::HdrMetadataCustom::displayPrimariesGreenX)
-        .def_readwrite("display_primaries_green_y", &DeckLinkOutput::HdrMetadataCustom::displayPrimariesGreenY)
-        .def_readwrite("display_primaries_blue_x", &DeckLinkOutput::HdrMetadataCustom::displayPrimariesBlueX)
-        .def_readwrite("display_primaries_blue_y", &DeckLinkOutput::HdrMetadataCustom::displayPrimariesBlueY)
-        .def_readwrite("white_point_x", &DeckLinkOutput::HdrMetadataCustom::whitePointX)
-        .def_readwrite("white_point_y", &DeckLinkOutput::HdrMetadataCustom::whitePointY)
-        .def_readwrite("max_display_mastering_luminance", &DeckLinkOutput::HdrMetadataCustom::maxMasteringLuminance)
-        .def_readwrite("min_display_mastering_luminance", &DeckLinkOutput::HdrMetadataCustom::minMasteringLuminance)
-        .def_readwrite("max_content_light_level", &DeckLinkOutput::HdrMetadataCustom::maxContentLightLevel)
-        .def_readwrite("max_frame_average_light_level", &DeckLinkOutput::HdrMetadataCustom::maxFrameAverageLightLevel);
+        .def_readwrite("display_primaries_red_x", &DeckLinkOutput::HdrStaticMetadata::displayPrimariesRedX)
+        .def_readwrite("display_primaries_red_y", &DeckLinkOutput::HdrStaticMetadata::displayPrimariesRedY)
+        .def_readwrite("display_primaries_green_x", &DeckLinkOutput::HdrStaticMetadata::displayPrimariesGreenX)
+        .def_readwrite("display_primaries_green_y", &DeckLinkOutput::HdrStaticMetadata::displayPrimariesGreenY)
+        .def_readwrite("display_primaries_blue_x", &DeckLinkOutput::HdrStaticMetadata::displayPrimariesBlueX)
+        .def_readwrite("display_primaries_blue_y", &DeckLinkOutput::HdrStaticMetadata::displayPrimariesBlueY)
+        .def_readwrite("white_point_x", &DeckLinkOutput::HdrStaticMetadata::whitePointX)
+        .def_readwrite("white_point_y", &DeckLinkOutput::HdrStaticMetadata::whitePointY)
+        .def_readwrite("max_display_mastering_luminance", &DeckLinkOutput::HdrStaticMetadata::maxMasteringLuminance)
+        .def_readwrite("min_display_mastering_luminance", &DeckLinkOutput::HdrStaticMetadata::minMasteringLuminance)
+        .def_readwrite("max_content_light_level", &DeckLinkOutput::HdrStaticMetadata::maxContentLightLevel)
+        .def_readwrite("max_frame_average_light_level", &DeckLinkOutput::HdrStaticMetadata::maxFrameAverageLightLevel);
 
     // VideoSettings struct
     py::class_<DeckLinkOutput::VideoSettings>(m, "VideoSettings")
@@ -2240,14 +2240,16 @@ PYBIND11_MODULE(decklink_io, m) {
              "see updated values mid-stream. SDI carries metadata per-frame and "
              "updates on the next frame without any extra step.",
              py::arg("colorimetry"), py::arg("eotf"))
-        .def("set_hdr_metadata_custom", &DeckLinkOutput::setHdrMetadataCustom,
-             "Set HDR metadata with custom values. Stores the values; the next "
+        .def("set_hdr_static_metadata", &DeckLinkOutput::setHdrStaticMetadata,
+             "Set HDR Static Metadata (per SMPTE ST 2086 / CEA-861.3 Type 1) with "
+             "explicit display primaries, white point, mastering display luminance, "
+             "and content light level fields. Stores the values; the next "
              "display_frame() call attaches them to the emitted frame. HDMI note: "
              "BMD's HDMI driver caches the HDR Static Metadata InfoFrame, so a "
              "subsequent display_frame() call is required for HDMI consumers to "
              "see updated values mid-stream. SDI carries metadata per-frame and "
              "updates on the next frame without any extra step.",
-             py::arg("colorimetry"), py::arg("eotf"), py::arg("custom"))
+             py::arg("colorimetry"), py::arg("eotf"), py::arg("static_metadata"))
         .def("clear_hdr_metadata", &DeckLinkOutput::clearHdrMetadata, "Clear HDR metadata and reset to SDR")
         .def("get_current_output_info", &DeckLinkOutput::getCurrentOutputInfo, "Get current output configuration info")
         .def("get_supported_display_modes", &DeckLinkOutput::getSupportedDisplayModes, "Get list of supported display modes");
@@ -2465,5 +2467,5 @@ PYBIND11_MODULE(decklink_io, m) {
              py::arg("dynamic_range_mask"));
 
     // Version info
-    m.attr("__version__") = "0.17.0b1";
+    m.attr("__version__") = "0.17.0b2";
 }

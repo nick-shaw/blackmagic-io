@@ -29,7 +29,7 @@ def test_pixel_format(output_device, input_device, pixel_format, display_mode, f
     if test_hdr_metadata:
         print("Setting HDR metadata (PQ, Rec.2020, custom values)...")
         # Create custom HDR metadata
-        hdr_metadata = decklink_io.HdrMetadataCustom()
+        hdr_metadata = decklink_io.HdrStaticMetadata()
         # Display primaries (Rec.2020)
         hdr_metadata.display_primaries_red_x = 0.708
         hdr_metadata.display_primaries_red_y = 0.292
@@ -47,7 +47,7 @@ def test_pixel_format(output_device, input_device, pixel_format, display_mode, f
         hdr_metadata.max_content_light_level = 800.0           # 800 nits
         hdr_metadata.max_frame_average_light_level = 400.0     # 400 nits
 
-        output_device.set_hdr_metadata_custom(
+        output_device.set_hdr_static_metadata(
             decklink_io.Gamut.Rec2020,
             decklink_io.Eotf.PQ,
             hdr_metadata

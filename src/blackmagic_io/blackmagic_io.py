@@ -283,7 +283,7 @@ class BlackmagicOutput:
                    - HD and higher use Rec.709
             hdr_metadata: Optional HDR metadata dict with keys:
                          - 'eotf': Eotf enum value (SDR, PQ, or HLG)
-                         - 'custom': Optional HdrMetadataCustom object
+                         - 'static_metadata': Optional HdrStaticMetadata object
                          If only eotf is provided, default metadata values are used.
             input_narrow_range: For uint16 inputs, whether to interpret values as narrow range.
                               - YUV10: If True, input is narrow (64-940 @10-bit, i.e., 4096-60160 @16-bit).
@@ -327,10 +327,10 @@ class BlackmagicOutput:
             if eotf is None:
                 raise ValueError("hdr_metadata must contain 'eotf' key")
 
-            custom = hdr_metadata.get('custom')
+            static_metadata = hdr_metadata.get('static_metadata')
 
-            if custom is not None:
-                self._device.set_hdr_metadata_custom(gamut, eotf.value, custom)
+            if static_metadata is not None:
+                self._device.set_hdr_static_metadata(gamut, eotf.value, static_metadata)
             else:
                 self._device.set_hdr_metadata(gamut, eotf.value)
         else:
@@ -384,7 +384,7 @@ class BlackmagicOutput:
                    - HD and higher use Rec.709
             hdr_metadata: Optional HDR metadata dict with keys:
                          - 'eotf': Eotf enum value (SDR, PQ, or HLG)
-                         - 'custom': Optional HdrMetadataCustom object
+                         - 'static_metadata': Optional HdrStaticMetadata object
                          If only eotf is provided, default metadata values are used.
             input_narrow_range: For integer inputs, whether to interpret values as narrow range.
                               If True, values are narrow (64-940). If False (default), full range (0-1023).

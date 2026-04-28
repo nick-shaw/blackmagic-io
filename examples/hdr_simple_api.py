@@ -69,23 +69,23 @@ def example_with_custom_metadata():
     width, height = 1920, 1080
     frame = np.ones((height, width, 3), dtype=np.float32) * 0.5
 
-    # Create custom HDR metadata
+    # Build HDR Static Metadata (per SMPTE ST 2086 / CEA-861.3 Type 1)
     import decklink_io as dl
-    custom = dl.HdrMetadataCustom()
-    custom.display_primaries_red_x = 0.68
-    custom.display_primaries_red_y = 0.32
-    custom.display_primaries_green_x = 0.265
-    custom.display_primaries_green_y = 0.69
-    custom.display_primaries_blue_x = 0.15
-    custom.display_primaries_blue_y = 0.06
-    custom.white_point_x = 0.3127
-    custom.white_point_y = 0.3290
-    custom.max_display_mastering_luminance = 1000.0
-    custom.min_display_mastering_luminance = 0.0001
-    custom.max_content_light_level = 1000.0
-    custom.max_frame_average_light_level = 400.0
+    static_metadata = dl.HdrStaticMetadata()
+    static_metadata.display_primaries_red_x = 0.68
+    static_metadata.display_primaries_red_y = 0.32
+    static_metadata.display_primaries_green_x = 0.265
+    static_metadata.display_primaries_green_y = 0.69
+    static_metadata.display_primaries_blue_x = 0.15
+    static_metadata.display_primaries_blue_y = 0.06
+    static_metadata.white_point_x = 0.3127
+    static_metadata.white_point_y = 0.3290
+    static_metadata.max_display_mastering_luminance = 1000.0
+    static_metadata.min_display_mastering_luminance = 0.0001
+    static_metadata.max_content_light_level = 1000.0
+    static_metadata.max_frame_average_light_level = 400.0
 
-    # Display with custom metadata
+    # Display with full HDR Static Metadata
     # pixel_format defaults to YUV10 for float32 data
     success = output.display_static_frame(
         frame,
@@ -93,7 +93,7 @@ def example_with_custom_metadata():
         matrix=bmo.Matrix.Rec2020,
         hdr_metadata={
             'eotf': bmo.Eotf.PQ,
-            'custom': custom
+            'static_metadata': static_metadata
         }
     )
 

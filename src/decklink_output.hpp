@@ -18,7 +18,7 @@ public:
     using VideoSettings = DeckLink::VideoSettings;
     using DisplayModeInfo = DeckLink::DisplayModeInfo;
 
-    struct HdrMetadataCustom {
+    struct HdrStaticMetadata {
         double displayPrimariesRedX = 0.64;
         double displayPrimariesRedY = 0.33;
         double displayPrimariesGreenX = 0.30;
@@ -65,7 +65,7 @@ public:
     // values. SDI carries metadata per-frame so SDI consumers see updates
     // immediately on the next frame without any extra step.
     void setHdrMetadata(Gamut colorimetry, Eotf eotf);
-    void setHdrMetadataCustom(Gamut colorimetry, Eotf eotf, const HdrMetadataCustom& custom);
+    void setHdrStaticMetadata(Gamut colorimetry, Eotf eotf, const HdrStaticMetadata& staticMetadata);
     void clearHdrMetadata();
     OutputInfo getCurrentOutputInfo();
     std::vector<DisplayModeInfo> getSupportedDisplayModes();
@@ -86,7 +86,7 @@ private:
     bool m_useHdrMetadata;
     Gamut m_hdrColorimetry;
     Eotf m_hdrEotf;
-    HdrMetadataCustom m_hdrCustom;
+    HdrStaticMetadata m_hdrStaticMetadata;
 
     bool createFrame(IDeckLinkMutableVideoFrame** frame);
     IDeckLinkVideoFrame* createHdrFrame(IDeckLinkMutableVideoFrame* frame);

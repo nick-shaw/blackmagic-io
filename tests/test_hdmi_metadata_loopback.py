@@ -39,24 +39,24 @@ LUMINANCE_TOLERANCE = 1.0
 MIN_LUMINANCE_TOLERANCE = 0.001
 
 
-def make_custom(primaries, white, max_lum, min_lum, max_cll, max_fall):
-    custom = decklink_io.HdrMetadataCustom()
-    custom.display_primaries_red_x = primaries["red_x"]
-    custom.display_primaries_red_y = primaries["red_y"]
-    custom.display_primaries_green_x = primaries["green_x"]
-    custom.display_primaries_green_y = primaries["green_y"]
-    custom.display_primaries_blue_x = primaries["blue_x"]
-    custom.display_primaries_blue_y = primaries["blue_y"]
-    custom.white_point_x = white["white_x"]
-    custom.white_point_y = white["white_y"]
-    custom.max_display_mastering_luminance = max_lum
-    custom.min_display_mastering_luminance = min_lum
-    custom.max_content_light_level = max_cll
-    custom.max_frame_average_light_level = max_fall
-    return custom
+def make_static_metadata(primaries, white, max_lum, min_lum, max_cll, max_fall):
+    static_metadata = decklink_io.HdrStaticMetadata()
+    static_metadata.display_primaries_red_x = primaries["red_x"]
+    static_metadata.display_primaries_red_y = primaries["red_y"]
+    static_metadata.display_primaries_green_x = primaries["green_x"]
+    static_metadata.display_primaries_green_y = primaries["green_y"]
+    static_metadata.display_primaries_blue_x = primaries["blue_x"]
+    static_metadata.display_primaries_blue_y = primaries["blue_y"]
+    static_metadata.white_point_x = white["white_x"]
+    static_metadata.white_point_y = white["white_y"]
+    static_metadata.max_display_mastering_luminance = max_lum
+    static_metadata.min_display_mastering_luminance = min_lum
+    static_metadata.max_content_light_level = max_cll
+    static_metadata.max_frame_average_light_level = max_fall
+    return static_metadata
 
 
-# (case_name, gamut, eotf, custom_metadata_or_None, expect_full_mastering)
+# (case_name, gamut, eotf, static_metadata_kwargs_or_None, expect_full_mastering)
 TEST_CASES = [
     (
         "SDR Rec.709 (no HDR metadata)",
@@ -110,18 +110,18 @@ TEST_CASES = [
 ]
 
 
-def configure_output_metadata(output_device, gamut, eotf, custom_kwargs):
+def configure_output_metadata(output_device, gamut, eotf, static_metadata_kwargs):
     if eotf == decklink_io.Eotf.SDR and gamut == decklink_io.Gamut.Rec709:
         output_device.clear_hdr_metadata()
         return None
 
-    if custom_kwargs is None:
+    if static_metadata_kwargs is None:
         output_device.set_hdr_metadata(gamut, eotf)
         return None
 
-    custom = make_custom(**custom_kwargs)
-    output_device.set_hdr_metadata_custom(gamut, eotf, custom)
-    return custom
+    static_metadata = make_static_metadata(**static_metadata_kwargs)
+    output_device.set_hdr_static_metadata(gamut, eotf, static_metadata)
+    return static_metadata
 
 
 def push_frame(output_device, settings):
@@ -143,7 +143,7 @@ def capture_frame(input_device):
     return frame
 
 
-def verify_metadata(case_name, gamut, eotf, custom_kwargs, expect_full_mastering, frame):
+def verify_metadata(case_name, gamut, eotf, static_metadata_kwargs, expect_full_mastering, frame):
     failures = []
 
     if frame.eotf != eotf:
@@ -153,8 +153,8 @@ def verify_metadata(case_name, gamut, eotf, custom_kwargs, expect_full_mastering
         failures.append(f"Colorspace mismatch: expected {gamut}, got {frame.colorspace}")
 
     if expect_full_mastering:
-        primaries = custom_kwargs["primaries"]
-        white = custom_kwargs["white"]
+        primaries = static_metadata_kwargs["primaries"]
+        white = static_metadata_kwargs["white"]
 
         if not frame.has_display_primaries:
             failures.append("Display primaries missing")
@@ -187,30 +187,30 @@ def verify_metadata(case_name, gamut, eotf, custom_kwargs, expect_full_mastering
         if not frame.has_mastering_luminance:
             failures.append("Mastering luminance missing")
         else:
-            if abs(frame.max_display_mastering_luminance - custom_kwargs["max_lum"]) > LUMINANCE_TOLERANCE:
+            if abs(frame.max_display_mastering_luminance - static_metadata_kwargs["max_lum"]) > LUMINANCE_TOLERANCE:
                 failures.append(
-                    f"Max mastering luminance mismatch: expected {custom_kwargs['max_lum']:.1f}, "
+                    f"Max mastering luminance mismatch: expected {static_metadata_kwargs['max_lum']:.1f}, "
                     f"got {frame.max_display_mastering_luminance:.1f}"
                 )
-            if abs(frame.min_display_mastering_luminance - custom_kwargs["min_lum"]) > MIN_LUMINANCE_TOLERANCE:
+            if abs(frame.min_display_mastering_luminance - static_metadata_kwargs["min_lum"]) > MIN_LUMINANCE_TOLERANCE:
                 failures.append(
-                    f"Min mastering luminance mismatch: expected {custom_kwargs['min_lum']:.4f}, "
+                    f"Min mastering luminance mismatch: expected {static_metadata_kwargs['min_lum']:.4f}, "
                     f"got {frame.min_display_mastering_luminance:.4f}"
                 )
 
         if not frame.has_max_cll:
             failures.append("MaxCLL missing")
-        elif abs(frame.max_content_light_level - custom_kwargs["max_cll"]) > LUMINANCE_TOLERANCE:
+        elif abs(frame.max_content_light_level - static_metadata_kwargs["max_cll"]) > LUMINANCE_TOLERANCE:
             failures.append(
-                f"MaxCLL mismatch: expected {custom_kwargs['max_cll']:.1f}, "
+                f"MaxCLL mismatch: expected {static_metadata_kwargs['max_cll']:.1f}, "
                 f"got {frame.max_content_light_level:.1f}"
             )
 
         if not frame.has_max_fall:
             failures.append("MaxFALL missing")
-        elif abs(frame.max_frame_average_light_level - custom_kwargs["max_fall"]) > LUMINANCE_TOLERANCE:
+        elif abs(frame.max_frame_average_light_level - static_metadata_kwargs["max_fall"]) > LUMINANCE_TOLERANCE:
             failures.append(
-                f"MaxFALL mismatch: expected {custom_kwargs['max_fall']:.1f}, "
+                f"MaxFALL mismatch: expected {static_metadata_kwargs['max_fall']:.1f}, "
                 f"got {frame.max_frame_average_light_level:.1f}"
             )
 
@@ -218,13 +218,13 @@ def verify_metadata(case_name, gamut, eotf, custom_kwargs, expect_full_mastering
 
 
 def run_case(output_device, input_device, settings, case):
-    case_name, gamut, eotf, custom_kwargs, expect_full_mastering = case
+    case_name, gamut, eotf, static_metadata_kwargs, expect_full_mastering = case
 
     print(f"\n{'=' * 70}")
     print(f"Case: {case_name}")
     print(f"{'=' * 70}")
 
-    custom = configure_output_metadata(output_device, gamut, eotf, custom_kwargs)
+    static_metadata = configure_output_metadata(output_device, gamut, eotf, static_metadata_kwargs)
 
     settings.format = PIXEL_FORMAT
     if not output_device.setup_output(settings):
@@ -272,7 +272,7 @@ def run_case(output_device, input_device, settings, case):
     if frame.has_max_fall:
         print(f"  MaxFALL:             {frame.max_frame_average_light_level:.1f} cd/m²")
 
-    failures = verify_metadata(case_name, gamut, eotf, custom_kwargs, expect_full_mastering, frame)
+    failures = verify_metadata(case_name, gamut, eotf, static_metadata_kwargs, expect_full_mastering, frame)
 
     if failures:
         print("\n  ✗ FAILED:")
