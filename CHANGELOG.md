@@ -7,6 +7,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [0.17.0b2] - 2026-04-28
 
+### Fixed
+- `tests/test_rgb10_colorbars.py` and `tests/test_rgb12_colorbars.py` were calling `BlackmagicOutput.display_static_frame()` with a stale `narrow_range=` keyword argument that was renamed in 0.15.0b0 (split into `input_narrow_range` and `output_narrow_range`). The tests had been broken since that release. Updated to use `output_narrow_range=` (the correct mapping for the float-input output cases these tests exercise).
+
 ### Changed
 - **BREAKING**: Renamed `HdrMetadataCustom` to `HdrStaticMetadata` and the corresponding setter method. The original "custom" name implied users could supply their own non-standard fields, which is misleading — the struct's fields are the fixed schema defined by SMPTE ST 2086 (mastering display) and CEA-861.3 (HDR Static Metadata Type 1 InfoFrame: MaxCLL, MaxFALL). The new name matches the standards' terminology and is consistent with Blackmagic's own use of "HDR Static" in `bmdDynamicRangeHDRStaticPQ` / `bmdDynamicRangeHDRStaticHLG`. Affected names:
   - `HdrMetadataCustom` (Python and C++ class) → `HdrStaticMetadata`

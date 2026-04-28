@@ -57,8 +57,8 @@ def main():
     output.cleanup()
 
 
-def example_with_custom_metadata():
-    """Example with custom HDR metadata values"""
+def example_with_static_metadata():
+    """Example providing explicit HDR Static Metadata values"""
     output = bmo.BlackmagicOutput()
 
     if not output.initialize(device_index=0):
@@ -98,7 +98,7 @@ def example_with_custom_metadata():
     )
 
     if success:
-        print("Displaying with custom HDR metadata")
+        print("Displaying with explicit HDR Static Metadata")
         print("Press Ctrl+C to stop...")
         try:
             import time
@@ -113,5 +113,5 @@ def example_with_custom_metadata():
 
 if __name__ == "__main__":
     main()
-    # Uncomment to try custom metadata:
-    # example_with_custom_metadata()
+    # Uncomment to try explicit HDR Static Metadata:
+    # example_with_static_metadata()

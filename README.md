@@ -298,7 +298,7 @@ Display a solid color continuously.
 - `display_mode`: Video resolution and frame rate
 - `pixel_format`: Pixel format (default: YUV10)
 - `matrix`: RGB to Y'CbCr conversion matrix (Rec601, Rec709 or Rec2020). Only applies when pixel_format is YUV10. If not specified, auto-detects based on resolution: SD modes (NTSC, PAL) use Rec.601, HD and higher use Rec.709
-- `hdr_metadata`: Optional HDR metadata dict with 'eotf' (and optional 'custom') keys
+- `hdr_metadata`: Optional HDR metadata dict with 'eotf' (and optional 'static_metadata') keys
 - `input_narrow_range`: Whether to interpret integer `color` values as narrow range (float is always interpreted as full range). Default: False
 - `output_narrow_range`: Whether to output a narrow range signal. Default: True
 - `patch`: Optional tuple (center_x, center_y, width, height) with normalized coordinates (0.0-1.0):
@@ -1402,7 +1402,7 @@ HDR metadata is embedded into each video frame using the DeckLink SDK's `IDeckLi
 
 ### Metadata Includes:
 
-- **Display Primaries**: Automatically set to match the matrix parameter (unless explicitly specified via custom metadata)
+- **Display Primaries**: Automatically set to match the matrix parameter (unless explicitly specified via `HdrStaticMetadata`)
   - Matrix.Rec709 → Rec.709 primaries (x,y): R(0.64, 0.33), G(0.30, 0.60), B(0.15, 0.06)
   - Matrix.Rec2020 → Rec.2020 primaries (x,y): R(0.708, 0.292), G(0.170, 0.797), B(0.131, 0.046)
 - **White Point**: D65 (0.3127, 0.3290) for all matrices (unless explicitly specified)
