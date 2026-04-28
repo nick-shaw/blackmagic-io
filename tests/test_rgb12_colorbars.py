@@ -6,9 +6,14 @@ This script tests the RGB12 pixel format by displaying color bars
 in 12-bit RGB format (full range only).
 """
 
+import os
+import sys
 import numpy as np
 import time
 from blackmagic_io import BlackmagicOutput, DisplayMode, PixelFormat
+
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+from _helpers import parse_test_args, wait_or_advance
 
 
 def create_colorbars_float(width, height):
@@ -87,7 +92,7 @@ def create_colorbars_uint16(width, height):
     return frame_uint16
 
 
-def test_rgb12_float():
+def test_rgb12_float(no_wait=False):
     """Test RGB12 output with float data (full range 0-4095)"""
     print("Test 1: RGB12 Color Bars - Float Input, Full Range (0-4095)")
     print("=" * 70)
@@ -124,19 +129,14 @@ def test_rgb12_float():
             PixelFormat.RGB12
         ):
             print("✓ Color bars displayed successfully")
-            print("  Press Ctrl+C to continue to next test...")
-            try:
-                while True:
-                    time.sleep(1)
-            except KeyboardInterrupt:
-                print("\n")
-                return True
+            wait_or_advance("  Press Ctrl+C to continue to next test...", no_wait)
+            return True
         else:
             print("✗ Failed to display frame")
             return False
 
 
-def test_rgb12_uint16():
+def test_rgb12_uint16(no_wait=False):
     """Test RGB12 output with uint16 data (bit-shifted)"""
     print("Test 2: RGB12 Color Bars - uint16 Input (bit-shifted 16→12)")
     print("=" * 70)
@@ -163,19 +163,14 @@ def test_rgb12_uint16():
             PixelFormat.RGB12
         ):
             print("✓ Color bars displayed successfully")
-            print("  Press Ctrl+C to continue to next test...")
-            try:
-                while True:
-                    time.sleep(1)
-            except KeyboardInterrupt:
-                print("\n")
-                return True
+            wait_or_advance("  Press Ctrl+C to continue to next test...", no_wait)
+            return True
         else:
             print("✗ Failed to display frame")
             return False
 
 
-def test_rgb12_comparison():
+def test_rgb12_comparison(no_wait=False):
     """Compare RGB12 with RGB10 and YUV10 output"""
     print("Test 3: Comparison - RGB12 vs RGB10 vs YUV10")
     print("=" * 70)
@@ -199,12 +194,7 @@ def test_rgb12_comparison():
             DisplayMode.HD1080p25,
             PixelFormat.RGB12
         ):
-            print("✓ RGB12 displayed - Press Ctrl+C to switch to RGB10...")
-            try:
-                while True:
-                    time.sleep(1)
-            except KeyboardInterrupt:
-                pass
+            wait_or_advance("✓ RGB12 displayed - Press Ctrl+C to switch to RGB10...", no_wait)
         else:
             print("✗ Failed to display RGB12")
             return False
@@ -217,12 +207,7 @@ def test_rgb12_comparison():
             PixelFormat.RGB10,
             output_narrow_range=False
         ):
-            print("✓ RGB10 displayed - Press Ctrl+C to switch to YUV10...")
-            try:
-                while True:
-                    time.sleep(1)
-            except KeyboardInterrupt:
-                pass
+            wait_or_advance("✓ RGB10 displayed - Press Ctrl+C to switch to YUV10...", no_wait)
         else:
             print("✗ Failed to display RGB10")
             return False
@@ -234,13 +219,8 @@ def test_rgb12_comparison():
             DisplayMode.HD1080p25,
             PixelFormat.YUV10
         ):
-            print("✓ YUV10 displayed - Press Ctrl+C to stop...")
-            try:
-                while True:
-                    time.sleep(1)
-            except KeyboardInterrupt:
-                print("\n")
-                return True
+            wait_or_advance("✓ YUV10 displayed - Press Ctrl+C to stop...", no_wait)
+            return True
         else:
             print("✗ Failed to display YUV10")
             return False
@@ -248,6 +228,8 @@ def test_rgb12_comparison():
 
 def main():
     """Main test function"""
+    args = parse_test_args()
+
     print("\n" + "=" * 70)
     print("12-bit RGB Color Bars Test Suite")
     print("=" * 70)
@@ -259,22 +241,27 @@ def main():
         ("RGB12 vs RGB10 vs YUV10 Comparison", test_rgb12_comparison),
     ]
 
-    print("Available tests:")
-    for i, (name, _) in enumerate(tests, 1):
-        print(f"  {i}. {name}")
-    print("  0. Run all tests")
-    print()
+    if args.no_wait:
+        # Smoke-test mode: run all tests with auto-advance, skip the menu.
+        choice = "0"
+    else:
+        print("Available tests:")
+        for i, (name, _) in enumerate(tests, 1):
+            print(f"  {i}. {name}")
+        print("  0. Run all tests")
+        print()
 
     try:
-        choice = input("Select test (0-3): ").strip()
-        print()
+        if not args.no_wait:
+            choice = input("Select test (0-3): ").strip()
+            print()
 
         if choice == "0":
             # Run all tests
             results = []
             for name, test_func in tests:
                 print(f"\n{'='*70}")
-                result = test_func()
+                result = test_func(no_wait=args.no_wait)
                 results.append((name, result))
                 print()
 
@@ -289,7 +276,7 @@ def main():
         elif choice.isdigit() and 1 <= int(choice) <= len(tests):
             idx = int(choice) - 1
             name, test_func = tests[idx]
-            test_func()
+            test_func(no_wait=args.no_wait)
         else:
             print("Invalid choice")
 

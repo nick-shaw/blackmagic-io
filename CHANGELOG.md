@@ -5,10 +5,16 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Added
+- `tests/_helpers.py` with shared `--no-wait` and `--no-display` CLI flags for hardware-dependent test scripts. With `--no-wait`, interactive Ctrl+C waits between phases auto-advance after a brief hold; with `--no-display`, `test_loopback.py` skips the matplotlib visual diff and reports pass/fail only. Lets the same scripts run interactively for visual confirmation and non-interactively for API smoke-testing.
+- `tests/run_all_tests.py` — single entry point that smoke-runs every hardware-dependent test script in non-interactive mode and aggregates pass/fail. Designed to catch API-shape regressions (like the stale `narrow_range=` argument fixed in 0.17.0b2) before tagging a release. Prompts to confirm SDI BNC and HDMI loopback cables are connected before running.
+
 ## [0.17.0b2] - 2026-04-28
 
 ### Fixed
-- `tests/test_rgb10_colorbars.py` and `tests/test_rgb12_colorbars.py` were calling `BlackmagicOutput.display_static_frame()` with a stale `narrow_range=` keyword argument that was renamed in 0.15.0b0 (split into `input_narrow_range` and `output_narrow_range`). The tests had been broken since that release. Updated to use `output_narrow_range=` (the correct mapping for the float-input output cases these tests exercise).
+- `tests/test_rgb10_colorbars.py` and `tests/test_rgb12_colorbars.py` were calling `BlackmagicOutput.display_static_frame()` with a stale `narrow_range=` keyword argument that was renamed in 0.15.0b0 (split into `input_narrow_range` and `output_narrow_range`). The tests had been broken since that release but were never re-run because they require manual interaction. Updated to use `output_narrow_range=` (the correct mapping for the float-input output cases these tests exercise).
 
 ### Changed
 - **BREAKING**: Renamed `HdrMetadataCustom` to `HdrStaticMetadata` and the corresponding setter method. The original "custom" name implied users could supply their own non-standard fields, which is misleading — the struct's fields are the fixed schema defined by SMPTE ST 2086 (mastering display) and CEA-861.3 (HDR Static Metadata Type 1 InfoFrame: MaxCLL, MaxFALL). The new name matches the standards' terminology and is consistent with Blackmagic's own use of "HDR Static" in `bmdDynamicRangeHDRStaticPQ` / `bmdDynamicRangeHDRStaticHLG`. Affected names:

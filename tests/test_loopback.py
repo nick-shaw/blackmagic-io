@@ -5,13 +5,18 @@ Requires a BNC cable connecting output to input on the same device.
 Tests output -> capture -> conversion for all supported pixel formats.
 """
 
+import os
+import sys
 import decklink_io
 from blackmagic_io import create_test_pattern
 import numpy as np
 import matplotlib.pyplot as plt
 import time
 
-def test_pixel_format(output_device, input_device, pixel_format, display_mode, format_name, test_hdr_metadata=False):
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+from _helpers import parse_test_args
+
+def test_pixel_format(output_device, input_device, pixel_format, display_mode, format_name, test_hdr_metadata=False, no_display=False):
     """Test a single pixel format with loopback."""
     print(f"\n{'=' * 70}")
     print(f"Testing {format_name} ({pixel_format})")
@@ -317,25 +322,26 @@ def test_pixel_format(output_device, input_device, pixel_format, display_mode, f
     else:
         print(f"  ✗ Verification FAILED (mean threshold: {acceptable_mean}, max threshold: {acceptable_max})")
 
-    # Display side-by-side comparison
-    fig, (ax1, ax2, ax3) = plt.subplots(1, 3, figsize=(18, 6))
+    # Display side-by-side comparison (skipped in --no-display mode)
+    if not no_display:
+        fig, (ax1, ax2, ax3) = plt.subplots(1, 3, figsize=(18, 6))
 
-    ax1.imshow(rgb_pattern)
-    ax1.set_title("Source Pattern")
-    ax1.axis('off')
+        ax1.imshow(rgb_pattern)
+        ax1.set_title("Source Pattern")
+        ax1.axis('off')
 
-    ax2.imshow(rgb_captured)
-    ax2.set_title(f"Captured: {format_name}\n({captured_frame.colorspace})")
-    ax2.axis('off')
+        ax2.imshow(rgb_captured)
+        ax2.set_title(f"Captured: {format_name}\n({captured_frame.colorspace})")
+        ax2.axis('off')
 
-    # Show difference (amplified for visibility)
-    diff_amplified = np.clip(diff * 10, 0, 1)
-    ax3.imshow(diff_amplified)
-    ax3.set_title(f"Difference (10x)\nMean: {mean_error:.4f}, Max: {max_error:.4f}")
-    ax3.axis('off')
+        # Show difference (amplified for visibility)
+        diff_amplified = np.clip(diff * 10, 0, 1)
+        ax3.imshow(diff_amplified)
+        ax3.set_title(f"Difference (10x)\nMean: {mean_error:.4f}, Max: {max_error:.4f}")
+        ax3.axis('off')
 
-    plt.tight_layout()
-    plt.show()
+        plt.tight_layout()
+        plt.show()
 
     # Cleanup
     input_device.stop_capture()
@@ -350,6 +356,8 @@ def test_pixel_format(output_device, input_device, pixel_format, display_mode, f
 
 def main():
     """Run loopback tests for all pixel formats."""
+    args = parse_test_args()
+
     print("Blackmagic Loopback Test")
     print("=" * 70)
     print("This test requires a BNC cable connecting output to input")
@@ -389,7 +397,8 @@ def main():
     for pixel_format, format_name, test_hdr in test_formats:
         success = test_pixel_format(
             output_device, input_device,
-            pixel_format, display_mode, format_name, test_hdr
+            pixel_format, display_mode, format_name, test_hdr,
+            no_display=args.no_display,
         )
         results.append((format_name, success))
 
