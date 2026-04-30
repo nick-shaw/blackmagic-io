@@ -358,13 +358,32 @@ void DeckLinkInput::onFrameArrived(IDeckLinkVideoInputFrame* videoFrame)
     IDeckLinkTimecode* timecode = nullptr;
     if (videoFrame->GetTimecode(bmdTimecodeRP188Any, &timecode) == S_OK && timecode != nullptr) {
         uint8_t hours, minutes, seconds, frames;
+        BMDTimecodeFlags tcFlags = timecode->GetFlags();
         if (timecode->GetComponents(&hours, &minutes, &seconds, &frames) == S_OK) {
+            // SMPTE 12M-1 HFR encoding: at >30fps the frame counter stays at
+            // 0-29 and the field-mark bit serves as the LSB to distinguish the
+            // two halves of each frame pair. Combine it so 50p/60p timecode
+            // counts 0-49 / 0-59. Only fold when the raw value is in the
+            // legacy range — some sources emit the full counter directly, in
+            // which case GetComponents already returns 0-59 and we leave it.
+            //
+            // Note on threading: m_detectedSettings is written under
+            // m_formatMutex in onFormatChanged, but read here without a lock.
+            // The framerate field is a double (atomic on every supported
+            // platform) and only changes on rare format-change events, so an
+            // unlocked read is safe in practice — a torn read can't happen and
+            // a transient stale value at most affects the fold decision for a
+            // single frame around a format change.
+            if (m_detectedSettings.framerate > 30.0 && frames < 30) {
+                uint8_t fieldMark = (tcFlags & bmdTimecodeFieldMark) ? 1 : 0;
+                frames = static_cast<uint8_t>(frames * 2 + fieldMark);
+            }
             tempFrame.hasTimecode = true;
             tempFrame.timecodeHours = hours;
             tempFrame.timecodeMinutes = minutes;
             tempFrame.timecodeSeconds = seconds;
             tempFrame.timecodeFrames = frames;
-            tempFrame.timecodeIsDropFrame = (timecode->GetFlags() & bmdTimecodeIsDropFrame) != 0;
+            tempFrame.timecodeIsDropFrame = (tcFlags & bmdTimecodeIsDropFrame) != 0;
         }
         timecode->Release();
     }
