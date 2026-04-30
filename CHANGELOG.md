@@ -19,7 +19,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 - `[project.urls]` in `pyproject.toml` still pointed at the archived `blackmagic-output` repo. Updated to point at `blackmagic-io`. Affects the project page on PyPI.
-- Timecode frames captured from HFR sources (50p, 59.94p, 60p) capped at 29 with each value appearing twice instead of counting 0–49 / 0–59. Per SMPTE 12M-1, HFR signals keep the binary frame counter at 0–29 and use the field-mark bit (`bmdTimecodeFieldMark`) as the LSB to distinguish the two halves of each frame pair. The DeckLink SDK exposes that bit on `IDeckLinkTimecode::GetFlags()` but does not fold it into `GetComponents()`. `onFrameArrived` now combines it when the detected framerate is >30 fps and the raw frame counter is <30 (sources that already emit the full 0–59 counter pass through unchanged). Reported by the team working on hdr-monitor.
+- Timecode frames captured from HFR sources (50p, 59.94p, 60p) capped at 29 with each value appearing twice instead of counting 0–49 / 0–59. Per SMPTE 12M-1, HFR signals keep the binary frame counter at 0–29 and use the field-mark bit (`bmdTimecodeFieldMark`) as the LSB to distinguish the two halves of each frame pair. The DeckLink SDK exposes that bit on `IDeckLinkTimecode::GetFlags()` but does not fold it into `GetComponents()`. `onFrameArrived` now combines it when the detected framerate is >30 fps. The fold is also gated on the raw counter being <30 as a defensive guard, so the code remains correct if a future SDK version or a non-standard source pre-folds the bit and returns the full 0–59 counter directly.
 
 ## [0.17.0b2] - 2026-04-28
 

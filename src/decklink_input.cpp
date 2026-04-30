@@ -363,9 +363,11 @@ void DeckLinkInput::onFrameArrived(IDeckLinkVideoInputFrame* videoFrame)
             // SMPTE 12M-1 HFR encoding: at >30fps the frame counter stays at
             // 0-29 and the field-mark bit serves as the LSB to distinguish the
             // two halves of each frame pair. Combine it so 50p/60p timecode
-            // counts 0-49 / 0-59. Only fold when the raw value is in the
-            // legacy range — some sources emit the full counter directly, in
-            // which case GetComponents already returns 0-59 and we leave it.
+            // counts 0-49 / 0-59. The frames < 30 check is a defensive guard:
+            // current BMD SDKs return the unfolded counter (so the guard is
+            // always true on HFR), but it keeps this correct if a future SDK
+            // version or a non-standard source pre-folds the bit and returns
+            // the full 0-59 counter directly.
             //
             // Note on threading: m_detectedSettings is written under
             // m_formatMutex in onFormatChanged, but read here without a lock.
