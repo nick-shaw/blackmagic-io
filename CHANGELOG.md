@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.17.0b3] - 2026-04-30
+
 ### Added
 - `tests/_helpers.py` with shared `--no-wait` and `--no-display` CLI flags for hardware-dependent test scripts. With `--no-wait`, interactive Ctrl+C waits between phases auto-advance after a brief hold; with `--no-display`, `test_loopback.py` skips the matplotlib visual diff and reports pass/fail only. Lets the same scripts run interactively for visual confirmation and non-interactively for API smoke-testing.
 - `tests/run_all_tests.py` — single entry point that smoke-runs every hardware-dependent test script in non-interactive mode and aggregates pass/fail. Designed to catch API-shape regressions (like the stale `narrow_range=` argument fixed in 0.17.0b2) before tagging a release. Prompts to confirm SDI BNC and HDMI loopback cables are connected before running.

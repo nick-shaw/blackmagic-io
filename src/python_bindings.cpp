@@ -2467,5 +2467,5 @@ PYBIND11_MODULE(decklink_io, m) {
              py::arg("dynamic_range_mask"));
 
     // Version info
-    m.attr("__version__") = "0.17.0b2";
+    m.attr("__version__") = "0.17.0b3";
 }

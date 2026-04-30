@@ -7,7 +7,7 @@ build-backend = "scikit_build_core.build"
 
 [project]
 name = "blackmagic-io"
-version = "0.17.0b2"
+version = "0.17.0b3"
 description = "Python library for video I/O with Blackmagic DeckLink devices"
 readme = "README.md"
 requires-python = ">=3.8"
