@@ -7,6 +7,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+- `yuv8_to_rgb_uint16` and `yuv8_to_rgb_float` decoded captured 8-bit Y'CbCr (2vuy) frames with chroma scaled 2× too large, producing visibly wrong colours (over-saturated reds/blues, with sub-zero clamping) compared to the same scene captured as 10-bit Y'CbCr. The decoders normalised Cb/Cr to [-1, 1] before applying matrix coefficients that expect [-0.5, 0.5]. Round-tripping pure red (R=255,G=0,B=0) returned roughly (1.79, -0.07, -0.20) instead of (1, 0, 0). The corresponding YUV8 encoders were correct, so output paths were unaffected; only capture decoding was wrong. The YUV10 decoder uses the correct scaling and was unaffected.
+
+### Added
+- `TestYUV8RoundTrip` in `tests/test_conversion_ranges.py` round-trips constant-colour frames through `rgb_uint8_to_yuv8` + `yuv8_to_rgb_float` for narrow and full range across Rec.709 and Rec.601 matrices. Runs in CI without hardware and would have caught the chroma-scaling bug above.
+- 8-bit YUV (2vuy) re-added to `tests/test_loopback.py`; previously dropped under the (mistaken) belief that visible round-trip error was 8-bit precision loss rather than a real decoder bug. Tolerance is set to account for both 4:2:2 chroma subsampling and 8-bit Y quantisation.
+
 ## [0.17.0b3] - 2026-04-30
 
 ### Added

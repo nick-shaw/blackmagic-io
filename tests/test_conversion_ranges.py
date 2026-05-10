@@ -508,5 +508,126 @@ class TestRGBtoRGB12Conversions:
         assert b == 3760, f"Expected B=3760 for float narrow white, got {b}"
 
 
+@pytest.mark.skipif(not CONVERSIONS_AVAILABLE, reason="Conversion functions not available")
+class TestYUV8RoundTrip:
+    """Round-trip RGB through 8-bit YUV (2vuy) encode + decode.
+
+    Regression test for a chroma-scaling bug in the YUV8 decoder where
+    Cb/Cr were normalised to [-1, 1] while the matrix coefficients
+    expected [-0.5, 0.5], doubling all chroma in the recovered RGB.
+
+    Uses constant-color frames so 4:2:2 chroma subsampling is lossless;
+    the only round-trip error is 8-bit quantisation.
+    """
+
+    # 8-bit narrow-range Y has 219 codes, so a 1-step quantisation error
+    # is 1/219 ~= 0.00457 in normalised RGB. Allow 1.5 codes of slack.
+    TOL = 1.5 / 219.0
+
+    @staticmethod
+    def _const_rgb_uint8(width, height, rgb_triplet):
+        frame = np.zeros((height, width, 3), dtype=np.uint8)
+        frame[:, :, 0] = rgb_triplet[0]
+        frame[:, :, 1] = rgb_triplet[1]
+        frame[:, :, 2] = rgb_triplet[2]
+        return frame
+
+    def _round_trip(self, rgb_uint8, width, height, matrix=None,
+                    output_narrow_range=True):
+        from blackmagic_io import (rgb_uint8_to_yuv8, yuv8_to_rgb_float, Gamut)
+        if matrix is None:
+            matrix = Gamut.Rec709
+        yuv = rgb_uint8_to_yuv8(rgb_uint8, width, height, matrix=matrix,
+                                input_narrow_range=False,
+                                output_narrow_range=output_narrow_range)
+        return yuv8_to_rgb_float(yuv, width, height, matrix=matrix,
+                                 input_narrow_range=output_narrow_range)
+
+    def test_mid_gray_narrow_rec709(self):
+        """Mid-gray round-trips with chroma at midpoint and Y in band."""
+        from blackmagic_io import Gamut
+        width, height = 16, 4
+        rgb = self._const_rgb_uint8(width, height, (128, 128, 128))
+        recovered = self._round_trip(rgb, width, height, matrix=Gamut.Rec709)
+
+        expected = 128 / 255.0
+        assert np.allclose(recovered, expected, atol=self.TOL), \
+            f"Mid-gray round-trip drift exceeds tolerance: {np.max(np.abs(recovered - expected))}"
+
+    def test_pure_red_narrow_rec709(self):
+        """Pure red round-trips to ~ (1, 0, 0). Bug produced ~ (1.79, -0.07, -0.20)."""
+        from blackmagic_io import Gamut
+        width, height = 16, 4
+        rgb = self._const_rgb_uint8(width, height, (255, 0, 0))
+        recovered = self._round_trip(rgb, width, height, matrix=Gamut.Rec709)
+
+        # Sample the centre pixel (avoids any potential edge effects).
+        r = recovered[height // 2, width // 2, 0]
+        g = recovered[height // 2, width // 2, 1]
+        b = recovered[height // 2, width // 2, 2]
+        assert abs(r - 1.0) < self.TOL, f"Red R={r} (expected 1.0)"
+        assert abs(g - 0.0) < self.TOL, f"Red G={g} (expected 0.0)"
+        assert abs(b - 0.0) < self.TOL, f"Red B={b} (expected 0.0)"
+
+    def test_pure_blue_narrow_rec709(self):
+        """Pure blue round-trips to ~ (0, 0, 1)."""
+        from blackmagic_io import Gamut
+        width, height = 16, 4
+        rgb = self._const_rgb_uint8(width, height, (0, 0, 255))
+        recovered = self._round_trip(rgb, width, height, matrix=Gamut.Rec709)
+
+        r = recovered[height // 2, width // 2, 0]
+        g = recovered[height // 2, width // 2, 1]
+        b = recovered[height // 2, width // 2, 2]
+        assert abs(r - 0.0) < self.TOL, f"Blue R={r} (expected 0.0)"
+        assert abs(g - 0.0) < self.TOL, f"Blue G={g} (expected 0.0)"
+        assert abs(b - 1.0) < self.TOL, f"Blue B={b} (expected 1.0)"
+
+    def test_pure_green_narrow_rec709(self):
+        """Pure green round-trips to ~ (0, 1, 0)."""
+        from blackmagic_io import Gamut
+        width, height = 16, 4
+        rgb = self._const_rgb_uint8(width, height, (0, 255, 0))
+        recovered = self._round_trip(rgb, width, height, matrix=Gamut.Rec709)
+
+        r = recovered[height // 2, width // 2, 0]
+        g = recovered[height // 2, width // 2, 1]
+        b = recovered[height // 2, width // 2, 2]
+        assert abs(r - 0.0) < self.TOL, f"Green R={r} (expected 0.0)"
+        assert abs(g - 1.0) < self.TOL, f"Green G={g} (expected 1.0)"
+        assert abs(b - 0.0) < self.TOL, f"Green B={b} (expected 0.0)"
+
+    def test_pure_red_full_range_rec709(self):
+        """Pure red round-trips correctly with full-range YUV too."""
+        from blackmagic_io import Gamut
+        width, height = 16, 4
+        rgb = self._const_rgb_uint8(width, height, (255, 0, 0))
+        recovered = self._round_trip(rgb, width, height, matrix=Gamut.Rec709,
+                                     output_narrow_range=False)
+
+        # Full range has 255 Y codes (vs 219), so tighter tolerance is fine,
+        # but reuse the narrow tolerance to keep this readable.
+        r = recovered[height // 2, width // 2, 0]
+        g = recovered[height // 2, width // 2, 1]
+        b = recovered[height // 2, width // 2, 2]
+        assert abs(r - 1.0) < self.TOL, f"Red (full) R={r} (expected 1.0)"
+        assert abs(g - 0.0) < self.TOL, f"Red (full) G={g} (expected 0.0)"
+        assert abs(b - 0.0) < self.TOL, f"Red (full) B={b} (expected 0.0)"
+
+    def test_pure_red_narrow_rec601(self):
+        """Bug applied to all matrices — verify Rec.601 round-trips too."""
+        from blackmagic_io import Gamut
+        width, height = 16, 4
+        rgb = self._const_rgb_uint8(width, height, (255, 0, 0))
+        recovered = self._round_trip(rgb, width, height, matrix=Gamut.Rec601)
+
+        r = recovered[height // 2, width // 2, 0]
+        g = recovered[height // 2, width // 2, 1]
+        b = recovered[height // 2, width // 2, 2]
+        assert abs(r - 1.0) < self.TOL, f"Rec.601 red R={r} (expected 1.0)"
+        assert abs(g - 0.0) < self.TOL, f"Rec.601 red G={g} (expected 0.0)"
+        assert abs(b - 0.0) < self.TOL, f"Rec.601 red B={b} (expected 0.0)"
+
+
 if __name__ == "__main__":
     pytest.main([__file__, "-v"])

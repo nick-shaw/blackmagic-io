@@ -304,10 +304,18 @@ def test_pixel_format(output_device, input_device, pixel_format, display_mode, f
 
     # 4:2:2 chroma-subsampled formats have small unavoidable errors from chroma
     # subsampling; RGB formats round-trip with zero error.
-    is_422 = captured_frame.format == decklink_io.PixelFormat.YUV10
+    is_422 = captured_frame.format in (
+        decklink_io.PixelFormat.YUV8,
+        decklink_io.PixelFormat.YUV10,
+    )
+    is_8bit_yuv = captured_frame.format == decklink_io.PixelFormat.YUV8
 
     # Set acceptable thresholds
-    if is_422:
+    if is_8bit_yuv:
+        # 2vuy has chroma subsampling AND 8-bit quantisation; allow larger error
+        acceptable_mean = 0.03  # 3% average error
+        acceptable_max = 0.20   # 20% max error
+    elif is_422:
         # v210 has chroma subsampling — small unavoidable errors
         acceptable_mean = 0.02  # 2% average error
         acceptable_max = 0.15   # 15% max error
@@ -386,11 +394,12 @@ def main():
     # Use HD1080p25 mode for testing
     display_mode = decklink_io.DisplayMode.HD1080p25
 
-    # Test 10/12-bit formats. 8-bit BGRA and 8-bit YUV are not production formats
-    # for this library and exhibit precision-limited round-trip error that exceeds
-    # any reasonable threshold a regression test could set without false negatives.
-    # RGB10 includes HDR metadata verification.
+    # Test 8/10/12-bit formats. 8-bit BGRA is not a production format for this
+    # library. RGB10 includes HDR metadata verification. YUV8 is included to
+    # guard against decoder regressions (a chroma-scaling bug shipped silently
+    # in 0.17.0b3 because YUV8 was excluded here).
     test_formats = [
+        (decklink_io.PixelFormat.YUV8, "8-bit YUV (2vuy)", False),
         (decklink_io.PixelFormat.YUV10, "10-bit YUV (v210)", False),
         (decklink_io.PixelFormat.RGB10, "10-bit RGB (R10l) + HDR metadata", True),
         (decklink_io.PixelFormat.RGB12, "12-bit RGB (R12L)", False),

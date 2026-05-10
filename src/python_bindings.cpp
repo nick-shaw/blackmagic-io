@@ -974,13 +974,13 @@ py::array_t<uint16_t> yuv8_to_rgb_uint16(py::array_t<uint8_t> yuv_array, int wid
             uint8_t v_byte = src[row_idx + 2];
             uint8_t y1_byte = src[row_idx + 3];
 
-            // Normalize to 0.0-1.0
+            // Normalize Y to 0.0-1.0 and Cb/Cr to -0.5..+0.5
             double y0 = (y0_byte - y_min) / y_range;
             double y1 = (y1_byte - y_min) / y_range;
-            double cb = (u_byte - c_mid) / (c_range / 2.0);
-            double cr = (v_byte - c_mid) / (c_range / 2.0);
+            double cb = (u_byte - c_mid) / c_range;
+            double cr = (v_byte - c_mid) / c_range;
 
-            // YCbCr to RGB conversion
+            // YCbCr to RGB conversion (chroma is in [-0.5, 0.5])
             double r_factor = cr * (2.0 - 2.0 * Kr);
             double g_factor = -cb * (2.0 - 2.0 * Kb) * Kb / Kg - cr * (2.0 - 2.0 * Kr) * Kr / Kg;
             double b_factor = cb * (2.0 - 2.0 * Kb);
@@ -1079,13 +1079,13 @@ py::array_t<float> yuv8_to_rgb_float(py::array_t<uint8_t> yuv_array, int width, 
             uint8_t v_byte = src[row_idx + 2];
             uint8_t y1_byte = src[row_idx + 3];
 
-            // Normalize to 0.0-1.0
+            // Normalize Y to 0.0-1.0 and Cb/Cr to -0.5..+0.5
             double y0 = (y0_byte - y_min) / y_range;
             double y1 = (y1_byte - y_min) / y_range;
-            double cb = (u_byte - c_mid) / (c_range / 2.0);
-            double cr = (v_byte - c_mid) / (c_range / 2.0);
+            double cb = (u_byte - c_mid) / c_range;
+            double cr = (v_byte - c_mid) / c_range;
 
-            // YCbCr to RGB conversion
+            // YCbCr to RGB conversion (chroma is in [-0.5, 0.5])
             double r_factor = cr * (2.0 - 2.0 * Kr);
             double g_factor = -cb * (2.0 - 2.0 * Kb) * Kb / Kg - cr * (2.0 - 2.0 * Kr) * Kr / Kg;
             double b_factor = cb * (2.0 - 2.0 * Kb);
