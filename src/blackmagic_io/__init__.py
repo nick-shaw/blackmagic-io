@@ -270,7 +270,7 @@ try:
         return _rgb_float_to_rgb12(rgb_array, width, height, output_narrow_range)
 
     # Unpacking functions (format -> RGB)
-    def yuv10_to_rgb_uint16(yuv_array, width, height, matrix=Gamut.Rec709, input_narrow_range=True, output_narrow_range=False):
+    def yuv10_to_rgb_uint16(yuv_array, width, height, matrix=Gamut.Rec709, input_narrow_range=True, output_narrow_range=False, row_bytes=None):
         """Convert 10-bit YUV (v210) to RGB uint16.
 
         Args:
@@ -280,14 +280,18 @@ try:
             matrix: Color matrix (Rec601, Rec709, or Rec2020)
             input_narrow_range: If True, input is narrow range (Y: 64-940, UV: 64-960). Default: True
             output_narrow_range: If True, output is narrow range (4096-60160 @16-bit). Default: False
+            row_bytes: Bytes per row in the source buffer. Pass ``captured_frame.row_bytes`` for
+                captured frames whose stride may include padding. If None, defaults to
+                ``((width + 47) // 48) * 128`` (the v210-native stride).
 
         Returns:
             HxWx3 RGB array (uint16)
         """
         yuv_array = np.ascontiguousarray(yuv_array)
-        return _yuv10_to_rgb_uint16(yuv_array, width, height, matrix, input_narrow_range, output_narrow_range)
+        return _yuv10_to_rgb_uint16(yuv_array, width, height, matrix, input_narrow_range, output_narrow_range,
+                                    -1 if row_bytes is None else row_bytes)
 
-    def yuv10_to_rgb_float(yuv_array, width, height, matrix=Gamut.Rec709, input_narrow_range=True):
+    def yuv10_to_rgb_float(yuv_array, width, height, matrix=Gamut.Rec709, input_narrow_range=True, row_bytes=None):
         """Convert 10-bit YUV (v210) to RGB float.
 
         Args:
@@ -296,14 +300,18 @@ try:
             height: Image height
             matrix: Color matrix (Rec601, Rec709, or Rec2020)
             input_narrow_range: If True, input is narrow range (Y: 64-940, UV: 64-960). Default: True
+            row_bytes: Bytes per row in the source buffer. Pass ``captured_frame.row_bytes`` for
+                captured frames whose stride may include padding. If None, defaults to
+                ``((width + 47) // 48) * 128`` (the v210-native stride).
 
         Returns:
             HxWx3 RGB array (float, 0.0-1.0 full range)
         """
         yuv_array = np.ascontiguousarray(yuv_array)
-        return _yuv10_to_rgb_float(yuv_array, width, height, matrix, input_narrow_range)
+        return _yuv10_to_rgb_float(yuv_array, width, height, matrix, input_narrow_range,
+                                   -1 if row_bytes is None else row_bytes)
 
-    def yuv8_to_rgb_uint16(yuv_array, width, height, matrix=Gamut.Rec709, input_narrow_range=True, output_narrow_range=False):
+    def yuv8_to_rgb_uint16(yuv_array, width, height, matrix=Gamut.Rec709, input_narrow_range=True, output_narrow_range=False, row_bytes=None):
         """Convert 8-bit YUV (2vuy) to RGB uint16.
 
         Args:
@@ -313,14 +321,17 @@ try:
             matrix: Color matrix (Rec601, Rec709, or Rec2020)
             input_narrow_range: If True, input is narrow range (Y: 16-235, UV: 16-240). Default: True
             output_narrow_range: If True, output is narrow range (4096-60160 @16-bit). Default: False
+            row_bytes: Bytes per row in the source buffer. Pass ``captured_frame.row_bytes`` for
+                captured frames whose stride may include padding. If None, defaults to ``width * 2``.
 
         Returns:
             HxWx3 RGB array (uint16)
         """
         yuv_array = np.ascontiguousarray(yuv_array)
-        return _yuv8_to_rgb_uint16(yuv_array, width, height, matrix, input_narrow_range, output_narrow_range)
+        return _yuv8_to_rgb_uint16(yuv_array, width, height, matrix, input_narrow_range, output_narrow_range,
+                                   -1 if row_bytes is None else row_bytes)
 
-    def yuv8_to_rgb_float(yuv_array, width, height, matrix=Gamut.Rec709, input_narrow_range=True):
+    def yuv8_to_rgb_float(yuv_array, width, height, matrix=Gamut.Rec709, input_narrow_range=True, row_bytes=None):
         """Convert 8-bit YUV (2vuy) to RGB float.
 
         Args:
@@ -329,14 +340,17 @@ try:
             height: Image height
             matrix: Color matrix (Rec601, Rec709, or Rec2020)
             input_narrow_range: If True, input is narrow range (Y: 16-235, UV: 16-240). Default: True
+            row_bytes: Bytes per row in the source buffer. Pass ``captured_frame.row_bytes`` for
+                captured frames whose stride may include padding. If None, defaults to ``width * 2``.
 
         Returns:
             HxWx3 RGB array (float, 0.0-1.0 full range)
         """
         yuv_array = np.ascontiguousarray(yuv_array)
-        return _yuv8_to_rgb_float(yuv_array, width, height, matrix, input_narrow_range)
+        return _yuv8_to_rgb_float(yuv_array, width, height, matrix, input_narrow_range,
+                                  -1 if row_bytes is None else row_bytes)
 
-    def rgb10_to_uint16(rgb_array, width, height, input_narrow_range=True, output_narrow_range=False):
+    def rgb10_to_uint16(rgb_array, width, height, input_narrow_range=True, output_narrow_range=False, row_bytes=None):
         """Convert 10-bit RGB (R10l) to RGB uint16.
 
         Args:
@@ -345,14 +359,17 @@ try:
             height: Image height
             input_narrow_range: If True, input is narrow range (64-940 @10-bit). Default: True
             output_narrow_range: If True, output is narrow range (4096-60160 @16-bit). Default: False
+            row_bytes: Bytes per row in the source buffer. Pass ``captured_frame.row_bytes`` for
+                captured frames whose stride may include padding. If None, defaults to ``width * 4``.
 
         Returns:
             HxWx3 RGB array (uint16)
         """
         rgb_array = np.ascontiguousarray(rgb_array)
-        return _rgb10_to_uint16(rgb_array, width, height, input_narrow_range, output_narrow_range)
+        return _rgb10_to_uint16(rgb_array, width, height, input_narrow_range, output_narrow_range,
+                                -1 if row_bytes is None else row_bytes)
 
-    def rgb10_to_float(rgb_array, width, height, input_narrow_range=True):
+    def rgb10_to_float(rgb_array, width, height, input_narrow_range=True, row_bytes=None):
         """Convert 10-bit RGB (R10l) to RGB float.
 
         Args:
@@ -360,14 +377,17 @@ try:
             width: Image width
             height: Image height
             input_narrow_range: If True, input is narrow range (64-940 @10-bit). Default: True
+            row_bytes: Bytes per row in the source buffer. Pass ``captured_frame.row_bytes`` for
+                captured frames whose stride may include padding. If None, defaults to ``width * 4``.
 
         Returns:
             HxWx3 RGB array (float, 0.0-1.0 full range)
         """
         rgb_array = np.ascontiguousarray(rgb_array)
-        return _rgb10_to_float(rgb_array, width, height, input_narrow_range)
+        return _rgb10_to_float(rgb_array, width, height, input_narrow_range,
+                               -1 if row_bytes is None else row_bytes)
 
-    def rgb12_to_uint16(rgb_array, width, height, input_narrow_range=False, output_narrow_range=False):
+    def rgb12_to_uint16(rgb_array, width, height, input_narrow_range=False, output_narrow_range=False, row_bytes=None):
         """Convert 12-bit RGB (R12L) to RGB uint16.
 
         Args:
@@ -376,14 +396,18 @@ try:
             height: Image height
             input_narrow_range: If True, input is narrow range (256-3760 @12-bit). Default: False
             output_narrow_range: If True, output is narrow range (4096-60160 @16-bit). Default: False
+            row_bytes: Bytes per row in the source buffer. Pass ``captured_frame.row_bytes`` for
+                captured frames whose stride may include padding. If None, defaults to
+                ``((width + 7) // 8) * 36`` (the R12L-native stride).
 
         Returns:
             HxWx3 RGB array (uint16)
         """
         rgb_array = np.ascontiguousarray(rgb_array)
-        return _rgb12_to_uint16(rgb_array, width, height, input_narrow_range, output_narrow_range)
+        return _rgb12_to_uint16(rgb_array, width, height, input_narrow_range, output_narrow_range,
+                                -1 if row_bytes is None else row_bytes)
 
-    def rgb12_to_float(rgb_array, width, height, input_narrow_range=False):
+    def rgb12_to_float(rgb_array, width, height, input_narrow_range=False, row_bytes=None):
         """Convert 12-bit RGB (R12L) to RGB float.
 
         Args:
@@ -391,69 +415,87 @@ try:
             width: Image width
             height: Image height
             input_narrow_range: If True, input is narrow range (256-3760 @12-bit). Default: False
+            row_bytes: Bytes per row in the source buffer. Pass ``captured_frame.row_bytes`` for
+                captured frames whose stride may include padding. If None, defaults to
+                ``((width + 7) // 8) * 36`` (the R12L-native stride).
 
         Returns:
             HxWx3 RGB array (float, 0.0-1.0 full range)
         """
         rgb_array = np.ascontiguousarray(rgb_array)
-        return _rgb12_to_float(rgb_array, width, height, input_narrow_range)
+        return _rgb12_to_float(rgb_array, width, height, input_narrow_range,
+                               -1 if row_bytes is None else row_bytes)
 
     # Unpacking functions (format -> components)
-    def unpack_v210(yuv_array, width, height):
+    def unpack_v210(yuv_array, width, height, row_bytes=None):
         """Unpack 10-bit YUV (v210) to separate Y, Cb, Cr arrays.
 
         Args:
             yuv_array: Flat uint8 array in v210 format
             width: Image width
             height: Image height
+            row_bytes: Bytes per row in the source buffer. Pass ``captured_frame.row_bytes`` for
+                captured frames whose stride may include padding. If None, defaults to
+                ``((width + 47) // 48) * 128`` (the v210-native stride).
 
         Returns:
             Dictionary with 'y', 'cb', 'cr' keys, each containing HxW uint16 array (10-bit values)
         """
         yuv_array = np.ascontiguousarray(yuv_array)
-        return _unpack_v210(yuv_array, width, height)
+        return _unpack_v210(yuv_array, width, height,
+                            -1 if row_bytes is None else row_bytes)
 
-    def unpack_2vuy(yuv_array, width, height):
+    def unpack_2vuy(yuv_array, width, height, row_bytes=None):
         """Unpack 8-bit YUV (2vuy) to separate Y, Cb, Cr arrays.
 
         Args:
             yuv_array: Flat uint8 array in 2vuy format
             width: Image width
             height: Image height
+            row_bytes: Bytes per row in the source buffer. Pass ``captured_frame.row_bytes`` for
+                captured frames whose stride may include padding. If None, defaults to ``width * 2``.
 
         Returns:
             Dictionary with 'y', 'cb', 'cr' keys, each containing HxW uint8 array
         """
         yuv_array = np.ascontiguousarray(yuv_array)
-        return _unpack_2vuy(yuv_array, width, height)
+        return _unpack_2vuy(yuv_array, width, height,
+                            -1 if row_bytes is None else row_bytes)
 
-    def unpack_rgb10(rgb_array, width, height):
+    def unpack_rgb10(rgb_array, width, height, row_bytes=None):
         """Unpack 10-bit RGB (R10l) to separate R, G, B arrays.
 
         Args:
             rgb_array: Flat uint8 array in R10l format
             width: Image width
             height: Image height
+            row_bytes: Bytes per row in the source buffer. Pass ``captured_frame.row_bytes`` for
+                captured frames whose stride may include padding. If None, defaults to ``width * 4``.
 
         Returns:
             Dictionary with 'r', 'g', 'b' keys, each containing HxW uint16 array (10-bit values)
         """
         rgb_array = np.ascontiguousarray(rgb_array)
-        return _unpack_rgb10(rgb_array, width, height)
+        return _unpack_rgb10(rgb_array, width, height,
+                             -1 if row_bytes is None else row_bytes)
 
-    def unpack_rgb12(rgb_array, width, height):
+    def unpack_rgb12(rgb_array, width, height, row_bytes=None):
         """Unpack 12-bit RGB (R12L) to separate R, G, B arrays.
 
         Args:
             rgb_array: Flat uint8 array in R12L format
             width: Image width
             height: Image height
+            row_bytes: Bytes per row in the source buffer. Pass ``captured_frame.row_bytes`` for
+                captured frames whose stride may include padding. If None, defaults to
+                ``((width + 7) // 8) * 36`` (the R12L-native stride).
 
         Returns:
             Dictionary with 'r', 'g', 'b' keys, each containing HxW uint16 array (12-bit values)
         """
         rgb_array = np.ascontiguousarray(rgb_array)
-        return _unpack_rgb12(rgb_array, width, height)
+        return _unpack_rgb12(rgb_array, width, height,
+                             -1 if row_bytes is None else row_bytes)
 
 except ImportError:
     # C++ extension not built yet

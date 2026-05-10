@@ -13,6 +13,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 - `TestYUV8RoundTrip` in `tests/test_conversion_ranges.py` round-trips constant-colour frames through `rgb_uint8_to_yuv8` + `yuv8_to_rgb_float` for narrow and full range across Rec.709 and Rec.601 matrices. Runs in CI without hardware and would have caught the chroma-scaling bug above.
 - 8-bit YUV (2vuy) re-added to `tests/test_loopback.py`; previously dropped under the (mistaken) belief that visible round-trip error was 8-bit precision loss rather than a real decoder bug. Tolerance is set to account for both 4:2:2 chroma subsampling and 8-bit Y quantisation.
+- Optional `row_bytes=` parameter on the eight `*_to_uint16` / `*_to_float` decoder wrappers (`yuv8`, `yuv10`, `rgb10`, `rgb12`) and on the four `unpack_*` helpers in `blackmagic_io.__init__`. Previously, only the high-level `captured_frame_to_*` paths could forward `captured_frame.row_bytes` to the C extension; direct callers fell back to a width-derived stride that happens to be correct for HD1080 but can mismatch BMD's actual stride at other widths (HD720 v210 in particular). The same parameter and `-1` sentinel was already accepted by the underlying C++ functions and is now also exposed on the four `unpack_*` C++ entry points. Defaults are unchanged, so existing callers are unaffected. `tests/test_loopback.py` now passes `captured_frame.row_bytes` for all four packed-format paths.
 
 ## [0.17.0b3] - 2026-04-30
 

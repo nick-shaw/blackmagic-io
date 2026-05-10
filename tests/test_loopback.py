@@ -243,7 +243,8 @@ def test_pixel_format(output_device, input_device, pixel_format, display_mode, f
             captured_frame.width,
             captured_frame.height,
             matrix=captured_frame.colorspace,
-            input_narrow_range=True
+            input_narrow_range=True,
+            row_bytes=captured_frame.row_bytes,
         )
     elif captured_frame.format == decklink_io.PixelFormat.YUV10:
         print("Converting YUV10 to RGB...")
@@ -252,7 +253,8 @@ def test_pixel_format(output_device, input_device, pixel_format, display_mode, f
             captured_frame.width,
             captured_frame.height,
             matrix=captured_frame.colorspace,
-            input_narrow_range=True
+            input_narrow_range=True,
+            row_bytes=captured_frame.row_bytes,
         )
     elif captured_frame.format == decklink_io.PixelFormat.RGB10:
         print("Converting RGB10 to RGB...")
@@ -260,7 +262,8 @@ def test_pixel_format(output_device, input_device, pixel_format, display_mode, f
             np.array(captured_frame.data, dtype=np.uint8),
             captured_frame.width,
             captured_frame.height,
-            input_narrow_range=True
+            input_narrow_range=True,
+            row_bytes=captured_frame.row_bytes,
         )
     elif captured_frame.format == decklink_io.PixelFormat.RGB12:
         print("Converting RGB12 to RGB...")
@@ -268,7 +271,8 @@ def test_pixel_format(output_device, input_device, pixel_format, display_mode, f
             np.array(captured_frame.data, dtype=np.uint8),
             captured_frame.width,
             captured_frame.height,
-            input_narrow_range=True
+            input_narrow_range=True,
+            row_bytes=captured_frame.row_bytes,
         )
     elif captured_frame.format == decklink_io.PixelFormat.BGRA:
         print("Converting BGRA to RGB...")
