@@ -284,6 +284,16 @@ py::array_t<uint8_t> rgb_uint16_to_rgb10(py::array_t<uint16_t> rgb_array, int wi
     ssize_t stride_y = buf.strides[0];
     ssize_t stride_x = buf.strides[1];
 
+    // Range constants (hoisted out of the per-pixel loop).
+    // Input is 16-bit; output is 10-bit. Narrow 16-bit is the 10-bit narrow
+    // range scaled up by 64, so 64<<6 .. 940<<6 = 4096 .. 60160.
+    double in_min   = input_narrow_range  ? 64.0 * 64.0  : 0.0;        // 4096 or 0
+    double in_range = input_narrow_range  ? 876.0 * 64.0 : 65535.0;    // 56064 or 65535
+    double out_min   = output_narrow_range ? 64.0   : 0.0;             // 10-bit narrow black
+    double out_range = output_narrow_range ? 876.0  : 1023.0;          // 10-bit narrow / full range
+
+    bool use_bitshift = (input_narrow_range == output_narrow_range);
+
     for (int y = 0; y < height; y++) {
         uint32_t* row_dst = dst + (y * row_bytes / 4);
         for (int x = 0; x < width; x++) {
@@ -292,40 +302,22 @@ py::array_t<uint8_t> rgb_uint16_to_rgb10(py::array_t<uint16_t> rgb_array, int wi
 
             uint16_t r10, g10, b10;
 
-            if (input_narrow_range == output_narrow_range) {
-                // Same range: simple bit-shift
+            if (use_bitshift) {
+                // Same range: 16-bit -> 10-bit by dropping bottom 6 bits
                 r10 = pixel[0] >> 6;
                 g10 = pixel[1] >> 6;
                 b10 = pixel[2] >> 6;
             } else {
-                // Different ranges: convert through normalized float
-                float rf, gf, bf;
-                if (input_narrow_range) {
-                    // Narrow 16-bit input: 64-940 @ 10-bit = 4096-60160 @ 16-bit
-                    rf = (pixel[0] - (64 << 6)) / (float)(876 << 6);
-                    gf = (pixel[1] - (64 << 6)) / (float)(876 << 6);
-                    bf = (pixel[2] - (64 << 6)) / (float)(876 << 6);
-                } else {
-                    // Full 16-bit input: 0-65535
-                    rf = pixel[0] / 65535.0f;
-                    gf = pixel[1] / 65535.0f;
-                    bf = pixel[2] / 65535.0f;
-                }
+                // Different ranges: normalise input to 0..1, scale to output range
+                double rf = (pixel[0] - in_min) / in_range;
+                double gf = (pixel[1] - in_min) / in_range;
+                double bf = (pixel[2] - in_min) / in_range;
 
-                int r10_int, g10_int, b10_int;
-                if (output_narrow_range) {
-                    // Narrow 10-bit output: 64-940
-                    r10_int = (int)(rf * 876.0f + 64.0f + 0.5f);
-                    g10_int = (int)(gf * 876.0f + 64.0f + 0.5f);
-                    b10_int = (int)(bf * 876.0f + 64.0f + 0.5f);
-                } else {
-                    // Full 10-bit output: 0-1023
-                    r10_int = (int)(rf * 1023.0f + 0.5f);
-                    g10_int = (int)(gf * 1023.0f + 0.5f);
-                    b10_int = (int)(bf * 1023.0f + 0.5f);
-                }
+                int r10_int = (int)(rf * out_range + out_min + 0.5);
+                int g10_int = (int)(gf * out_range + out_min + 0.5);
+                int b10_int = (int)(bf * out_range + out_min + 0.5);
 
-                // Clamp to valid 10-bit range before packing
+                // Clamp to valid 10-bit code range before packing
                 r10 = (uint16_t)(r10_int < 0 ? 0 : (r10_int > 1023 ? 1023 : r10_int));
                 g10 = (uint16_t)(g10_int < 0 ? 0 : (g10_int > 1023 ? 1023 : g10_int));
                 b10 = (uint16_t)(b10_int < 0 ? 0 : (b10_int > 1023 ? 1023 : b10_int));
@@ -363,10 +355,11 @@ py::array_t<uint8_t> rgb_float_to_rgb10(py::array_t<float> rgb_array, int width,
     ssize_t stride_y = buf.strides[0];
     ssize_t stride_x = buf.strides[1];
 
-    // Narrow range: 0.0-1.0 maps to 64-940 (10-bit)
-    // Full range: 0.0-1.0 maps to 0-1023 (10-bit)
-    float scale = output_narrow_range ? 876.0f : 1023.0f;
-    float offset = output_narrow_range ? 64.0f : 0.0f;
+    // Output range constants. Float input is always 0..1 full range.
+    // Narrow output: 0..1 maps to 64..940 (10-bit narrow).
+    // Full output:   0..1 maps to 0..1023 (10-bit full).
+    double out_min   = output_narrow_range ? 64.0  : 0.0;
+    double out_range = output_narrow_range ? 876.0 : 1023.0;
 
     for (int y = 0; y < height; y++) {
         uint32_t* row_dst = dst + (y * row_bytes / 4);
@@ -374,12 +367,12 @@ py::array_t<uint8_t> rgb_float_to_rgb10(py::array_t<float> rgb_array, int width,
             const float* pixel = reinterpret_cast<const float*>(
                 src_base + y * stride_y + x * stride_x);
 
-            // Convert float (0.0-1.0) to 10-bit with rounding and clamping
-            int r10 = (int)(pixel[0] * scale + offset + 0.5f);
-            int g10 = (int)(pixel[1] * scale + offset + 0.5f);
-            int b10 = (int)(pixel[2] * scale + offset + 0.5f);
+            // Convert float (0..1) to 10-bit with rounding
+            int r10 = (int)(pixel[0] * out_range + out_min + 0.5);
+            int g10 = (int)(pixel[1] * out_range + out_min + 0.5);
+            int b10 = (int)(pixel[2] * out_range + out_min + 0.5);
 
-            // Clamp to valid range
+            // Clamp to valid 10-bit code range
             r10 = r10 < 0 ? 0 : (r10 > 1023 ? 1023 : r10);
             g10 = g10 < 0 ? 0 : (g10 > 1023 ? 1023 : g10);
             b10 = b10 < 0 ? 0 : (b10 > 1023 ? 1023 : b10);
@@ -416,7 +409,14 @@ py::array_t<uint8_t> rgb_uint16_to_rgb12(py::array_t<uint16_t> rgb_array, int wi
     ssize_t stride_y = buf.strides[0];
     ssize_t stride_x = buf.strides[1];
 
-    // Optimize: use bit-shift when input and output ranges match
+    // Range constants (hoisted out of the per-pixel loop).
+    // Input is 16-bit; output is 12-bit. Narrow 16-bit is the 12-bit narrow
+    // range scaled up by 16, so 256<<4 .. 3760<<4 = 4096 .. 60160.
+    double in_min   = input_narrow_range  ? 256.0 * 16.0  : 0.0;       // 4096 or 0
+    double in_range = input_narrow_range  ? 3504.0 * 16.0 : 65535.0;   // 56064 or 65535
+    double out_min   = output_narrow_range ? 256.0  : 0.0;             // 12-bit narrow black
+    double out_range = output_narrow_range ? 3504.0 : 4095.0;          // 12-bit narrow / full range
+
     bool use_bitshift = (input_narrow_range == output_narrow_range);
 
     for (int y = 0; y < height; y++) {
@@ -433,41 +433,21 @@ py::array_t<uint8_t> rgb_uint16_to_rgb12(py::array_t<uint16_t> rgb_array, int wi
                         src_base + y * stride_y + pixel_x * stride_x);
 
                     if (use_bitshift) {
-                        // Convert 16-bit to 12-bit by right-shifting 4 bits
+                        // Same range: 16-bit -> 12-bit by dropping bottom 4 bits
                         r[i] = pixel[0] >> 4;
                         g[i] = pixel[1] >> 4;
                         b[i] = pixel[2] >> 4;
                     } else {
-                        // Convert through normalized float when ranges differ
-                        float rf, gf, bf;
+                        // Different ranges: normalise input to 0..1, scale to output range
+                        double rf = (pixel[0] - in_min) / in_range;
+                        double gf = (pixel[1] - in_min) / in_range;
+                        double bf = (pixel[2] - in_min) / in_range;
 
-                        // Input conversion to 0.0-1.0
-                        if (input_narrow_range) {
-                            // Narrow range: 4096-60160 (64-940 @12-bit)
-                            rf = (pixel[0] - (64 << 6)) / (float)(876 << 6);
-                            gf = (pixel[1] - (64 << 6)) / (float)(876 << 6);
-                            bf = (pixel[2] - (64 << 6)) / (float)(876 << 6);
-                        } else {
-                            // Full range: 0-65535
-                            rf = pixel[0] / 65535.0f;
-                            gf = pixel[1] / 65535.0f;
-                            bf = pixel[2] / 65535.0f;
-                        }
+                        int r12 = (int)(rf * out_range + out_min + 0.5);
+                        int g12 = (int)(gf * out_range + out_min + 0.5);
+                        int b12 = (int)(bf * out_range + out_min + 0.5);
 
-                        // Output conversion from 0.0-1.0 with rounding
-                        int r12, g12, b12;
-                        if (output_narrow_range) {
-                            // Narrow range: 256-3760
-                            r12 = (int)(rf * 3504.0f + 256.0f + 0.5f);
-                            g12 = (int)(gf * 3504.0f + 256.0f + 0.5f);
-                            b12 = (int)(bf * 3504.0f + 256.0f + 0.5f);
-                        } else {
-                            // Full range: 0-4095
-                            r12 = (int)(rf * 4095.0f + 0.5f);
-                            g12 = (int)(gf * 4095.0f + 0.5f);
-                            b12 = (int)(bf * 4095.0f + 0.5f);
-                        }
-                        // Clamp to valid 12-bit range before packing
+                        // Clamp to valid 12-bit code range before packing
                         r[i] = (uint16_t)(r12 < 0 ? 0 : (r12 > 4095 ? 4095 : r12));
                         g[i] = (uint16_t)(g12 < 0 ? 0 : (g12 > 4095 ? 4095 : g12));
                         b[i] = (uint16_t)(b12 < 0 ? 0 : (b12 > 4095 ? 4095 : b12));
@@ -519,10 +499,11 @@ py::array_t<uint8_t> rgb_float_to_rgb12(py::array_t<float> rgb_array, int width,
     ssize_t stride_y = buf.strides[0];
     ssize_t stride_x = buf.strides[1];
 
-    // Narrow range: 0.0-1.0 maps to 256-3760 (12-bit)
-    // Full range: 0.0-1.0 maps to 0-4095 (12-bit)
-    float scale = output_narrow_range ? 3504.0f : 4095.0f;
-    float offset = output_narrow_range ? 256.0f : 0.0f;
+    // Output range constants. Float input is always 0..1 full range.
+    // Narrow output: 0..1 maps to 256..3760 (12-bit narrow).
+    // Full output:   0..1 maps to 0..4095 (12-bit full).
+    double out_min   = output_narrow_range ? 256.0  : 0.0;
+    double out_range = output_narrow_range ? 3504.0 : 4095.0;
 
     for (int y = 0; y < height; y++) {
         uint32_t* nextWord = dst + (y * row_bytes / 4);
@@ -537,12 +518,12 @@ py::array_t<uint8_t> rgb_float_to_rgb12(py::array_t<float> rgb_array, int width,
                     const float* pixel = reinterpret_cast<const float*>(
                         src_base + y * stride_y + pixel_x * stride_x);
 
-                    // Convert float (0.0-1.0) to 12-bit with rounding and clamping
-                    int r12 = (int)(pixel[0] * scale + offset + 0.5f);
-                    int g12 = (int)(pixel[1] * scale + offset + 0.5f);
-                    int b12 = (int)(pixel[2] * scale + offset + 0.5f);
+                    // Convert float (0..1) to 12-bit with rounding
+                    int r12 = (int)(pixel[0] * out_range + out_min + 0.5);
+                    int g12 = (int)(pixel[1] * out_range + out_min + 0.5);
+                    int b12 = (int)(pixel[2] * out_range + out_min + 0.5);
 
-                    // Clamp to valid range
+                    // Clamp to valid 12-bit code range
                     r[i] = (uint16_t)(r12 < 0 ? 0 : (r12 > 4095 ? 4095 : r12));
                     g[i] = (uint16_t)(g12 < 0 ? 0 : (g12 > 4095 ? 4095 : g12));
                     b[i] = (uint16_t)(b12 < 0 ? 0 : (b12 > 4095 ? 4095 : b12));
@@ -1478,25 +1459,13 @@ py::array_t<uint16_t> rgb10_to_uint16(py::array_t<uint8_t> rgb_array, int width,
     const uint8_t* src_base = static_cast<const uint8_t*>(buf.ptr);
     uint16_t* dst = static_cast<uint16_t*>(res_buf.ptr);
 
-    // Input range parameters
-    double in_min, in_range;
-    if (input_narrow_range) {
-        in_min = 64.0;
-        in_range = 876.0;
-    } else {
-        in_min = 0.0;
-        in_range = 1023.0;
-    }
-
-    // Output range parameters
-    double out_min, out_range;
-    if (output_narrow_range) {
-        out_min = 4096.0;
-        out_range = 56064.0;
-    } else {
-        out_min = 0.0;
-        out_range = 65535.0;
-    }
+    // Range constants (hoisted out of the per-pixel loop).
+    // Input is 10-bit; output is 16-bit. Narrow 16-bit is the 10-bit narrow
+    // range scaled up by 64, so 64<<6 .. 940<<6 = 4096 .. 60160.
+    double in_min   = input_narrow_range  ? 64.0   : 0.0;              // 10-bit narrow black
+    double in_range = input_narrow_range  ? 876.0  : 1023.0;           // 10-bit narrow / full range
+    double out_min   = output_narrow_range ? 64.0 * 64.0  : 0.0;       // 4096 or 0
+    double out_range = output_narrow_range ? 876.0 * 64.0 : 65535.0;   // 56064 or 65535
 
     bool use_bitshift = (input_narrow_range == output_narrow_range);
 
@@ -1513,19 +1482,20 @@ py::array_t<uint16_t> rgb10_to_uint16(py::array_t<uint8_t> rgb_array, int width,
             int pixel_idx = (y * width + x) * 3;
 
             if (use_bitshift) {
-                // Same range: simple bit-shift (exact inverse of packing)
-                dst[pixel_idx] = r10 << 6;
+                // Same range: 10-bit -> 16-bit by shifting up 6 bits (exact inverse of packing)
+                dst[pixel_idx]     = r10 << 6;
                 dst[pixel_idx + 1] = g10 << 6;
                 dst[pixel_idx + 2] = b10 << 6;
             } else {
-                // Convert to output range (allow super-whites, clamp after scaling)
-                double r_norm = (r10 - in_min) / in_range;
-                double g_norm = (g10 - in_min) / in_range;
-                double b_norm = (b10 - in_min) / in_range;
+                // Different ranges: normalise input to 0..1, scale to output range.
+                // Allow super-whites, clamp after scaling to prevent uint16_t overflow.
+                double rf = (r10 - in_min) / in_range;
+                double gf = (g10 - in_min) / in_range;
+                double bf = (b10 - in_min) / in_range;
 
-                dst[pixel_idx] = static_cast<uint16_t>(std::max(0.0, std::min(65535.0, r_norm * out_range + out_min)));
-                dst[pixel_idx + 1] = static_cast<uint16_t>(std::max(0.0, std::min(65535.0, g_norm * out_range + out_min)));
-                dst[pixel_idx + 2] = static_cast<uint16_t>(std::max(0.0, std::min(65535.0, b_norm * out_range + out_min)));
+                dst[pixel_idx]     = static_cast<uint16_t>(std::max(0.0, std::min(65535.0, rf * out_range + out_min)));
+                dst[pixel_idx + 1] = static_cast<uint16_t>(std::max(0.0, std::min(65535.0, gf * out_range + out_min)));
+                dst[pixel_idx + 2] = static_cast<uint16_t>(std::max(0.0, std::min(65535.0, bf * out_range + out_min)));
             }
         }
     }
@@ -1557,15 +1527,9 @@ py::array_t<float> rgb10_to_float(py::array_t<uint8_t> rgb_array, int width, int
     const uint8_t* src_base = static_cast<const uint8_t*>(buf.ptr);
     float* dst = static_cast<float*>(res_buf.ptr);
 
-    // Input range parameters
-    double in_min, in_range;
-    if (input_narrow_range) {
-        in_min = 64.0;
-        in_range = 876.0;
-    } else {
-        in_min = 0.0;
-        in_range = 1023.0;
-    }
+    // Input range constants. Output is always 0..1 full-range float.
+    double in_min   = input_narrow_range ? 64.0  : 0.0;
+    double in_range = input_narrow_range ? 876.0 : 1023.0;
 
     for (int y = 0; y < height; y++) {
         const uint32_t* src = reinterpret_cast<const uint32_t*>(src_base + y * row_bytes);
@@ -1577,16 +1541,15 @@ py::array_t<float> rgb10_to_float(py::array_t<uint8_t> rgb_array, int width, int
             uint16_t g10 = (word >> 12) & 0x3FF;
             uint16_t b10 = (word >> 2) & 0x3FF;
 
-            // Convert to 0.0-1.0 (allow super-whites > 1.0)
-            double r_norm = (r10 - in_min) / in_range;
-            double g_norm = (g10 - in_min) / in_range;
-            double b_norm = (b10 - in_min) / in_range;
+            // Normalise 10-bit to 0..1 (allow super-whites > 1.0 to pass through)
+            double rf = (r10 - in_min) / in_range;
+            double gf = (g10 - in_min) / in_range;
+            double bf = (b10 - in_min) / in_range;
 
-            // Allow super-whites: values > 1.0 are valid for super-white content
             int pixel_idx = (y * width + x) * 3;
-            dst[pixel_idx] = static_cast<float>(r_norm);
-            dst[pixel_idx + 1] = static_cast<float>(g_norm);
-            dst[pixel_idx + 2] = static_cast<float>(b_norm);
+            dst[pixel_idx]     = static_cast<float>(rf);
+            dst[pixel_idx + 1] = static_cast<float>(gf);
+            dst[pixel_idx + 2] = static_cast<float>(bf);
         }
     }
 
@@ -1667,25 +1630,13 @@ py::array_t<uint16_t> rgb12_to_uint16(py::array_t<uint8_t> rgb_array, int width,
     const uint8_t* src_base = static_cast<const uint8_t*>(buf.ptr);
     uint16_t* dst = static_cast<uint16_t*>(res_buf.ptr);
 
-    // Input range parameters
-    double in_min, in_range;
-    if (input_narrow_range) {
-        in_min = 256.0;
-        in_range = 3504.0;
-    } else {
-        in_min = 0.0;
-        in_range = 4095.0;
-    }
-
-    // Output range parameters
-    double out_min, out_range;
-    if (output_narrow_range) {
-        out_min = 4096.0;
-        out_range = 56064.0;
-    } else {
-        out_min = 0.0;
-        out_range = 65535.0;
-    }
+    // Range constants (hoisted out of the per-pixel loop).
+    // Input is 12-bit; output is 16-bit. Narrow 16-bit is the 12-bit narrow
+    // range scaled up by 16, so 256<<4 .. 3760<<4 = 4096 .. 60160.
+    double in_min   = input_narrow_range  ? 256.0  : 0.0;              // 12-bit narrow black
+    double in_range = input_narrow_range  ? 3504.0 : 4095.0;           // 12-bit narrow / full range
+    double out_min   = output_narrow_range ? 256.0 * 16.0  : 0.0;      // 4096 or 0
+    double out_range = output_narrow_range ? 3504.0 * 16.0 : 65535.0;  // 56064 or 65535
 
     bool use_bitshift = (input_narrow_range == output_narrow_range);
 
@@ -1731,24 +1682,24 @@ py::array_t<uint16_t> rgb12_to_uint16(py::array_t<uint8_t> rgb_array, int width,
             g[7] = (group[8] >> 8) & 0xFFF;
             b[7] = (group[8] >> 20) & 0xFFF;
 
-            // Convert to output range
             for (int i = 0; i < 8 && (x + i) < width; i++) {
                 int pixel_idx = (y * width + x + i) * 3;
 
                 if (use_bitshift) {
-                    // Same range: simple bit-shift (exact inverse of packing)
-                    dst[pixel_idx] = r[i] << 4;
+                    // Same range: 12-bit -> 16-bit by shifting up 4 bits (exact inverse of packing)
+                    dst[pixel_idx]     = r[i] << 4;
                     dst[pixel_idx + 1] = g[i] << 4;
                     dst[pixel_idx + 2] = b[i] << 4;
                 } else {
-                    // Allow super-whites, clamp after scaling to prevent uint16_t overflow
-                    double r_norm = (r[i] - in_min) / in_range;
-                    double g_norm = (g[i] - in_min) / in_range;
-                    double b_norm = (b[i] - in_min) / in_range;
+                    // Different ranges: normalise input to 0..1, scale to output range.
+                    // Allow super-whites, clamp after scaling to prevent uint16_t overflow.
+                    double rf = (r[i] - in_min) / in_range;
+                    double gf = (g[i] - in_min) / in_range;
+                    double bf = (b[i] - in_min) / in_range;
 
-                    dst[pixel_idx] = static_cast<uint16_t>(std::max(0.0, std::min(65535.0, r_norm * out_range + out_min)));
-                    dst[pixel_idx + 1] = static_cast<uint16_t>(std::max(0.0, std::min(65535.0, g_norm * out_range + out_min)));
-                    dst[pixel_idx + 2] = static_cast<uint16_t>(std::max(0.0, std::min(65535.0, b_norm * out_range + out_min)));
+                    dst[pixel_idx]     = static_cast<uint16_t>(std::max(0.0, std::min(65535.0, rf * out_range + out_min)));
+                    dst[pixel_idx + 1] = static_cast<uint16_t>(std::max(0.0, std::min(65535.0, gf * out_range + out_min)));
+                    dst[pixel_idx + 2] = static_cast<uint16_t>(std::max(0.0, std::min(65535.0, bf * out_range + out_min)));
                 }
             }
         }
@@ -1781,15 +1732,9 @@ py::array_t<float> rgb12_to_float(py::array_t<uint8_t> rgb_array, int width, int
     const uint8_t* src_base = static_cast<const uint8_t*>(buf.ptr);
     float* dst = static_cast<float*>(res_buf.ptr);
 
-    // Input range parameters
-    double in_min, in_range;
-    if (input_narrow_range) {
-        in_min = 256.0;
-        in_range = 3504.0;
-    } else {
-        in_min = 0.0;
-        in_range = 4095.0;
-    }
+    // Input range constants. Output is always 0..1 full-range float.
+    double in_min   = input_narrow_range ? 256.0  : 0.0;
+    double in_range = input_narrow_range ? 3504.0 : 4095.0;
 
     for (int y = 0; y < height; y++) {
         const uint32_t* row_src = reinterpret_cast<const uint32_t*>(src_base + y * row_bytes);
@@ -1833,17 +1778,16 @@ py::array_t<float> rgb12_to_float(py::array_t<uint8_t> rgb_array, int width, int
             g[7] = (group[8] >> 8) & 0xFFF;
             b[7] = (group[8] >> 20) & 0xFFF;
 
-            // Convert to 0.0-1.0 (allow super-whites > 1.0)
             for (int i = 0; i < 8 && (x + i) < width; i++) {
-                double r_norm = (r[i] - in_min) / in_range;
-                double g_norm = (g[i] - in_min) / in_range;
-                double b_norm = (b[i] - in_min) / in_range;
+                // Normalise 12-bit to 0..1 (allow super-whites > 1.0 to pass through)
+                double rf = (r[i] - in_min) / in_range;
+                double gf = (g[i] - in_min) / in_range;
+                double bf = (b[i] - in_min) / in_range;
 
-                // Allow super-whites: values > 1.0 are valid for super-white content
                 int pixel_idx = (y * width + x + i) * 3;
-                dst[pixel_idx] = static_cast<float>(r_norm);
-                dst[pixel_idx + 1] = static_cast<float>(g_norm);
-                dst[pixel_idx + 2] = static_cast<float>(b_norm);
+                dst[pixel_idx]     = static_cast<float>(rf);
+                dst[pixel_idx + 1] = static_cast<float>(gf);
+                dst[pixel_idx + 2] = static_cast<float>(bf);
             }
         }
     }

@@ -7,6 +7,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+- Refactored the four RGB10 and four RGB12 conversion functions onto the same idiom as the YUV refactor in 0.17.0b4: range constants (`in_min`, `in_range`, `out_min`, `out_range`) hoisted out of the per-pixel loop, consistent variable naming (`rf`, `gf`, `bf`) between encoders and decoders, broadcast-familiar code-value constants (876, 64, 1023 for 10-bit; 3504, 256, 4095 for 12-bit) inline in their canonical positions. Each encoder now reads as a term-for-term inverse of its decoder. Mathematically identical to the previous code; round-trip and bit-shift fast paths unchanged.
+
 ## [0.17.0b4] - 2026-05-11
 
 ### Changed
