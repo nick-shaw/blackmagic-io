@@ -41,6 +41,7 @@ TESTS = [
     ("test_device_detection.py",       [],                      "DeckLink device"),
     ("test_support_query.py",          [],                      "DeckLink device"),
     ("test_conversion_ranges.py",      [],                      "no hardware (pure unit tests)"),
+    ("test_colour_science_parity.py",  [],                      "no hardware (skipped if colour-science not installed)"),
     ("test_resolutions.py",            [],                      "DeckLink device"),
     ("test_rgb10_colorbars.py",        ["--no-wait"],           "DeckLink device"),
     ("test_rgb12_colorbars.py",        ["--no-wait"],           "DeckLink device"),
