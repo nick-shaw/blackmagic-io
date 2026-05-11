@@ -628,6 +628,158 @@ class TestYUV8RoundTrip:
         assert abs(g - 0.0) < self.TOL, f"Rec.601 red G={g} (expected 0.0)"
         assert abs(b - 0.0) < self.TOL, f"Rec.601 red B={b} (expected 0.0)"
 
+    def test_pure_red_narrow_rec2020(self):
+        """Rec.2020 has different Kr/Kb but same encode/decode structure."""
+        from blackmagic_io import Gamut
+        width, height = 16, 4
+        rgb = self._const_rgb_uint8(width, height, (255, 0, 0))
+        recovered = self._round_trip(rgb, width, height, matrix=Gamut.Rec2020)
+
+        r = recovered[height // 2, width // 2, 0]
+        g = recovered[height // 2, width // 2, 1]
+        b = recovered[height // 2, width // 2, 2]
+        assert abs(r - 1.0) < self.TOL, f"Rec.2020 red R={r} (expected 1.0)"
+        assert abs(g - 0.0) < self.TOL, f"Rec.2020 red G={g} (expected 0.0)"
+        assert abs(b - 0.0) < self.TOL, f"Rec.2020 red B={b} (expected 0.0)"
+
+
+@pytest.mark.skipif(not CONVERSIONS_AVAILABLE, reason="Conversion functions not available")
+class TestYUV10RoundTrip:
+    """Round-trip RGB through 10-bit YUV (v210) encode + decode.
+
+    Mirrors TestYUV8RoundTrip at 10-bit precision. Provides direct
+    non-hardware coverage of the YUV10 decoder, which previously was
+    only exercised by the hardware loopback test.
+
+    Uses constant-color frames so 4:2:2 chroma subsampling is lossless;
+    the only round-trip error is 10-bit quantisation.
+    """
+
+    # 10-bit narrow-range Y has 876 codes; a 1-step quantisation error
+    # is 1/876 ~= 0.00114 in normalised RGB. Allow 1.5 codes of slack.
+    TOL = 1.5 / 876.0
+
+    # v210 packs 6 pixels per 16 bytes. The encoder writes the minimum
+    # ((width+5)/6)*16 bytes/row, but the decoder defaults to BMD's hardware
+    # stride ((width+47)/48)*128. These agree only when width is a multiple
+    # of 48. Real BMD captures (1280, 1920, ...) all satisfy that; pick 48
+    # here so the round-trip works without an explicit row_bytes= argument.
+
+    @staticmethod
+    def _const_rgb_uint16(width, height, rgb_triplet_u16):
+        frame = np.zeros((height, width, 3), dtype=np.uint16)
+        frame[:, :, 0] = rgb_triplet_u16[0]
+        frame[:, :, 1] = rgb_triplet_u16[1]
+        frame[:, :, 2] = rgb_triplet_u16[2]
+        return frame
+
+    def _round_trip(self, rgb_uint16, width, height, matrix=None,
+                    output_narrow_range=True):
+        from blackmagic_io import (rgb_uint16_to_yuv10, yuv10_to_rgb_float, Gamut)
+        if matrix is None:
+            matrix = Gamut.Rec709
+        yuv = rgb_uint16_to_yuv10(rgb_uint16, width, height, matrix=matrix,
+                                  input_narrow_range=False,
+                                  output_narrow_range=output_narrow_range)
+        return yuv10_to_rgb_float(yuv, width, height, matrix=matrix,
+                                  input_narrow_range=output_narrow_range)
+
+    def test_mid_gray_narrow_rec709(self):
+        """Mid-gray round-trips with chroma at midpoint and Y in band."""
+        from blackmagic_io import Gamut
+        width, height = 48, 4
+        rgb = self._const_rgb_uint16(width, height, (32768, 32768, 32768))
+        recovered = self._round_trip(rgb, width, height, matrix=Gamut.Rec709)
+
+        expected = 32768 / 65535.0
+        assert np.allclose(recovered, expected, atol=self.TOL), \
+            f"Mid-gray round-trip drift exceeds tolerance: {np.max(np.abs(recovered - expected))}"
+
+    def test_pure_red_narrow_rec709(self):
+        """Pure red round-trips to ~ (1, 0, 0)."""
+        from blackmagic_io import Gamut
+        width, height = 48, 4
+        rgb = self._const_rgb_uint16(width, height, (65535, 0, 0))
+        recovered = self._round_trip(rgb, width, height, matrix=Gamut.Rec709)
+
+        r = recovered[height // 2, width // 2, 0]
+        g = recovered[height // 2, width // 2, 1]
+        b = recovered[height // 2, width // 2, 2]
+        assert abs(r - 1.0) < self.TOL, f"Red R={r} (expected 1.0)"
+        assert abs(g - 0.0) < self.TOL, f"Red G={g} (expected 0.0)"
+        assert abs(b - 0.0) < self.TOL, f"Red B={b} (expected 0.0)"
+
+    def test_pure_blue_narrow_rec709(self):
+        """Pure blue round-trips to ~ (0, 0, 1)."""
+        from blackmagic_io import Gamut
+        width, height = 48, 4
+        rgb = self._const_rgb_uint16(width, height, (0, 0, 65535))
+        recovered = self._round_trip(rgb, width, height, matrix=Gamut.Rec709)
+
+        r = recovered[height // 2, width // 2, 0]
+        g = recovered[height // 2, width // 2, 1]
+        b = recovered[height // 2, width // 2, 2]
+        assert abs(r - 0.0) < self.TOL, f"Blue R={r} (expected 0.0)"
+        assert abs(g - 0.0) < self.TOL, f"Blue G={g} (expected 0.0)"
+        assert abs(b - 1.0) < self.TOL, f"Blue B={b} (expected 1.0)"
+
+    def test_pure_green_narrow_rec709(self):
+        """Pure green round-trips to ~ (0, 1, 0)."""
+        from blackmagic_io import Gamut
+        width, height = 48, 4
+        rgb = self._const_rgb_uint16(width, height, (0, 65535, 0))
+        recovered = self._round_trip(rgb, width, height, matrix=Gamut.Rec709)
+
+        r = recovered[height // 2, width // 2, 0]
+        g = recovered[height // 2, width // 2, 1]
+        b = recovered[height // 2, width // 2, 2]
+        assert abs(r - 0.0) < self.TOL, f"Green R={r} (expected 0.0)"
+        assert abs(g - 1.0) < self.TOL, f"Green G={g} (expected 1.0)"
+        assert abs(b - 0.0) < self.TOL, f"Green B={b} (expected 0.0)"
+
+    def test_pure_red_full_range_rec709(self):
+        """Pure red round-trips correctly with full-range YUV too."""
+        from blackmagic_io import Gamut
+        width, height = 48, 4
+        rgb = self._const_rgb_uint16(width, height, (65535, 0, 0))
+        recovered = self._round_trip(rgb, width, height, matrix=Gamut.Rec709,
+                                     output_narrow_range=False)
+
+        r = recovered[height // 2, width // 2, 0]
+        g = recovered[height // 2, width // 2, 1]
+        b = recovered[height // 2, width // 2, 2]
+        assert abs(r - 1.0) < self.TOL, f"Red (full) R={r} (expected 1.0)"
+        assert abs(g - 0.0) < self.TOL, f"Red (full) G={g} (expected 0.0)"
+        assert abs(b - 0.0) < self.TOL, f"Red (full) B={b} (expected 0.0)"
+
+    def test_pure_red_narrow_rec601(self):
+        """Rec.601 (different Kr/Kb) round-trips too."""
+        from blackmagic_io import Gamut
+        width, height = 48, 4
+        rgb = self._const_rgb_uint16(width, height, (65535, 0, 0))
+        recovered = self._round_trip(rgb, width, height, matrix=Gamut.Rec601)
+
+        r = recovered[height // 2, width // 2, 0]
+        g = recovered[height // 2, width // 2, 1]
+        b = recovered[height // 2, width // 2, 2]
+        assert abs(r - 1.0) < self.TOL, f"Rec.601 red R={r} (expected 1.0)"
+        assert abs(g - 0.0) < self.TOL, f"Rec.601 red G={g} (expected 0.0)"
+        assert abs(b - 0.0) < self.TOL, f"Rec.601 red B={b} (expected 0.0)"
+
+    def test_pure_red_narrow_rec2020(self):
+        """Rec.2020 has different Kr/Kb but same encode/decode structure."""
+        from blackmagic_io import Gamut
+        width, height = 48, 4
+        rgb = self._const_rgb_uint16(width, height, (65535, 0, 0))
+        recovered = self._round_trip(rgb, width, height, matrix=Gamut.Rec2020)
+
+        r = recovered[height // 2, width // 2, 0]
+        g = recovered[height // 2, width // 2, 1]
+        b = recovered[height // 2, width // 2, 2]
+        assert abs(r - 1.0) < self.TOL, f"Rec.2020 red R={r} (expected 1.0)"
+        assert abs(g - 0.0) < self.TOL, f"Rec.2020 red G={g} (expected 0.0)"
+        assert abs(b - 0.0) < self.TOL, f"Rec.2020 red B={b} (expected 0.0)"
+
 
 if __name__ == "__main__":
     pytest.main([__file__, "-v"])
