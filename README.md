@@ -63,10 +63,10 @@ The build system (CMake + scikit-build-core) automatically uses the correct plat
 **Option A (recommended for most users): from PyPI**
 
 ```bash
-pip install blackmagic-io==0.17.0b0
+pip install blackmagic-io
 ```
 
-The explicit version pin is required because this is a beta release and `pip` skips pre-releases by default. (Once a non-beta version is published, `pip install blackmagic-io` without the version will work.) Pre-built wheels are available for Python 3.8–3.14 on macOS, Linux, and Windows; pip falls back to a source build on unsupported Pythons (which requires a C++ compiler — Xcode Command Line Tools on macOS, build-essential on Linux, or MSVC on Windows).
+This installs the latest beta. `pip` normally skips pre-releases, but falls back to them when no stable version is available — and every published version of this library is currently a beta (`0.17.0bN`). Once a stable `0.17.0` (or later) is published, `pip install blackmagic-io` will resolve to that stable version, and getting a future beta will require `pip install --pre blackmagic-io`. Pre-built wheels are available for Python 3.8–3.14 on macOS, Linux, and Windows; pip falls back to a source build on unsupported Pythons (which requires a C++ compiler — Xcode Command Line Tools on macOS, build-essential on Linux, or MSVC on Windows).
 
 To use the library at runtime you also need Blackmagic Desktop Video installed on your system (separate from this Python package) — the runtime DeckLink driver and framework are provided by Desktop Video, available from [blackmagicdesign.com/support](https://www.blackmagicdesign.com/support).
 
