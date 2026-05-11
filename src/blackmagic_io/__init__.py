@@ -97,7 +97,7 @@ try:
             height: Image height
             matrix: Color matrix (Rec601, Rec709, or Rec2020)
             input_narrow_range: If True, input is narrow range (16-235); if False, full range (0-255)
-            output_narrow_range: If True, output is narrow range (Y: 16-235, CbCr: 16-240); if False, full range
+            output_narrow_range: If True, output is narrow range (Y: 16-235, CbCr: 16-240; clamped to [0, 255], so super-blacks/super-whites are preserved); if False, full range
 
         Returns:
             Flat uint8 array in 2vuy format
@@ -117,7 +117,8 @@ try:
             matrix: Color matrix (Rec601, Rec709, or Rec2020)
             input_narrow_range: If True, input is narrow range (64-940 @10-bit, i.e., 4096-60160 @16-bit).
                               If False, input is full range (0-65535). Default: False
-            output_narrow_range: If True, output YUV is narrow range (Y: 16-235, CbCr: 16-240).
+            output_narrow_range: If True, output YUV is narrow range (Y: 16-235, CbCr: 16-240;
+                               clamped to [0, 255], so super-blacks/super-whites are preserved).
                                If False, output is full range (0-255). Default: True
 
         Returns:
@@ -138,7 +139,8 @@ try:
             width: Image width
             height: Image height
             matrix: Color matrix (Rec601, Rec709, or Rec2020)
-            output_narrow_range: If True, output YUV is narrow range (Y: 16-235, CbCr: 16-240).
+            output_narrow_range: If True, output YUV is narrow range (Y: 16-235, CbCr: 16-240;
+                               clamped to [0, 255], so super-blacks/super-whites are preserved).
                                If False, output is full range (0-255). Default: True
 
         Returns:

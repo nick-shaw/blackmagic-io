@@ -727,7 +727,7 @@ Convert R'G'B' uint8 to 8-bit Y'CbCr 2vuy format.
 - `rgb_array`: NumPy array (H×W×3), dtype uint8 (0-255 range)
 - `matrix`: R'G'B' to Y'CbCr conversion matrix (Matrix.Rec601, Matrix.Rec709 or Matrix.Rec2020). Default: Matrix.Rec709
 - `input_narrow_range`: Whether to interpret the `rgb_array` as narrow range (16-235). Default: False
-- `output_narrow_range`: Whether to encode the Y'CbCr as narrow range (Y: 16-235, CbCr: 16-240). Default: True
+- `output_narrow_range`: Whether to encode the Y'CbCr as narrow range (Y: 16-235, CbCr: 16-240; clamped to [0, 255], so super-blacks/super-whites are preserved). Default: True
 - Returns: Packed 2vuy array
 
 **`rgb_uint16_to_yuv8(rgb_array, width, height, matrix=Matrix.Rec709, input_narrow_range=False, output_narrow_range=True) -> np.ndarray`**
@@ -735,14 +735,14 @@ Convert R'G'B' uint16 to 8-bit Y'CbCr 2vuy format.
 - `rgb_array`: NumPy array (H×W×3), dtype uint16 (0-65535 range)
 - `matrix`: R'G'B' to Y'CbCr conversion matrix (Matrix.Rec601, Matrix.Rec709 or Matrix.Rec2020). Default: Matrix.Rec709
 - `input_narrow_range`: Whether to interpret the `rgb_array` as narrow range. Default: False
-- `output_narrow_range`: Whether to encode the Y'CbCr as narrow range (Y: 16-235, CbCr: 16-240). Default: True
+- `output_narrow_range`: Whether to encode the Y'CbCr as narrow range (Y: 16-235, CbCr: 16-240; clamped to [0, 255], so super-blacks/super-whites are preserved). Default: True
 - Returns: Packed 2vuy array
 
 **`rgb_float_to_yuv8(rgb_array, width, height, matrix=Matrix.Rec709, output_narrow_range=True) -> np.ndarray`**
 Convert R'G'B' float to 8-bit Y'CbCr 2vuy format.
 - `rgb_array`: NumPy array (H×W×3), dtype float32 (0.0-1.0 range)
 - `matrix`: R'G'B' to Y'CbCr conversion matrix (Matrix.Rec601, Matrix.Rec709 or Matrix.Rec2020). Default: Matrix.Rec709
-- `output_narrow_range`: Whether to encode the Y'CbCr as narrow range (Y: 16-235, CbCr: 16-240). Default: True
+- `output_narrow_range`: Whether to encode the Y'CbCr as narrow range (Y: 16-235, CbCr: 16-240; clamped to [0, 255], so super-blacks/super-whites are preserved). Default: True
 - Returns: Packed 2vuy array
 
 **`rgb_uint16_to_yuv10(rgb_array, width, height, matrix=Matrix.Rec709, input_narrow_range=False, output_narrow_range=True) -> np.ndarray`**
@@ -786,101 +786,117 @@ Convert R'G'B' float to 12-bit R'G'B' (bmdFormat12BitRGBLE) format.
 - `output_narrow_range`: Whether to output narrow range. Default: False
 - Returns: Packed 12-bit R'G'B' array
 
-**`yuv10_to_rgb_uint16(yuv_array, width, height, matrix=Matrix.Rec709, input_narrow_range=True) -> np.ndarray`**
+**`yuv10_to_rgb_uint16(yuv_array, width, height, matrix=Matrix.Rec709, input_narrow_range=True, output_narrow_range=False, row_bytes=None) -> np.ndarray`**
 Convert 10-bit Y'CbCr v210 format to R'G'B' uint16.
 - `yuv_array`: NumPy array containing packed v210 data
 - `width`: Frame width in pixels
 - `height`: Frame height in pixels
 - `matrix`: Y'CbCr to R'G'B' conversion matrix (Matrix.Rec601, Matrix.Rec709 or Matrix.Rec2020). Default: Matrix.Rec709
 - `input_narrow_range`: Whether to interpret the Y'CbCr as narrow range. Default: True
+- `output_narrow_range`: Whether to encode the uint16 R'G'B' output as narrow range (4096-60160 @ 16-bit). Default: False
+- `row_bytes`: Bytes per row in the source buffer. Pass `captured_frame.row_bytes` for captured frames whose stride may include padding. If None, defaults to `((width + 47) // 48) * 128` (the v210-native stride).
 - Returns: NumPy array (H×W×3), dtype uint16 (0-65535 range)
 
-**`yuv10_to_rgb_float(yuv_array, width, height, matrix=Matrix.Rec709, input_narrow_range=True) -> np.ndarray`**
+**`yuv10_to_rgb_float(yuv_array, width, height, matrix=Matrix.Rec709, input_narrow_range=True, row_bytes=None) -> np.ndarray`**
 Convert 10-bit Y'CbCr v210 format to R'G'B' float.
 - `yuv_array`: NumPy array containing packed v210 data
 - `width`: Frame width in pixels
 - `height`: Frame height in pixels
 - `matrix`: Y'CbCr to R'G'B' conversion matrix (Matrix.Rec601, Matrix.Rec709 or Matrix.Rec2020). Default: Matrix.Rec709
 - `input_narrow_range`: Whether to interpret the Y'CbCr as narrow range. Default: True
+- `row_bytes`: Bytes per row in the source buffer. Pass `captured_frame.row_bytes` for captured frames whose stride may include padding. If None, defaults to `((width + 47) // 48) * 128` (the v210-native stride).
 - Returns: NumPy array (H×W×3), dtype float32 (0.0-1.0 range)
 
-**`yuv8_to_rgb_uint16(yuv_array, width, height, matrix=Matrix.Rec709) -> np.ndarray`**
+**`yuv8_to_rgb_uint16(yuv_array, width, height, matrix=Matrix.Rec709, input_narrow_range=True, output_narrow_range=False, row_bytes=None) -> np.ndarray`**
 Convert 8-bit Y'CbCr 4:2:2 (2vuy) format to R'G'B' uint16.
 - `yuv_array`: NumPy array containing packed 2vuy data
 - `width`: Frame width in pixels
 - `height`: Frame height in pixels
 - `matrix`: Y'CbCr to R'G'B' conversion matrix (Matrix.Rec601, Matrix.Rec709 or Matrix.Rec2020). Default: Matrix.Rec709
+- `input_narrow_range`: Whether to interpret the Y'CbCr as narrow range (Y: 16-235, CbCr: 16-240). Default: True
+- `output_narrow_range`: Whether to encode the uint16 R'G'B' output as narrow range (4096-60160 @ 16-bit). Default: False
+- `row_bytes`: Bytes per row in the source buffer. Pass `captured_frame.row_bytes` for captured frames whose stride may include padding. If None, defaults to `width * 2`.
 - Returns: NumPy array (H×W×3), dtype uint16 (0-65535 range)
 
-**`yuv8_to_rgb_float(yuv_array, width, height, matrix=Matrix.Rec709) -> np.ndarray`**
+**`yuv8_to_rgb_float(yuv_array, width, height, matrix=Matrix.Rec709, input_narrow_range=True, row_bytes=None) -> np.ndarray`**
 Convert 8-bit Y'CbCr 4:2:2 (2vuy) format to R'G'B' float.
 - `yuv_array`: NumPy array containing packed 2vuy data
 - `width`: Frame width in pixels
 - `height`: Frame height in pixels
 - `matrix`: Y'CbCr to R'G'B' conversion matrix (Matrix.Rec601, Matrix.Rec709 or Matrix.Rec2020). Default: Matrix.Rec709
+- `input_narrow_range`: Whether to interpret the Y'CbCr as narrow range (Y: 16-235, CbCr: 16-240). Default: True
+- `row_bytes`: Bytes per row in the source buffer. Pass `captured_frame.row_bytes` for captured frames whose stride may include padding. If None, defaults to `width * 2`.
 - Returns: NumPy array (H×W×3), dtype float32 (0.0-1.0 range)
 
-**`rgb10_to_uint16(rgb_array, width, height, input_narrow_range=True, output_narrow_range=False) -> np.ndarray`**
+**`rgb10_to_uint16(rgb_array, width, height, input_narrow_range=True, output_narrow_range=False, row_bytes=None) -> np.ndarray`**
 Convert 10-bit R'G'B' (bmdFormat10BitRGBXLE) format to R'G'B' uint16.
 - `rgb_array`: NumPy array containing packed 10-bit R'G'B' data
 - `width`: Frame width in pixels
 - `height`: Frame height in pixels
 - `input_narrow_range`: Whether to interpret the 10-bit R'G'B' as narrow range. Default: True
 - `output_narrow_range`: Whether to output narrow range. Default: False
+- `row_bytes`: Bytes per row in the source buffer. Pass `captured_frame.row_bytes` for captured frames whose stride may include padding. If None, defaults to `width * 4`.
 - Returns: NumPy array (H×W×3), dtype uint16 (0-65535 range)
 
-**`rgb10_to_float(rgb_array, width, height, input_narrow_range=True) -> np.ndarray`**
+**`rgb10_to_float(rgb_array, width, height, input_narrow_range=True, row_bytes=None) -> np.ndarray`**
 Convert 10-bit R'G'B' (bmdFormat10BitRGBXLE) format to R'G'B' float.
 - `rgb_array`: NumPy array containing packed 10-bit R'G'B' data
 - `width`: Frame width in pixels
 - `height`: Frame height in pixels
 - `input_narrow_range`: Whether to interpret the 10-bit R'G'B' as narrow range. Default: True
+- `row_bytes`: Bytes per row in the source buffer. Pass `captured_frame.row_bytes` for captured frames whose stride may include padding. If None, defaults to `width * 4`.
 - Returns: NumPy array (H×W×3), dtype float32 (0.0-1.0 range)
 
-**`rgb12_to_uint16(rgb_array, width, height, input_narrow_range=False, output_narrow_range=False) -> np.ndarray`**
+**`rgb12_to_uint16(rgb_array, width, height, input_narrow_range=False, output_narrow_range=False, row_bytes=None) -> np.ndarray`**
 Convert 12-bit R'G'B' (bmdFormat12BitRGBLE) format to R'G'B' uint16.
 - `rgb_array`: NumPy array containing packed 12-bit R'G'B' data
 - `width`: Frame width in pixels
 - `height`: Frame height in pixels
 - `input_narrow_range`: Whether to interpret the 12-bit R'G'B' as narrow range. Default: False
 - `output_narrow_range`: Whether to output narrow range. Default: False
+- `row_bytes`: Bytes per row in the source buffer. Pass `captured_frame.row_bytes` for captured frames whose stride may include padding. If None, defaults to `((width + 7) // 8) * 36` (the R12L-native stride).
 - Returns: NumPy array (H×W×3), dtype uint16 (0-65535 range)
 
-**`rgb12_to_float(rgb_array, width, height, input_narrow_range=False) -> np.ndarray`**
+**`rgb12_to_float(rgb_array, width, height, input_narrow_range=False, row_bytes=None) -> np.ndarray`**
 Convert 12-bit R'G'B' (bmdFormat12BitRGBLE) format to R'G'B' float.
 - `rgb_array`: NumPy array containing packed 12-bit R'G'B' data
 - `width`: Frame width in pixels
 - `height`: Frame height in pixels
 - `input_narrow_range`: Whether to interpret the 12-bit R'G'B' as narrow range. Default: False
+- `row_bytes`: Bytes per row in the source buffer. Pass `captured_frame.row_bytes` for captured frames whose stride may include padding. If None, defaults to `((width + 7) // 8) * 36` (the R12L-native stride).
 - Returns: NumPy array (H×W×3), dtype float32 (0.0-1.0 range)
 
-**`unpack_v210(v210_array, width, height) -> tuple[np.ndarray, np.ndarray, np.ndarray]`**
+**`unpack_v210(v210_array, width, height, row_bytes=None) -> dict`**
 Unpack 10-bit Y'CbCr v210 format to Y', Cb, Cr component arrays.
 - `v210_array`: NumPy array containing packed v210 data
 - `width`: Frame width in pixels
 - `height`: Frame height in pixels
-- Returns: Tuple of (Y, Cb, Cr) NumPy arrays, each dtype uint16 (0-1023 range, 10-bit values)
+- `row_bytes`: Bytes per row in the source buffer. Pass `captured_frame.row_bytes` for captured frames whose stride may include padding. If None, defaults to `((width + 47) // 48) * 128` (the v210-native stride).
+- Returns: Dictionary with `'y'`, `'cb'`, `'cr'` keys, each containing an H×W NumPy array, dtype uint16 (0-1023 range, 10-bit values)
 
-**`unpack_2vuy(yuv_array, width, height) -> tuple[np.ndarray, np.ndarray, np.ndarray]`**
+**`unpack_2vuy(yuv_array, width, height, row_bytes=None) -> dict`**
 Unpack 8-bit Y'CbCr 4:2:2 (2vuy) format to Y', Cb, Cr component arrays.
 - `yuv_array`: NumPy array containing packed 2vuy data
 - `width`: Frame width in pixels
 - `height`: Frame height in pixels
-- Returns: Tuple of (Y, Cb, Cr) NumPy arrays, each dtype uint8
+- `row_bytes`: Bytes per row in the source buffer. Pass `captured_frame.row_bytes` for captured frames whose stride may include padding. If None, defaults to `width * 2`.
+- Returns: Dictionary with `'y'`, `'cb'`, `'cr'` keys, each containing an H×W NumPy array, dtype uint8
 
-**`unpack_rgb10(rgb_array, width, height) -> tuple[np.ndarray, np.ndarray, np.ndarray]`**
+**`unpack_rgb10(rgb_array, width, height, row_bytes=None) -> dict`**
 Unpack 10-bit R'G'B' (bmdFormat10BitRGBXLE) format to R', G', B' component arrays.
 - `rgb_array`: NumPy array containing packed 10-bit R'G'B' data
 - `width`: Frame width in pixels
 - `height`: Frame height in pixels
-- Returns: Tuple of (R, G, B) NumPy arrays, each dtype uint16 (0-1023 range, 10-bit values)
+- `row_bytes`: Bytes per row in the source buffer. Pass `captured_frame.row_bytes` for captured frames whose stride may include padding. If None, defaults to `width * 4`.
+- Returns: Dictionary with `'r'`, `'g'`, `'b'` keys, each containing an H×W NumPy array, dtype uint16 (0-1023 range, 10-bit values)
 
-**`unpack_rgb12(rgb_array, width, height) -> tuple[np.ndarray, np.ndarray, np.ndarray]`**
+**`unpack_rgb12(rgb_array, width, height, row_bytes=None) -> dict`**
 Unpack 12-bit R'G'B' (bmdFormat12BitRGBLE) format to R', G', B' component arrays.
 - `rgb_array`: NumPy array containing packed 12-bit R'G'B' data
 - `width`: Frame width in pixels
 - `height`: Frame height in pixels
-- Returns: Tuple of (R, G, B) NumPy arrays, each dtype uint16 (0-4095 range, 12-bit values)
+- `row_bytes`: Bytes per row in the source buffer. Pass `captured_frame.row_bytes` for captured frames whose stride may include padding. If None, defaults to `((width + 7) // 8) * 36` (the R12L-native stride).
+- Returns: Dictionary with `'r'`, `'g'`, `'b'` keys, each containing an H×W NumPy array, dtype uint16 (0-4095 range, 12-bit values)
 
 ### Enums
 
