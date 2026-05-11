@@ -781,5 +781,184 @@ class TestYUV10RoundTrip:
         assert abs(b - 0.0) < self.TOL, f"Rec.2020 red B={b} (expected 0.0)"
 
 
+@pytest.mark.skipif(not CONVERSIONS_AVAILABLE, reason="Conversion functions not available")
+class TestRGB10RoundTrip:
+    """Round-trip RGB uint16 through 10-bit RGB (R10l) encode + decode.
+
+    RGB10 has no chroma subsampling and no matrix, so same-range round-trips
+    take the bit-shift fast path and must be exactly equal. Cross-range
+    conversions go through float math and lose at most one 10-bit code.
+    """
+
+    @staticmethod
+    def _const_rgb_uint16(width, height, rgb_triplet_u16):
+        frame = np.zeros((height, width, 3), dtype=np.uint16)
+        frame[:, :, 0] = rgb_triplet_u16[0]
+        frame[:, :, 1] = rgb_triplet_u16[1]
+        frame[:, :, 2] = rgb_triplet_u16[2]
+        return frame
+
+    def _round_trip_same_range(self, rgb_uint16, width, height, narrow):
+        """Encode and decode in matching ranges (exercises bit-shift fast path)."""
+        from blackmagic_io import rgb_uint16_to_rgb10, rgb10_to_uint16
+        packed = rgb_uint16_to_rgb10(rgb_uint16, width, height,
+                                     input_narrow_range=narrow,
+                                     output_narrow_range=narrow)
+        return rgb10_to_uint16(packed, width, height,
+                               input_narrow_range=narrow,
+                               output_narrow_range=narrow)
+
+    def _round_trip_cross_range(self, rgb_uint16, width, height):
+        """Encode narrow→full, decode full→narrow (exercises float fallback)."""
+        from blackmagic_io import rgb_uint16_to_rgb10, rgb10_to_uint16
+        packed = rgb_uint16_to_rgb10(rgb_uint16, width, height,
+                                     input_narrow_range=True,
+                                     output_narrow_range=False)
+        return rgb10_to_uint16(packed, width, height,
+                               input_narrow_range=False,
+                               output_narrow_range=True)
+
+    def test_white_narrow_round_trip(self):
+        """Narrow white (60160 = 940<<6) round-trips bit-exact."""
+        width, height = 12, 2
+        rgb = self._const_rgb_uint16(width, height, (60160, 60160, 60160))
+        recovered = self._round_trip_same_range(rgb, width, height, narrow=True)
+        assert np.array_equal(rgb, recovered), \
+            "Narrow white must round-trip exactly via bit-shift path"
+
+    def test_black_narrow_round_trip(self):
+        """Narrow black (4096 = 64<<6) round-trips bit-exact."""
+        width, height = 12, 2
+        rgb = self._const_rgb_uint16(width, height, (4096, 4096, 4096))
+        recovered = self._round_trip_same_range(rgb, width, height, narrow=True)
+        assert np.array_equal(rgb, recovered), \
+            "Narrow black must round-trip exactly via bit-shift path"
+
+    def test_mid_gray_narrow_round_trip(self):
+        """Narrow mid-gray (32128 = 502<<6) round-trips bit-exact."""
+        width, height = 12, 2
+        rgb = self._const_rgb_uint16(width, height, (32128, 32128, 32128))
+        recovered = self._round_trip_same_range(rgb, width, height, narrow=True)
+        assert np.array_equal(rgb, recovered), \
+            "Narrow mid-gray must round-trip exactly via bit-shift path"
+
+    def test_pure_red_narrow_round_trip(self):
+        """Per-channel: pure red round-trips bit-exact (rules out channel swap)."""
+        width, height = 12, 2
+        rgb = self._const_rgb_uint16(width, height, (60160, 4096, 4096))
+        recovered = self._round_trip_same_range(rgb, width, height, narrow=True)
+        assert np.array_equal(rgb, recovered), \
+            "Narrow pure red must round-trip exactly via bit-shift path"
+
+    def test_white_full_round_trip(self):
+        """Full-range white (65535) round-trips bit-exact via second bit-shift path."""
+        width, height = 12, 2
+        rgb = self._const_rgb_uint16(width, height, (65535, 65535, 65535))
+        recovered = self._round_trip_same_range(rgb, width, height, narrow=False)
+        # 16-bit full white -> 10-bit 1023 (top 10 bits) -> 16-bit 65472 (1023<<6)
+        # The bit-shift drops the bottom 6 bits, so we lose precision but stays
+        # in the saturating range. Expect each channel to equal 1023<<6 = 65472.
+        expected = self._const_rgb_uint16(width, height, (65472, 65472, 65472))
+        assert np.array_equal(recovered, expected), \
+            f"Full white bit-shift round-trip mismatch"
+
+    def test_cross_range_narrow_white(self):
+        """Narrow→full→narrow round-trip stays within 1 code (10-bit ≈ 64 in 16-bit)."""
+        width, height = 12, 2
+        rgb = self._const_rgb_uint16(width, height, (60160, 60160, 60160))
+        recovered = self._round_trip_cross_range(rgb, width, height)
+        # One 10-bit narrow code is 1<<6 = 64 in 16-bit representation.
+        max_diff = int(np.max(np.abs(rgb.astype(int) - recovered.astype(int))))
+        assert max_diff <= 64, \
+            f"Cross-range round-trip drift exceeds 1 narrow 10-bit code: {max_diff}"
+
+
+@pytest.mark.skipif(not CONVERSIONS_AVAILABLE, reason="Conversion functions not available")
+class TestRGB12RoundTrip:
+    """Round-trip RGB uint16 through 12-bit RGB (R12L) encode + decode.
+
+    Same structure as TestRGB10RoundTrip but at 12-bit precision. Width must
+    be a multiple of 8 because R12L packs 8 pixels per 36-byte group.
+    """
+
+    @staticmethod
+    def _const_rgb_uint16(width, height, rgb_triplet_u16):
+        frame = np.zeros((height, width, 3), dtype=np.uint16)
+        frame[:, :, 0] = rgb_triplet_u16[0]
+        frame[:, :, 1] = rgb_triplet_u16[1]
+        frame[:, :, 2] = rgb_triplet_u16[2]
+        return frame
+
+    def _round_trip_same_range(self, rgb_uint16, width, height, narrow):
+        from blackmagic_io import rgb_uint16_to_rgb12, rgb12_to_uint16
+        packed = rgb_uint16_to_rgb12(rgb_uint16, width, height,
+                                     input_narrow_range=narrow,
+                                     output_narrow_range=narrow)
+        return rgb12_to_uint16(packed, width, height,
+                               input_narrow_range=narrow,
+                               output_narrow_range=narrow)
+
+    def _round_trip_cross_range(self, rgb_uint16, width, height):
+        from blackmagic_io import rgb_uint16_to_rgb12, rgb12_to_uint16
+        packed = rgb_uint16_to_rgb12(rgb_uint16, width, height,
+                                     input_narrow_range=True,
+                                     output_narrow_range=False)
+        return rgb12_to_uint16(packed, width, height,
+                               input_narrow_range=False,
+                               output_narrow_range=True)
+
+    def test_white_narrow_round_trip(self):
+        """Narrow white (60160 = 3760<<4) round-trips bit-exact."""
+        width, height = 16, 2
+        rgb = self._const_rgb_uint16(width, height, (60160, 60160, 60160))
+        recovered = self._round_trip_same_range(rgb, width, height, narrow=True)
+        assert np.array_equal(rgb, recovered), \
+            "Narrow white must round-trip exactly via bit-shift path"
+
+    def test_black_narrow_round_trip(self):
+        """Narrow black (4096 = 256<<4) round-trips bit-exact."""
+        width, height = 16, 2
+        rgb = self._const_rgb_uint16(width, height, (4096, 4096, 4096))
+        recovered = self._round_trip_same_range(rgb, width, height, narrow=True)
+        assert np.array_equal(rgb, recovered), \
+            "Narrow black must round-trip exactly via bit-shift path"
+
+    def test_mid_gray_narrow_round_trip(self):
+        """Narrow mid-gray (32128 = 2008<<4) round-trips bit-exact."""
+        width, height = 16, 2
+        rgb = self._const_rgb_uint16(width, height, (32128, 32128, 32128))
+        recovered = self._round_trip_same_range(rgb, width, height, narrow=True)
+        assert np.array_equal(rgb, recovered), \
+            "Narrow mid-gray must round-trip exactly via bit-shift path"
+
+    def test_pure_red_narrow_round_trip(self):
+        """Per-channel: pure red round-trips bit-exact (rules out channel swap)."""
+        width, height = 16, 2
+        rgb = self._const_rgb_uint16(width, height, (60160, 4096, 4096))
+        recovered = self._round_trip_same_range(rgb, width, height, narrow=True)
+        assert np.array_equal(rgb, recovered), \
+            "Narrow pure red must round-trip exactly via bit-shift path"
+
+    def test_white_full_round_trip(self):
+        """Full-range white (65535) round-trips bit-exact via second bit-shift path."""
+        width, height = 16, 2
+        rgb = self._const_rgb_uint16(width, height, (65535, 65535, 65535))
+        recovered = self._round_trip_same_range(rgb, width, height, narrow=False)
+        # 16-bit full white -> 12-bit 4095 (top 12 bits) -> 16-bit 65520 (4095<<4)
+        expected = self._const_rgb_uint16(width, height, (65520, 65520, 65520))
+        assert np.array_equal(recovered, expected), \
+            "Full white bit-shift round-trip mismatch"
+
+    def test_cross_range_narrow_white(self):
+        """Narrow→full→narrow round-trip stays within 1 code (12-bit ≈ 16 in 16-bit)."""
+        width, height = 16, 2
+        rgb = self._const_rgb_uint16(width, height, (60160, 60160, 60160))
+        recovered = self._round_trip_cross_range(rgb, width, height)
+        # One 12-bit narrow code is 1<<4 = 16 in 16-bit representation.
+        max_diff = int(np.max(np.abs(rgb.astype(int) - recovered.astype(int))))
+        assert max_diff <= 16, \
+            f"Cross-range round-trip drift exceeds 1 narrow 12-bit code: {max_diff}"
+
+
 if __name__ == "__main__":
     pytest.main([__file__, "-v"])
