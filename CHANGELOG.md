@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.17.0b4] - 2026-05-11
+
 ### Changed
 - Refactored all nine RGB↔YUV conversion functions (`rgb_*_to_yuv8`, `rgb_*_to_yuv10`, `yuv8_to_rgb_*`, `yuv10_to_rgb_*`) onto a single shared idiom: `Kr/Kb/Kg` matrix algebra computed once per frame, chroma normalised to `[-1, +1]`, the `(1-Kr)` matrix form, and broadcast-familiar code-value constants (876, 896, 1023 for 10-bit; 219, 224, 255 for 8-bit) inline at their canonical positions. Each encoder is now a term-for-term inverse of its decoder, and the 8-bit and 10-bit functions differ only in the bit-depth constants. Mathematically identical to the previous hardcoded numerical coefficients (Rec.601, Rec.709, Rec.2020 all preserved). The YUV8 encoder previously clamped narrow-range Y to `[16, 235]` and chroma to `[16, 240]`; it now clamps only to the byte range `[0, 255]`, matching the YUV10 encoder and preserving super-blacks / super-whites in narrow-range output.
 
