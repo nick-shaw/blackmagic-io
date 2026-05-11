@@ -72,14 +72,23 @@ py::array_t<uint8_t> rgb_uint16_to_yuv10(py::array_t<uint16_t> rgb_array, int wi
     // Get strides in bytes
     ssize_t stride_y = buf.strides[0];
     ssize_t stride_x = buf.strides[1];
-    ssize_t stride_c = buf.strides[2];
+
+    // Matrix coefficients: Y = Kr*R + Kg*G + Kb*B
+    double Kr, Kb;
+    switch (matrix) {
+        case DeckLinkOutput::Gamut::Rec601:  Kr = 0.299;  Kb = 0.114;  break;
+        case DeckLinkOutput::Gamut::Rec2020: Kr = 0.2627; Kb = 0.0593; break;
+        case DeckLinkOutput::Gamut::Rec709:
+        default:                             Kr = 0.2126; Kb = 0.0722; break;
+    }
+    double Kg = 1.0 - Kr - Kb;
 
     for (int y = 0; y < height; y++) {
         for (int x = 0; x < width; x += 6) {
             uint16_t y_values[6], u_values[3], v_values[3];
-            float u_temp[6], v_temp[6];
+            double cb_temp[6], cr_temp[6];   // chroma in -1..+1
 
-            // Convert RGB to YUV for up to 6 pixels
+            // Convert RGB to YCbCr for up to 6 pixels
             for (int i = 0; i < 6; i++) {
                 int pixel_x = x + i;
                 if (pixel_x < width) {
@@ -89,65 +98,52 @@ py::array_t<uint8_t> rgb_uint16_to_yuv10(py::array_t<uint16_t> rgb_array, int wi
                     uint16_t g = pixel[1];
                     uint16_t b = pixel[2];
 
-                    float rf, gf, bf;
+                    double rf, gf, bf;
                     if (input_narrow_range) {
-                        rf = (r - (64 << 6)) / (float)(876 << 6);
-                        gf = (g - (64 << 6)) / (float)(876 << 6);
-                        bf = (b - (64 << 6)) / (float)(876 << 6);
+                        rf = (r - (64 << 6)) / (double)(876 << 6);
+                        gf = (g - (64 << 6)) / (double)(876 << 6);
+                        bf = (b - (64 << 6)) / (double)(876 << 6);
                     } else {
-                        rf = r / 65535.0f;
-                        gf = g / 65535.0f;
-                        bf = b / 65535.0f;
+                        rf = r / 65535.0;
+                        gf = g / 65535.0;
+                        bf = b / 65535.0;
                     }
 
-                    float yf, uf, vf;
-                    if (matrix == DeckLinkOutput::Gamut::Rec601) {
-                        // Rec.601 coefficients
-                        yf = 0.299f * rf + 0.587f * gf + 0.114f * bf;
-                        uf = -0.1687f * rf - 0.3313f * gf + 0.5000f * bf;
-                        vf = 0.5000f * rf - 0.4187f * gf - 0.0813f * bf;
-                    } else if (matrix == DeckLinkOutput::Gamut::Rec2020) {
-                        // Rec.2020 coefficients
-                        yf = 0.2627f * rf + 0.6780f * gf + 0.0593f * bf;
-                        uf = -0.1396f * rf - 0.3604f * gf + 0.5000f * bf;
-                        vf = 0.5000f * rf - 0.4598f * gf - 0.0402f * bf;
-                    } else {
-                        // Rec.709 coefficients (default)
-                        yf = 0.2126f * rf + 0.7152f * gf + 0.0722f * bf;
-                        uf = -0.1146f * rf - 0.3854f * gf + 0.5000f * bf;
-                        vf = 0.5000f * rf - 0.4542f * gf - 0.0458f * bf;
-                    }
+                    // RGB -> YCbCr ((1-Kr) form, chroma in -1..+1)
+                    double yf  = Kr * rf + Kg * gf + Kb * bf;
+                    double cbf = (bf - yf) / (1.0 - Kb);
+                    double crf = (rf - yf) / (1.0 - Kr);
 
                     int y10;
                     if (output_narrow_range) {
-                        y10 = (int)(yf * 876.0f + 64.0f + 0.5f);
+                        y10 = (int)(yf * 876.0 + 64.0 + 0.5);
                     } else {
-                        y10 = (int)(yf * 1023.0f + 0.5f);
+                        y10 = (int)(yf * 1023.0 + 0.5);
                     }
                     y_values[i] = (uint16_t)(y10 < 0 ? 0 : (y10 > 1023 ? 1023 : y10));
-                    u_temp[i] = uf;
-                    v_temp[i] = vf;
+                    cb_temp[i] = cbf;
+                    cr_temp[i] = crf;
                 } else {
                     y_values[i] = output_narrow_range ? 64 : 0;
-                    u_temp[i] = 0.0f;
-                    v_temp[i] = 0.0f;
+                    cb_temp[i] = 0.0;
+                    cr_temp[i] = 0.0;
                 }
             }
 
-            // Average pairs of U/V samples for 4:2:2 chroma subsampling
+            // Average pairs of Cb/Cr samples for 4:2:2 chroma subsampling
             for (int i = 0; i < 3; i++) {
-                float u_avg = (u_temp[i*2] + u_temp[i*2+1]) * 0.5f;
-                float v_avg = (v_temp[i*2] + v_temp[i*2+1]) * 0.5f;
-                int u10, v10;
+                double cb_avg = (cb_temp[i*2] + cb_temp[i*2+1]) * 0.5;
+                double cr_avg = (cr_temp[i*2] + cr_temp[i*2+1]) * 0.5;
+                int cb10, cr10;
                 if (output_narrow_range) {
-                    u10 = (int)((u_avg + 0.5f) * 896.0f + 64.0f + 0.5f);
-                    v10 = (int)((v_avg + 0.5f) * 896.0f + 64.0f + 0.5f);
+                    cb10 = (int)(cb_avg * 448.0 + 512.0 + 0.5);
+                    cr10 = (int)(cr_avg * 448.0 + 512.0 + 0.5);
                 } else {
-                    u10 = (int)(512.0f + 1023.0f * u_avg + 0.5f);
-                    v10 = (int)(512.0f + 1023.0f * v_avg + 0.5f);
+                    cb10 = (int)(cb_avg * 1023.0 / 2.0 + 512.0 + 0.5);
+                    cr10 = (int)(cr_avg * 1023.0 / 2.0 + 512.0 + 0.5);
                 }
-                u_values[i] = (uint16_t)(u10 < 0 ? 0 : (u10 > 1023 ? 1023 : u10));
-                v_values[i] = (uint16_t)(v10 < 0 ? 0 : (v10 > 1023 ? 1023 : v10));
+                u_values[i] = (uint16_t)(cb10 < 0 ? 0 : (cb10 > 1023 ? 1023 : cb10));
+                v_values[i] = (uint16_t)(cr10 < 0 ? 0 : (cr10 > 1023 ? 1023 : cr10));
             }
 
             // Pack into v210 format
@@ -187,72 +183,67 @@ py::array_t<uint8_t> rgb_float_to_yuv10(py::array_t<float> rgb_array, int width,
     // Get strides in bytes
     ssize_t stride_y = buf.strides[0];
     ssize_t stride_x = buf.strides[1];
-    ssize_t stride_c = buf.strides[2];
 
+    // Matrix coefficients: Y = Kr*R + Kg*G + Kb*B
+    double Kr, Kb;
+    switch (matrix) {
+        case DeckLinkOutput::Gamut::Rec601:  Kr = 0.299;  Kb = 0.114;  break;
+        case DeckLinkOutput::Gamut::Rec2020: Kr = 0.2627; Kb = 0.0593; break;
+        case DeckLinkOutput::Gamut::Rec709:
+        default:                             Kr = 0.2126; Kb = 0.0722; break;
+    }
+    double Kg = 1.0 - Kr - Kb;
 
     for (int y = 0; y < height; y++) {
         for (int x = 0; x < width; x += 6) {
             uint16_t y_values[6], u_values[3], v_values[3];
-            float u_temp[6], v_temp[6];
+            double cb_temp[6], cr_temp[6];   // chroma in -1..+1
 
-            // Convert RGB to YUV for up to 6 pixels
+            // Convert RGB to YCbCr for up to 6 pixels
             for (int i = 0; i < 6; i++) {
                 int pixel_x = x + i;
                 if (pixel_x < width) {
                     const float* pixel = reinterpret_cast<const float*>(
                         src_base + y * stride_y + pixel_x * stride_x);
-                    float r = pixel[0];
-                    float g = pixel[1];
-                    float b = pixel[2];
+                    double rf = pixel[0];
+                    double gf = pixel[1];
+                    double bf = pixel[2];
 
-                    float yf, uf, vf;
-                    if (matrix == DeckLinkOutput::Gamut::Rec601) {
-                        // Rec.601 coefficients
-                        yf = 0.299f * r + 0.587f * g + 0.114f * b;
-                        uf = -0.1687f * r - 0.3313f * g + 0.5000f * b;
-                        vf = 0.5000f * r - 0.4187f * g - 0.0813f * b;
-                    } else if (matrix == DeckLinkOutput::Gamut::Rec2020) {
-                        // Rec.2020 coefficients
-                        yf = 0.2627f * r + 0.6780f * g + 0.0593f * b;
-                        uf = -0.1396f * r - 0.3604f * g + 0.5000f * b;
-                        vf = 0.5000f * r - 0.4598f * g - 0.0402f * b;
-                    } else {
-                        // Rec.709 coefficients (default)
-                        yf = 0.2126f * r + 0.7152f * g + 0.0722f * b;
-                        uf = -0.1146f * r - 0.3854f * g + 0.5000f * b;
-                        vf = 0.5000f * r - 0.4542f * g - 0.0458f * b;
-                    }
+                    // RGB -> YCbCr ((1-Kr) form, chroma in -1..+1)
+                    double yf  = Kr * rf + Kg * gf + Kb * bf;
+                    double cbf = (bf - yf) / (1.0 - Kb);
+                    double crf = (rf - yf) / (1.0 - Kr);
 
                     int y10;
                     if (output_narrow_range) {
-                        y10 = (int)(yf * 876.0f + 64.0f + 0.5f);
+                        y10 = (int)(yf * 876.0 + 64.0 + 0.5);
                     } else {
-                        y10 = (int)(yf * 1023.0f + 0.5f);
+                        y10 = (int)(yf * 1023.0 + 0.5);
                     }
                     y_values[i] = (uint16_t)(y10 < 0 ? 0 : (y10 > 1023 ? 1023 : y10));
-                    u_temp[i] = uf;
-                    v_temp[i] = vf;
+                    cb_temp[i] = cbf;
+                    cr_temp[i] = crf;
                 } else {
                     y_values[i] = output_narrow_range ? 64 : 0;
-                    u_temp[i] = 0.0f;
-                    v_temp[i] = 0.0f;
+                    cb_temp[i] = 0.0;
+                    cr_temp[i] = 0.0;
                 }
             }
 
-            // Average pairs of U/V samples for 4:2:2 chroma subsampling
+            // Average pairs of Cb/Cr samples for 4:2:2 chroma subsampling
             for (int i = 0; i < 3; i++) {
-                float u_avg = (u_temp[i*2] + u_temp[i*2+1]) * 0.5f;
-                float v_avg = (v_temp[i*2] + v_temp[i*2+1]) * 0.5f;
-                int u10, v10;
+                double cb_avg = (cb_temp[i*2] + cb_temp[i*2+1]) * 0.5;
+                double cr_avg = (cr_temp[i*2] + cr_temp[i*2+1]) * 0.5;
+                int cb10, cr10;
                 if (output_narrow_range) {
-                    u10 = (int)((u_avg + 0.5f) * 896.0f + 64.0f + 0.5f);
-                    v10 = (int)((v_avg + 0.5f) * 896.0f + 64.0f + 0.5f);
+                    cb10 = (int)(cb_avg * 448.0 + 512.0 + 0.5);
+                    cr10 = (int)(cr_avg * 448.0 + 512.0 + 0.5);
                 } else {
-                    u10 = (int)(512.0f + 1023.0f * u_avg + 0.5f);
-                    v10 = (int)(512.0f + 1023.0f * v_avg + 0.5f);
+                    cb10 = (int)(cb_avg * 1023.0 / 2.0 + 512.0 + 0.5);
+                    cr10 = (int)(cr_avg * 1023.0 / 2.0 + 512.0 + 0.5);
                 }
-                u_values[i] = (uint16_t)(u10 < 0 ? 0 : (u10 > 1023 ? 1023 : u10));
-                v_values[i] = (uint16_t)(v10 < 0 ? 0 : (v10 > 1023 ? 1023 : v10));
+                u_values[i] = (uint16_t)(cb10 < 0 ? 0 : (cb10 > 1023 ? 1023 : cb10));
+                v_values[i] = (uint16_t)(cr10 < 0 ? 0 : (cr10 > 1023 ? 1023 : cr10));
             }
 
             // Pack into v210 format
@@ -602,6 +593,16 @@ py::array_t<uint16_t> yuv10_to_rgb_uint16(py::array_t<uint8_t> yuv_array, int wi
     const uint8_t* src_base = static_cast<const uint8_t*>(buf.ptr);
     uint16_t* dst = static_cast<uint16_t*>(res_buf.ptr);
 
+    // Matrix coefficients: Y = Kr*R + Kg*G + Kb*B
+    double Kr, Kb;
+    switch (matrix) {
+        case DeckLinkOutput::Gamut::Rec601:  Kr = 0.299;  Kb = 0.114;  break;
+        case DeckLinkOutput::Gamut::Rec2020: Kr = 0.2627; Kb = 0.0593; break;
+        case DeckLinkOutput::Gamut::Rec709:
+        default:                             Kr = 0.2126; Kb = 0.0722; break;
+    }
+    double Kg = 1.0 - Kr - Kb;
+
     for (int y = 0; y < height; y++) {
         const uint32_t* src = reinterpret_cast<const uint32_t*>(src_base + y * row_bytes);
         for (int x = 0; x < width; x += 6) {
@@ -649,45 +650,35 @@ py::array_t<uint16_t> yuv10_to_rgb_uint16(py::array_t<uint8_t> yuv_array, int wi
                         break;
                 }
 
-                float yf, cbf, crf;
-
+                // Normalise Y to 0..1 and Cb/Cr to -1..+1
+                double yf, cbf, crf;
                 if (input_narrow_range) {
-                    yf = (y_val - 64.0f) / 876.0f;
-                    cbf = (cb_val - 512.0f) / 896.0f;
-                    crf = (cr_val - 512.0f) / 896.0f;
+                    yf  = (y_val  -  64.0) / 876.0;
+                    cbf = (cb_val - 512.0) / 448.0;
+                    crf = (cr_val - 512.0) / 448.0;
                 } else {
-                    yf = y_val / 1023.0f;
-                    cbf = (cb_val - 512.0f) / 1023.0f;
-                    crf = (cr_val - 512.0f) / 1023.0f;
+                    yf  =  y_val           / 1023.0;
+                    cbf = (cb_val - 512.0) * 2.0 / 1023.0;
+                    crf = (cr_val - 512.0) * 2.0 / 1023.0;
                 }
 
-                float rf, gf, bf;
-
-                if (matrix == DeckLinkOutput::Gamut::Rec601) {
-                    rf = yf + 1.402f * crf;
-                    gf = yf - 0.344136f * cbf - 0.714136f * crf;
-                    bf = yf + 1.772f * cbf;
-                } else if (matrix == DeckLinkOutput::Gamut::Rec2020) {
-                    rf = yf + 1.4746f * crf;
-                    gf = yf - 0.16455f * cbf - 0.57135f * crf;
-                    bf = yf + 1.8814f * cbf;
-                } else {
-                    rf = yf + 1.5748f * crf;
-                    gf = yf - 0.1873f * cbf - 0.4681f * crf;
-                    bf = yf + 1.8556f * cbf;
-                }
+                // YCbCr -> RGB ((1-Kr) form, chroma in -1..+1)
+                double rf = yf + (1.0 - Kr) * crf;
+                double bf = yf + (1.0 - Kb) * cbf;
+                double gf = yf - (Kr * (1.0 - Kr) / Kg) * crf
+                                - (Kb * (1.0 - Kb) / Kg) * cbf;
 
                 // Allow super-whites (values > 1.0), but clamp after scaling to prevent uint16_t overflow
                 uint16_t r16, g16, b16;
 
                 if (output_narrow_range) {
-                    r16 = (uint16_t)std::max(0.0f, std::min(65535.0f, rf * 876.0f * 64.0f + 64.0f * 64.0f));
-                    g16 = (uint16_t)std::max(0.0f, std::min(65535.0f, gf * 876.0f * 64.0f + 64.0f * 64.0f));
-                    b16 = (uint16_t)std::max(0.0f, std::min(65535.0f, bf * 876.0f * 64.0f + 64.0f * 64.0f));
+                    r16 = (uint16_t)std::max(0.0, std::min(65535.0, rf * 876.0 * 64.0 + 64.0 * 64.0));
+                    g16 = (uint16_t)std::max(0.0, std::min(65535.0, gf * 876.0 * 64.0 + 64.0 * 64.0));
+                    b16 = (uint16_t)std::max(0.0, std::min(65535.0, bf * 876.0 * 64.0 + 64.0 * 64.0));
                 } else {
-                    r16 = (uint16_t)std::max(0.0f, std::min(65535.0f, rf * 65535.0f));
-                    g16 = (uint16_t)std::max(0.0f, std::min(65535.0f, gf * 65535.0f));
-                    b16 = (uint16_t)std::max(0.0f, std::min(65535.0f, bf * 65535.0f));
+                    r16 = (uint16_t)std::max(0.0, std::min(65535.0, rf * 65535.0));
+                    g16 = (uint16_t)std::max(0.0, std::min(65535.0, gf * 65535.0));
+                    b16 = (uint16_t)std::max(0.0, std::min(65535.0, bf * 65535.0));
                 }
 
                 int pixel_idx = (y * width + x + i) * 3;
@@ -724,6 +715,16 @@ py::array_t<float> yuv10_to_rgb_float(py::array_t<uint8_t> yuv_array, int width,
     const uint8_t* src_base = static_cast<const uint8_t*>(buf.ptr);
     float* dst = static_cast<float*>(res_buf.ptr);
 
+    // Matrix coefficients: Y = Kr*R + Kg*G + Kb*B
+    double Kr, Kb;
+    switch (matrix) {
+        case DeckLinkOutput::Gamut::Rec601:  Kr = 0.299;  Kb = 0.114;  break;
+        case DeckLinkOutput::Gamut::Rec2020: Kr = 0.2627; Kb = 0.0593; break;
+        case DeckLinkOutput::Gamut::Rec709:
+        default:                             Kr = 0.2126; Kb = 0.0722; break;
+    }
+    double Kg = 1.0 - Kr - Kb;
+
     for (int y = 0; y < height; y++) {
         const uint32_t* src = reinterpret_cast<const uint32_t*>(src_base + y * row_bytes);
         for (int x = 0; x < width; x += 6) {
@@ -771,39 +772,29 @@ py::array_t<float> yuv10_to_rgb_float(py::array_t<uint8_t> yuv_array, int width,
                         break;
                 }
 
-                float yf, cbf, crf;
-
+                // Normalise Y to 0..1 and Cb/Cr to -1..+1
+                double yf, cbf, crf;
                 if (input_narrow_range) {
-                    yf = (y_val - 64.0f) / 876.0f;
-                    cbf = (cb_val - 512.0f) / 896.0f;
-                    crf = (cr_val - 512.0f) / 896.0f;
+                    yf  = (y_val  -  64.0) / 876.0;
+                    cbf = (cb_val - 512.0) / 448.0;
+                    crf = (cr_val - 512.0) / 448.0;
                 } else {
-                    yf = y_val / 1023.0f;
-                    cbf = (cb_val - 512.0f) / 1023.0f;
-                    crf = (cr_val - 512.0f) / 1023.0f;
+                    yf  =  y_val           / 1023.0;
+                    cbf = (cb_val - 512.0) * 2.0 / 1023.0;
+                    crf = (cr_val - 512.0) * 2.0 / 1023.0;
                 }
 
-                float rf, gf, bf;
-
-                if (matrix == DeckLinkOutput::Gamut::Rec601) {
-                    rf = yf + 1.402f * crf;
-                    gf = yf - 0.344136f * cbf - 0.714136f * crf;
-                    bf = yf + 1.772f * cbf;
-                } else if (matrix == DeckLinkOutput::Gamut::Rec2020) {
-                    rf = yf + 1.4746f * crf;
-                    gf = yf - 0.16455f * cbf - 0.57135f * crf;
-                    bf = yf + 1.8814f * cbf;
-                } else {
-                    rf = yf + 1.5748f * crf;
-                    gf = yf - 0.1873f * cbf - 0.4681f * crf;
-                    bf = yf + 1.8556f * cbf;
-                }
+                // YCbCr -> RGB ((1-Kr) form, chroma in -1..+1)
+                double rf = yf + (1.0 - Kr) * crf;
+                double bf = yf + (1.0 - Kb) * cbf;
+                double gf = yf - (Kr * (1.0 - Kr) / Kg) * crf
+                                - (Kb * (1.0 - Kb) / Kg) * cbf;
 
                 // Allow super-whites: values > 1.0 are valid for super-white content
                 int pixel_idx = (y * width + x + i) * 3;
-                dst[pixel_idx + 0] = rf;
-                dst[pixel_idx + 1] = gf;
-                dst[pixel_idx + 2] = bf;
+                dst[pixel_idx + 0] = static_cast<float>(rf);
+                dst[pixel_idx + 1] = static_cast<float>(gf);
+                dst[pixel_idx + 2] = static_cast<float>(bf);
             }
         }
     }
@@ -928,42 +919,21 @@ py::array_t<uint16_t> yuv8_to_rgb_uint16(py::array_t<uint8_t> yuv_array, int wid
     const uint8_t* src_base = static_cast<const uint8_t*>(buf.ptr);
     uint16_t* rgb_dst = static_cast<uint16_t*>(rgb_buf.ptr);
 
-    // Conversion matrices (same as YUV10)
+    // Matrix coefficients: Y = Kr*R + Kg*G + Kb*B
     double Kr, Kb;
     switch (matrix) {
-        case DeckLinkOutput::Gamut::Rec601:
-            Kr = 0.299; Kb = 0.114;
-            break;
+        case DeckLinkOutput::Gamut::Rec601:  Kr = 0.299;  Kb = 0.114;  break;
+        case DeckLinkOutput::Gamut::Rec2020: Kr = 0.2627; Kb = 0.0593; break;
         case DeckLinkOutput::Gamut::Rec709:
-            Kr = 0.2126; Kb = 0.0722;
-            break;
-        case DeckLinkOutput::Gamut::Rec2020:
-            Kr = 0.2627; Kb = 0.0593;
-            break;
-        default:
-            Kr = 0.2126; Kb = 0.0722;
+        default:                             Kr = 0.2126; Kb = 0.0722; break;
     }
     double Kg = 1.0 - Kr - Kb;
 
-    // Input range scaling
-    double y_min, y_range, c_range, c_mid;
-    if (input_narrow_range) {
-        y_min = 16.0;
-        y_range = 219.0;
-        c_range = 224.0;
-        c_mid = 128.0;
-    } else {
-        y_min = 0.0;
-        y_range = 255.0;
-        c_range = 255.0;
-        c_mid = 128.0;
-    }
-
-    // Output range
+    // Output 16-bit range (narrow = 64<<6 .. 940<<6, full = 0..65535)
     double out_min, out_range;
     if (output_narrow_range) {
-        out_min = 4096.0;
-        out_range = 56064.0;
+        out_min = 64.0 * 64.0;       // 4096
+        out_range = 876.0 * 64.0;    // 56064
     } else {
         out_min = 0.0;
         out_range = 65535.0;
@@ -979,38 +949,37 @@ py::array_t<uint16_t> yuv8_to_rgb_uint16(py::array_t<uint8_t> yuv_array, int wid
             uint8_t v_byte = src[row_idx + 2];
             uint8_t y1_byte = src[row_idx + 3];
 
-            // Normalize Y to 0.0-1.0 and Cb/Cr to -0.5..+0.5
-            double y0 = (y0_byte - y_min) / y_range;
-            double y1 = (y1_byte - y_min) / y_range;
-            double cb = (u_byte - c_mid) / c_range;
-            double cr = (v_byte - c_mid) / c_range;
+            // Normalise Y to 0..1 and Cb/Cr to -1..+1
+            double y0, y1, cbf, crf;
+            if (input_narrow_range) {
+                // Y: 16..235 (range 219); Cb/Cr: 16..240 (±112 from 128)
+                y0  = (y0_byte - 16.0)  / 219.0;
+                y1  = (y1_byte - 16.0)  / 219.0;
+                cbf = (u_byte  - 128.0) / 112.0;
+                crf = (v_byte  - 128.0) / 112.0;
+            } else {
+                y0  =  y0_byte           / 255.0;
+                y1  =  y1_byte           / 255.0;
+                cbf = (u_byte  - 128.0) * 2.0 / 255.0;
+                crf = (v_byte  - 128.0) * 2.0 / 255.0;
+            }
 
-            // YCbCr to RGB conversion (chroma is in [-0.5, 0.5])
-            double r_factor = cr * (2.0 - 2.0 * Kr);
-            double g_factor = -cb * (2.0 - 2.0 * Kb) * Kb / Kg - cr * (2.0 - 2.0 * Kr) * Kr / Kg;
-            double b_factor = cb * (2.0 - 2.0 * Kb);
+            // YCbCr -> RGB ((1-Kr) form, chroma in -1..+1)
+            double r_off = (1.0 - Kr) * crf;
+            double b_off = (1.0 - Kb) * cbf;
+            double g_off = - (Kr * (1.0 - Kr) / Kg) * crf
+                            - (Kb * (1.0 - Kb) / Kg) * cbf;
 
-            // First pixel
-            double r0 = y0 + r_factor;
-            double g0 = y0 + g_factor;
-            double b0 = y0 + b_factor;
-
-            // Allow super-whites, but clamp after scaling to prevent uint16_t overflow
             int pixel0_idx = (y * width + x) * 3;
-            rgb_dst[pixel0_idx] = static_cast<uint16_t>(std::max(0.0, std::min(65535.0, r0 * out_range + out_min)));
-            rgb_dst[pixel0_idx + 1] = static_cast<uint16_t>(std::max(0.0, std::min(65535.0, g0 * out_range + out_min)));
-            rgb_dst[pixel0_idx + 2] = static_cast<uint16_t>(std::max(0.0, std::min(65535.0, b0 * out_range + out_min)));
+            rgb_dst[pixel0_idx]     = static_cast<uint16_t>(std::max(0.0, std::min(65535.0, (y0 + r_off) * out_range + out_min)));
+            rgb_dst[pixel0_idx + 1] = static_cast<uint16_t>(std::max(0.0, std::min(65535.0, (y0 + g_off) * out_range + out_min)));
+            rgb_dst[pixel0_idx + 2] = static_cast<uint16_t>(std::max(0.0, std::min(65535.0, (y0 + b_off) * out_range + out_min)));
 
-            // Second pixel (if exists)
             if (x + 1 < width) {
-                double r1 = y1 + r_factor;
-                double g1 = y1 + g_factor;
-                double b1 = y1 + b_factor;
-
                 int pixel1_idx = (y * width + x + 1) * 3;
-                rgb_dst[pixel1_idx] = static_cast<uint16_t>(std::max(0.0, std::min(65535.0, r1 * out_range + out_min)));
-                rgb_dst[pixel1_idx + 1] = static_cast<uint16_t>(std::max(0.0, std::min(65535.0, g1 * out_range + out_min)));
-                rgb_dst[pixel1_idx + 2] = static_cast<uint16_t>(std::max(0.0, std::min(65535.0, b1 * out_range + out_min)));
+                rgb_dst[pixel1_idx]     = static_cast<uint16_t>(std::max(0.0, std::min(65535.0, (y1 + r_off) * out_range + out_min)));
+                rgb_dst[pixel1_idx + 1] = static_cast<uint16_t>(std::max(0.0, std::min(65535.0, (y1 + g_off) * out_range + out_min)));
+                rgb_dst[pixel1_idx + 2] = static_cast<uint16_t>(std::max(0.0, std::min(65535.0, (y1 + b_off) * out_range + out_min)));
             }
         }
     }
@@ -1043,36 +1012,15 @@ py::array_t<float> yuv8_to_rgb_float(py::array_t<uint8_t> yuv_array, int width, 
     const uint8_t* src_base = static_cast<const uint8_t*>(buf.ptr);
     float* rgb_dst = static_cast<float*>(rgb_buf.ptr);
 
-    // Conversion matrices
+    // Matrix coefficients: Y = Kr*R + Kg*G + Kb*B
     double Kr, Kb;
     switch (matrix) {
-        case DeckLinkOutput::Gamut::Rec601:
-            Kr = 0.299; Kb = 0.114;
-            break;
+        case DeckLinkOutput::Gamut::Rec601:  Kr = 0.299;  Kb = 0.114;  break;
+        case DeckLinkOutput::Gamut::Rec2020: Kr = 0.2627; Kb = 0.0593; break;
         case DeckLinkOutput::Gamut::Rec709:
-            Kr = 0.2126; Kb = 0.0722;
-            break;
-        case DeckLinkOutput::Gamut::Rec2020:
-            Kr = 0.2627; Kb = 0.0593;
-            break;
-        default:
-            Kr = 0.2126; Kb = 0.0722;
+        default:                             Kr = 0.2126; Kb = 0.0722; break;
     }
     double Kg = 1.0 - Kr - Kb;
-
-    // Input range scaling
-    double y_min, y_range, c_range, c_mid;
-    if (input_narrow_range) {
-        y_min = 16.0;
-        y_range = 219.0;
-        c_range = 224.0;
-        c_mid = 128.0;
-    } else {
-        y_min = 0.0;
-        y_range = 255.0;
-        c_range = 255.0;
-        c_mid = 128.0;
-    }
 
     for (int y = 0; y < height; y++) {
         const uint8_t* src = src_base + y * row_bytes;
@@ -1084,38 +1032,38 @@ py::array_t<float> yuv8_to_rgb_float(py::array_t<uint8_t> yuv_array, int width, 
             uint8_t v_byte = src[row_idx + 2];
             uint8_t y1_byte = src[row_idx + 3];
 
-            // Normalize Y to 0.0-1.0 and Cb/Cr to -0.5..+0.5
-            double y0 = (y0_byte - y_min) / y_range;
-            double y1 = (y1_byte - y_min) / y_range;
-            double cb = (u_byte - c_mid) / c_range;
-            double cr = (v_byte - c_mid) / c_range;
+            // Normalise Y to 0..1 and Cb/Cr to -1..+1
+            double y0, y1, cbf, crf;
+            if (input_narrow_range) {
+                // Y: 16..235 (range 219); Cb/Cr: 16..240 (±112 from 128)
+                y0  = (y0_byte - 16.0)  / 219.0;
+                y1  = (y1_byte - 16.0)  / 219.0;
+                cbf = (u_byte  - 128.0) / 112.0;
+                crf = (v_byte  - 128.0) / 112.0;
+            } else {
+                y0  =  y0_byte           / 255.0;
+                y1  =  y1_byte           / 255.0;
+                cbf = (u_byte  - 128.0) * 2.0 / 255.0;
+                crf = (v_byte  - 128.0) * 2.0 / 255.0;
+            }
 
-            // YCbCr to RGB conversion (chroma is in [-0.5, 0.5])
-            double r_factor = cr * (2.0 - 2.0 * Kr);
-            double g_factor = -cb * (2.0 - 2.0 * Kb) * Kb / Kg - cr * (2.0 - 2.0 * Kr) * Kr / Kg;
-            double b_factor = cb * (2.0 - 2.0 * Kb);
-
-            // First pixel
-            double r0 = y0 + r_factor;
-            double g0 = y0 + g_factor;
-            double b0 = y0 + b_factor;
+            // YCbCr -> RGB ((1-Kr) form, chroma in -1..+1)
+            double r_off = (1.0 - Kr) * crf;
+            double b_off = (1.0 - Kb) * cbf;
+            double g_off = - (Kr * (1.0 - Kr) / Kg) * crf
+                            - (Kb * (1.0 - Kb) / Kg) * cbf;
 
             // Allow super-whites: values > 1.0 are valid for super-white content
             int pixel0_idx = (y * width + x) * 3;
-            rgb_dst[pixel0_idx] = static_cast<float>(r0);
-            rgb_dst[pixel0_idx + 1] = static_cast<float>(g0);
-            rgb_dst[pixel0_idx + 2] = static_cast<float>(b0);
+            rgb_dst[pixel0_idx]     = static_cast<float>(y0 + r_off);
+            rgb_dst[pixel0_idx + 1] = static_cast<float>(y0 + g_off);
+            rgb_dst[pixel0_idx + 2] = static_cast<float>(y0 + b_off);
 
-            // Second pixel (if exists)
             if (x + 1 < width) {
-                double r1 = y1 + r_factor;
-                double g1 = y1 + g_factor;
-                double b1 = y1 + b_factor;
-
                 int pixel1_idx = (y * width + x + 1) * 3;
-                rgb_dst[pixel1_idx] = static_cast<float>(r1);
-                rgb_dst[pixel1_idx + 1] = static_cast<float>(g1);
-                rgb_dst[pixel1_idx + 2] = static_cast<float>(b1);
+                rgb_dst[pixel1_idx]     = static_cast<float>(y1 + r_off);
+                rgb_dst[pixel1_idx + 1] = static_cast<float>(y1 + g_off);
+                rgb_dst[pixel1_idx + 2] = static_cast<float>(y1 + b_off);
             }
         }
     }
@@ -1149,17 +1097,22 @@ py::array_t<uint8_t> rgb_uint8_to_yuv8(py::array_t<uint8_t> rgb_array, int width
     ssize_t stride_y = buf.strides[0];
     ssize_t stride_x = buf.strides[1];
 
-    const uint8_t Y_NARROW_MIN = 16;
-    const uint8_t Y_NARROW_MAX = 235;
-    const uint8_t C_NARROW_MIN = 16;
-    const uint8_t C_NARROW_MAX = 240;
+    // Matrix coefficients: Y = Kr*R + Kg*G + Kb*B
+    double Kr, Kb;
+    switch (matrix) {
+        case DeckLinkOutput::Gamut::Rec601:  Kr = 0.299;  Kb = 0.114;  break;
+        case DeckLinkOutput::Gamut::Rec2020: Kr = 0.2627; Kb = 0.0593; break;
+        case DeckLinkOutput::Gamut::Rec709:
+        default:                             Kr = 0.2126; Kb = 0.0722; break;
+    }
+    double Kg = 1.0 - Kr - Kb;
 
     for (int y = 0; y < height; y++) {
         for (int x = 0; x < width; x += 2) {
-            float u_temp[2], v_temp[2];
+            double cb_temp[2], cr_temp[2];   // chroma in -1..+1
             uint8_t y_values[2];
 
-            // Convert RGB to YUV for 2 pixels
+            // Convert RGB to YCbCr for 2 pixels
             for (int i = 0; i < 2; i++) {
                 int pixel_x = x + i;
                 if (pixel_x < width) {
@@ -1168,72 +1121,60 @@ py::array_t<uint8_t> rgb_uint8_to_yuv8(py::array_t<uint8_t> rgb_array, int width
                     uint8_t g = pixel[1];
                     uint8_t b = pixel[2];
 
-                    float rf, gf, bf;
+                    double rf, gf, bf;
                     if (input_narrow_range) {
-                        rf = (r - 16) / 219.0f;
-                        gf = (g - 16) / 219.0f;
-                        bf = (b - 16) / 219.0f;
+                        rf = (r - 16) / 219.0;
+                        gf = (g - 16) / 219.0;
+                        bf = (b - 16) / 219.0;
                     } else {
-                        rf = r / 255.0f;
-                        gf = g / 255.0f;
-                        bf = b / 255.0f;
+                        rf = r / 255.0;
+                        gf = g / 255.0;
+                        bf = b / 255.0;
                     }
 
-                    float yf, uf, vf;
-                    if (matrix == DeckLinkOutput::Gamut::Rec601) {
-                        yf = 0.299f * rf + 0.587f * gf + 0.114f * bf;
-                        uf = -0.1687f * rf - 0.3313f * gf + 0.5000f * bf;
-                        vf = 0.5000f * rf - 0.4187f * gf - 0.0813f * bf;
-                    } else if (matrix == DeckLinkOutput::Gamut::Rec2020) {
-                        yf = 0.2627f * rf + 0.6780f * gf + 0.0593f * bf;
-                        uf = -0.1396f * rf - 0.3604f * gf + 0.5000f * bf;
-                        vf = 0.5000f * rf - 0.4598f * gf - 0.0402f * bf;
-                    } else {
-                        yf = 0.2126f * rf + 0.7152f * gf + 0.0722f * bf;
-                        uf = -0.1146f * rf - 0.3854f * gf + 0.5000f * bf;
-                        vf = 0.5000f * rf - 0.4542f * gf - 0.0458f * bf;
-                    }
+                    // RGB -> YCbCr ((1-Kr) form, chroma in -1..+1)
+                    double yf  = Kr * rf + Kg * gf + Kb * bf;
+                    double cbf = (bf - yf) / (1.0 - Kb);
+                    double crf = (rf - yf) / (1.0 - Kr);
 
                     int y8;
                     if (output_narrow_range) {
-                        y8 = (int)(yf * 219.0f + 16.0f + 0.5f);
-                        y8 = (y8 < Y_NARROW_MIN) ? Y_NARROW_MIN : ((y8 > Y_NARROW_MAX) ? Y_NARROW_MAX : y8);
+                        y8 = (int)(yf * 219.0 + 16.0 + 0.5);
                     } else {
-                        y8 = (int)(yf * 255.0f + 0.5f);
-                        y8 = (y8 < 0) ? 0 : ((y8 > 255) ? 255 : y8);
+                        y8 = (int)(yf * 255.0 + 0.5);
                     }
+                    // Clamp to byte range, allowing super-blacks/super-whites
+                    y8 = (y8 < 0) ? 0 : ((y8 > 255) ? 255 : y8);
                     y_values[i] = (uint8_t)y8;
-                    u_temp[i] = uf;
-                    v_temp[i] = vf;
+                    cb_temp[i] = cbf;
+                    cr_temp[i] = crf;
                 } else {
-                    y_values[i] = output_narrow_range ? Y_NARROW_MIN : 0;
-                    u_temp[i] = 0.0f;
-                    v_temp[i] = 0.0f;
+                    y_values[i] = output_narrow_range ? 16 : 0;
+                    cb_temp[i] = 0.0;
+                    cr_temp[i] = 0.0;
                 }
             }
 
-            // Average U/V samples for 4:2:2 chroma subsampling
-            float u_avg = (u_temp[0] + u_temp[1]) * 0.5f;
-            float v_avg = (v_temp[0] + v_temp[1]) * 0.5f;
+            // Average Cb/Cr samples for 4:2:2 chroma subsampling
+            double cb_avg = (cb_temp[0] + cb_temp[1]) * 0.5;
+            double cr_avg = (cr_temp[0] + cr_temp[1]) * 0.5;
 
-            int u8, v8;
+            int cb8, cr8;
             if (output_narrow_range) {
-                u8 = (int)((u_avg + 0.5f) * 224.0f + 16.0f + 0.5f);
-                v8 = (int)((v_avg + 0.5f) * 224.0f + 16.0f + 0.5f);
-                u8 = (u8 < C_NARROW_MIN) ? C_NARROW_MIN : ((u8 > C_NARROW_MAX) ? C_NARROW_MAX : u8);
-                v8 = (v8 < C_NARROW_MIN) ? C_NARROW_MIN : ((v8 > C_NARROW_MAX) ? C_NARROW_MAX : v8);
+                cb8 = (int)(cb_avg * 112.0 + 128.0 + 0.5);
+                cr8 = (int)(cr_avg * 112.0 + 128.0 + 0.5);
             } else {
-                u8 = (int)(128.0f + 255.0f * u_avg + 0.5f);
-                v8 = (int)(128.0f + 255.0f * v_avg + 0.5f);
-                u8 = (u8 < 0) ? 0 : ((u8 > 255) ? 255 : u8);
-                v8 = (v8 < 0) ? 0 : ((v8 > 255) ? 255 : v8);
+                cb8 = (int)(cb_avg * 255.0 / 2.0 + 128.0 + 0.5);
+                cr8 = (int)(cr_avg * 255.0 / 2.0 + 128.0 + 0.5);
             }
+            cb8 = (cb8 < 0) ? 0 : ((cb8 > 255) ? 255 : cb8);
+            cr8 = (cr8 < 0) ? 0 : ((cr8 > 255) ? 255 : cr8);
 
             // Pack into 2vuy format: U Y0 V Y1
             int dst_idx = (y * width + x) * 2;
-            dst[dst_idx + 0] = (uint8_t)u8;
+            dst[dst_idx + 0] = (uint8_t)cb8;
             dst[dst_idx + 1] = y_values[0];
-            dst[dst_idx + 2] = (uint8_t)v8;
+            dst[dst_idx + 2] = (uint8_t)cr8;
             dst[dst_idx + 3] = y_values[1];
         }
     }
@@ -1266,17 +1207,22 @@ py::array_t<uint8_t> rgb_uint16_to_yuv8(py::array_t<uint16_t> rgb_array, int wid
     ssize_t stride_y = buf.strides[0];
     ssize_t stride_x = buf.strides[1];
 
-    const uint8_t Y_NARROW_MIN = 16;
-    const uint8_t Y_NARROW_MAX = 235;
-    const uint8_t C_NARROW_MIN = 16;
-    const uint8_t C_NARROW_MAX = 240;
+    // Matrix coefficients: Y = Kr*R + Kg*G + Kb*B
+    double Kr, Kb;
+    switch (matrix) {
+        case DeckLinkOutput::Gamut::Rec601:  Kr = 0.299;  Kb = 0.114;  break;
+        case DeckLinkOutput::Gamut::Rec2020: Kr = 0.2627; Kb = 0.0593; break;
+        case DeckLinkOutput::Gamut::Rec709:
+        default:                             Kr = 0.2126; Kb = 0.0722; break;
+    }
+    double Kg = 1.0 - Kr - Kb;
 
     for (int y = 0; y < height; y++) {
         for (int x = 0; x < width; x += 2) {
-            float u_temp[2], v_temp[2];
+            double cb_temp[2], cr_temp[2];   // chroma in -1..+1
             uint8_t y_values[2];
 
-            // Convert RGB to YUV for 2 pixels
+            // Convert RGB to YCbCr for 2 pixels
             for (int i = 0; i < 2; i++) {
                 int pixel_x = x + i;
                 if (pixel_x < width) {
@@ -1286,72 +1232,60 @@ py::array_t<uint8_t> rgb_uint16_to_yuv8(py::array_t<uint16_t> rgb_array, int wid
                     uint16_t g = pixel[1];
                     uint16_t b = pixel[2];
 
-                    float rf, gf, bf;
+                    double rf, gf, bf;
                     if (input_narrow_range) {
-                        rf = (r - (64 << 6)) / (float)(876 << 6);
-                        gf = (g - (64 << 6)) / (float)(876 << 6);
-                        bf = (b - (64 << 6)) / (float)(876 << 6);
+                        rf = (r - (64 << 6)) / (double)(876 << 6);
+                        gf = (g - (64 << 6)) / (double)(876 << 6);
+                        bf = (b - (64 << 6)) / (double)(876 << 6);
                     } else {
-                        rf = r / 65535.0f;
-                        gf = g / 65535.0f;
-                        bf = b / 65535.0f;
+                        rf = r / 65535.0;
+                        gf = g / 65535.0;
+                        bf = b / 65535.0;
                     }
 
-                    float yf, uf, vf;
-                    if (matrix == DeckLinkOutput::Gamut::Rec601) {
-                        yf = 0.299f * rf + 0.587f * gf + 0.114f * bf;
-                        uf = -0.1687f * rf - 0.3313f * gf + 0.5000f * bf;
-                        vf = 0.5000f * rf - 0.4187f * gf - 0.0813f * bf;
-                    } else if (matrix == DeckLinkOutput::Gamut::Rec2020) {
-                        yf = 0.2627f * rf + 0.6780f * gf + 0.0593f * bf;
-                        uf = -0.1396f * rf - 0.3604f * gf + 0.5000f * bf;
-                        vf = 0.5000f * rf - 0.4598f * gf - 0.0402f * bf;
-                    } else {
-                        yf = 0.2126f * rf + 0.7152f * gf + 0.0722f * bf;
-                        uf = -0.1146f * rf - 0.3854f * gf + 0.5000f * bf;
-                        vf = 0.5000f * rf - 0.4542f * gf - 0.0458f * bf;
-                    }
+                    // RGB -> YCbCr ((1-Kr) form, chroma in -1..+1)
+                    double yf  = Kr * rf + Kg * gf + Kb * bf;
+                    double cbf = (bf - yf) / (1.0 - Kb);
+                    double crf = (rf - yf) / (1.0 - Kr);
 
                     int y8;
                     if (output_narrow_range) {
-                        y8 = (int)(yf * 219.0f + 16.0f + 0.5f);
-                        y8 = (y8 < Y_NARROW_MIN) ? Y_NARROW_MIN : ((y8 > Y_NARROW_MAX) ? Y_NARROW_MAX : y8);
+                        y8 = (int)(yf * 219.0 + 16.0 + 0.5);
                     } else {
-                        y8 = (int)(yf * 255.0f + 0.5f);
-                        y8 = (y8 < 0) ? 0 : ((y8 > 255) ? 255 : y8);
+                        y8 = (int)(yf * 255.0 + 0.5);
                     }
+                    // Clamp to byte range, allowing super-blacks/super-whites
+                    y8 = (y8 < 0) ? 0 : ((y8 > 255) ? 255 : y8);
                     y_values[i] = (uint8_t)y8;
-                    u_temp[i] = uf;
-                    v_temp[i] = vf;
+                    cb_temp[i] = cbf;
+                    cr_temp[i] = crf;
                 } else {
-                    y_values[i] = output_narrow_range ? Y_NARROW_MIN : 0;
-                    u_temp[i] = 0.0f;
-                    v_temp[i] = 0.0f;
+                    y_values[i] = output_narrow_range ? 16 : 0;
+                    cb_temp[i] = 0.0;
+                    cr_temp[i] = 0.0;
                 }
             }
 
-            // Average U/V samples for 4:2:2 chroma subsampling
-            float u_avg = (u_temp[0] + u_temp[1]) * 0.5f;
-            float v_avg = (v_temp[0] + v_temp[1]) * 0.5f;
+            // Average Cb/Cr samples for 4:2:2 chroma subsampling
+            double cb_avg = (cb_temp[0] + cb_temp[1]) * 0.5;
+            double cr_avg = (cr_temp[0] + cr_temp[1]) * 0.5;
 
-            int u8, v8;
+            int cb8, cr8;
             if (output_narrow_range) {
-                u8 = (int)((u_avg + 0.5f) * 224.0f + 16.0f + 0.5f);
-                v8 = (int)((v_avg + 0.5f) * 224.0f + 16.0f + 0.5f);
-                u8 = (u8 < C_NARROW_MIN) ? C_NARROW_MIN : ((u8 > C_NARROW_MAX) ? C_NARROW_MAX : u8);
-                v8 = (v8 < C_NARROW_MIN) ? C_NARROW_MIN : ((v8 > C_NARROW_MAX) ? C_NARROW_MAX : v8);
+                cb8 = (int)(cb_avg * 112.0 + 128.0 + 0.5);
+                cr8 = (int)(cr_avg * 112.0 + 128.0 + 0.5);
             } else {
-                u8 = (int)(128.0f + 255.0f * u_avg + 0.5f);
-                v8 = (int)(128.0f + 255.0f * v_avg + 0.5f);
-                u8 = (u8 < 0) ? 0 : ((u8 > 255) ? 255 : u8);
-                v8 = (v8 < 0) ? 0 : ((v8 > 255) ? 255 : v8);
+                cb8 = (int)(cb_avg * 255.0 / 2.0 + 128.0 + 0.5);
+                cr8 = (int)(cr_avg * 255.0 / 2.0 + 128.0 + 0.5);
             }
+            cb8 = (cb8 < 0) ? 0 : ((cb8 > 255) ? 255 : cb8);
+            cr8 = (cr8 < 0) ? 0 : ((cr8 > 255) ? 255 : cr8);
 
             // Pack into 2vuy format: U Y0 V Y1
             int dst_idx = (y * width + x) * 2;
-            dst[dst_idx + 0] = (uint8_t)u8;
+            dst[dst_idx + 0] = (uint8_t)cb8;
             dst[dst_idx + 1] = y_values[0];
-            dst[dst_idx + 2] = (uint8_t)v8;
+            dst[dst_idx + 2] = (uint8_t)cr8;
             dst[dst_idx + 3] = y_values[1];
         }
     }
@@ -1384,81 +1318,74 @@ py::array_t<uint8_t> rgb_float_to_yuv8(py::array_t<float> rgb_array, int width, 
     ssize_t stride_y = buf.strides[0];
     ssize_t stride_x = buf.strides[1];
 
-    const uint8_t Y_NARROW_MIN = 16;
-    const uint8_t Y_NARROW_MAX = 235;
-    const uint8_t C_NARROW_MIN = 16;
-    const uint8_t C_NARROW_MAX = 240;
+    // Matrix coefficients: Y = Kr*R + Kg*G + Kb*B
+    double Kr, Kb;
+    switch (matrix) {
+        case DeckLinkOutput::Gamut::Rec601:  Kr = 0.299;  Kb = 0.114;  break;
+        case DeckLinkOutput::Gamut::Rec2020: Kr = 0.2627; Kb = 0.0593; break;
+        case DeckLinkOutput::Gamut::Rec709:
+        default:                             Kr = 0.2126; Kb = 0.0722; break;
+    }
+    double Kg = 1.0 - Kr - Kb;
 
     for (int y = 0; y < height; y++) {
         for (int x = 0; x < width; x += 2) {
-            float u_temp[2], v_temp[2];
+            double cb_temp[2], cr_temp[2];   // chroma in -1..+1
             uint8_t y_values[2];
 
-            // Convert RGB to YUV for 2 pixels
+            // Convert RGB to YCbCr for 2 pixels
             for (int i = 0; i < 2; i++) {
                 int pixel_x = x + i;
                 if (pixel_x < width) {
                     const float* pixel = reinterpret_cast<const float*>(
                         src_base + y * stride_y + pixel_x * stride_x);
-                    float r = pixel[0];
-                    float g = pixel[1];
-                    float b = pixel[2];
+                    double rf = pixel[0];
+                    double gf = pixel[1];
+                    double bf = pixel[2];
 
-                    float yf, uf, vf;
-                    if (matrix == DeckLinkOutput::Gamut::Rec601) {
-                        yf = 0.299f * r + 0.587f * g + 0.114f * b;
-                        uf = -0.1687f * r - 0.3313f * g + 0.5000f * b;
-                        vf = 0.5000f * r - 0.4187f * g - 0.0813f * b;
-                    } else if (matrix == DeckLinkOutput::Gamut::Rec2020) {
-                        yf = 0.2627f * r + 0.6780f * g + 0.0593f * b;
-                        uf = -0.1396f * r - 0.3604f * g + 0.5000f * b;
-                        vf = 0.5000f * r - 0.4598f * g - 0.0402f * b;
-                    } else {
-                        yf = 0.2126f * r + 0.7152f * g + 0.0722f * b;
-                        uf = -0.1146f * r - 0.3854f * g + 0.5000f * b;
-                        vf = 0.5000f * r - 0.4542f * g - 0.0458f * b;
-                    }
+                    // RGB -> YCbCr ((1-Kr) form, chroma in -1..+1)
+                    double yf  = Kr * rf + Kg * gf + Kb * bf;
+                    double cbf = (bf - yf) / (1.0 - Kb);
+                    double crf = (rf - yf) / (1.0 - Kr);
 
                     int y8;
                     if (output_narrow_range) {
-                        y8 = (int)(yf * 219.0f + 16.0f + 0.5f);
-                        y8 = (y8 < Y_NARROW_MIN) ? Y_NARROW_MIN : ((y8 > Y_NARROW_MAX) ? Y_NARROW_MAX : y8);
+                        y8 = (int)(yf * 219.0 + 16.0 + 0.5);
                     } else {
-                        y8 = (int)(yf * 255.0f + 0.5f);
-                        y8 = (y8 < 0) ? 0 : ((y8 > 255) ? 255 : y8);
+                        y8 = (int)(yf * 255.0 + 0.5);
                     }
+                    // Clamp to byte range, allowing super-blacks/super-whites
+                    y8 = (y8 < 0) ? 0 : ((y8 > 255) ? 255 : y8);
                     y_values[i] = (uint8_t)y8;
-                    u_temp[i] = uf;
-                    v_temp[i] = vf;
+                    cb_temp[i] = cbf;
+                    cr_temp[i] = crf;
                 } else {
-                    y_values[i] = output_narrow_range ? Y_NARROW_MIN : 0;
-                    u_temp[i] = 0.0f;
-                    v_temp[i] = 0.0f;
+                    y_values[i] = output_narrow_range ? 16 : 0;
+                    cb_temp[i] = 0.0;
+                    cr_temp[i] = 0.0;
                 }
             }
 
-            // Average U/V samples for 4:2:2 chroma subsampling
-            float u_avg = (u_temp[0] + u_temp[1]) * 0.5f;
-            float v_avg = (v_temp[0] + v_temp[1]) * 0.5f;
+            // Average Cb/Cr samples for 4:2:2 chroma subsampling
+            double cb_avg = (cb_temp[0] + cb_temp[1]) * 0.5;
+            double cr_avg = (cr_temp[0] + cr_temp[1]) * 0.5;
 
-            int u8, v8;
+            int cb8, cr8;
             if (output_narrow_range) {
-                u8 = (int)((u_avg + 0.5f) * 224.0f + 16.0f + 0.5f);
-                v8 = (int)((v_avg + 0.5f) * 224.0f + 16.0f + 0.5f);
-                u8 = (u8 < C_NARROW_MIN) ? C_NARROW_MIN : ((u8 > C_NARROW_MAX) ? C_NARROW_MAX : u8);
-                v8 = (v8 < C_NARROW_MIN) ? C_NARROW_MIN : ((v8 > C_NARROW_MAX) ? C_NARROW_MAX : v8);
+                cb8 = (int)(cb_avg * 112.0 + 128.0 + 0.5);
+                cr8 = (int)(cr_avg * 112.0 + 128.0 + 0.5);
             } else {
-                u8 = (int)(128.0f + 255.0f * u_avg + 0.5f);
-                v8 = (int)(128.0f + 255.0f * v_avg + 0.5f);
-                u8 = (u8 < 0) ? 0 : ((u8 > 255) ? 255 : u8);
-                v8 = (v8 < 0) ? 0 : ((v8 > 255) ? 255 : v8);
+                cb8 = (int)(cb_avg * 255.0 / 2.0 + 128.0 + 0.5);
+                cr8 = (int)(cr_avg * 255.0 / 2.0 + 128.0 + 0.5);
             }
+            cb8 = (cb8 < 0) ? 0 : ((cb8 > 255) ? 255 : cb8);
+            cr8 = (cr8 < 0) ? 0 : ((cr8 > 255) ? 255 : cr8);
 
             // Pack into 2vuy format: U Y0 V Y1
             int dst_idx = (y * width + x) * 2;
-            dst[dst_idx + 0] = (uint8_t)u8;
+            dst[dst_idx + 0] = (uint8_t)cb8;
             dst[dst_idx + 1] = y_values[0];
-            dst[dst_idx + 2] = (uint8_t)v8;
+            dst[dst_idx + 2] = (uint8_t)cr8;
             dst[dst_idx + 3] = y_values[1];
         }
     }

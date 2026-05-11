@@ -7,6 +7,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+- Refactored all nine RGB↔YUV conversion functions (`rgb_*_to_yuv8`, `rgb_*_to_yuv10`, `yuv8_to_rgb_*`, `yuv10_to_rgb_*`) onto a single shared idiom: `Kr/Kb/Kg` matrix algebra computed once per frame, chroma normalised to `[-1, +1]`, the `(1-Kr)` matrix form, and broadcast-familiar code-value constants (876, 896, 1023 for 10-bit; 219, 224, 255 for 8-bit) inline at their canonical positions. Each encoder is now a term-for-term inverse of its decoder, and the 8-bit and 10-bit functions differ only in the bit-depth constants. Mathematically identical to the previous hardcoded numerical coefficients (Rec.601, Rec.709, Rec.2020 all preserved). The YUV8 encoder previously clamped narrow-range Y to `[16, 235]` and chroma to `[16, 240]`; it now clamps only to the byte range `[0, 255]`, matching the YUV10 encoder and preserving super-blacks / super-whites in narrow-range output.
+
 ### Fixed
 - `yuv8_to_rgb_uint16` and `yuv8_to_rgb_float` decoded captured 8-bit Y'CbCr (2vuy) frames with chroma scaled 2× too large, producing visibly wrong colours (over-saturated reds/blues, with sub-zero clamping) compared to the same scene captured as 10-bit Y'CbCr. The decoders normalised Cb/Cr to [-1, 1] before applying matrix coefficients that expect [-0.5, 0.5]. Round-tripping pure red (R=255,G=0,B=0) returned roughly (1.79, -0.07, -0.20) instead of (1, 0, 0). The corresponding YUV8 encoders were correct, so output paths were unaffected; only capture decoding was wrong. The YUV10 decoder uses the correct scaling and was unaffected.
 
