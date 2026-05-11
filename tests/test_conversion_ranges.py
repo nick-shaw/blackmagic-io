@@ -1089,5 +1089,253 @@ class TestRGB12FloatRoundTrip:
         assert np.allclose(recovered, 1.0, atol=self.TOL_FULL)
 
 
+# --------------------------------------------------------------------------
+# Gap-closing tests for paths previously only covered by hardware loopback.
+# (Closes items from issue #2 plus the YUV uint16 decoder gap.)
+# --------------------------------------------------------------------------
+
+@pytest.mark.skipif(not CONVERSIONS_AVAILABLE, reason="Conversion functions not available")
+class TestYUV8Uint16RoundTrip:
+    """Exercises `yuv8_to_rgb_uint16` (the uint16-output decoder branch).
+
+    The float decoder `yuv8_to_rgb_float` is covered by `TestYUV8RoundTrip`
+    and the colour-science parity tests, but the uint16 decoder has a
+    separate output-packing branch (`rf * 56064 + 4096` for narrow 16-bit,
+    `rf * 65535` for full) that wasn't exercised in CI.
+    """
+
+    # 8-bit Y has 219 narrow codes; one code in narrow 16-bit output is
+    # ~256 uint16 units. Allow 2 codes of slack.
+    TOL = 512
+
+    @staticmethod
+    def _const_rgb_uint8(width, height, rgb_triplet):
+        frame = np.zeros((height, width, 3), dtype=np.uint8)
+        frame[:, :, 0] = rgb_triplet[0]
+        frame[:, :, 1] = rgb_triplet[1]
+        frame[:, :, 2] = rgb_triplet[2]
+        return frame
+
+    def _round_trip(self, rgb_uint8, width, height, output_narrow_range):
+        from blackmagic_io import rgb_uint8_to_yuv8, yuv8_to_rgb_uint16, Gamut
+        yuv = rgb_uint8_to_yuv8(rgb_uint8, width, height,
+                                matrix=Gamut.Rec709,
+                                input_narrow_range=False,
+                                output_narrow_range=True)
+        return yuv8_to_rgb_uint16(yuv, width, height,
+                                  matrix=Gamut.Rec709,
+                                  input_narrow_range=True,
+                                  output_narrow_range=output_narrow_range)
+
+    def test_white_to_full_uint16(self):
+        width, height = 16, 4
+        rgb = self._const_rgb_uint8(width, height, (255, 255, 255))
+        recovered = self._round_trip(rgb, width, height, output_narrow_range=False)
+        cy, cx = height // 2, width // 2
+        for ch in range(3):
+            assert abs(int(recovered[cy, cx, ch]) - 65535) <= self.TOL, \
+                f"channel {ch}: {recovered[cy, cx, ch]} (expected ~65535)"
+
+    def test_white_to_narrow_uint16(self):
+        """Exercises the `rf * 56064 + 4096` narrow output branch."""
+        width, height = 16, 4
+        rgb = self._const_rgb_uint8(width, height, (255, 255, 255))
+        recovered = self._round_trip(rgb, width, height, output_narrow_range=True)
+        cy, cx = height // 2, width // 2
+        # Narrow 16-bit white = 60160 (= 940 << 6)
+        for ch in range(3):
+            assert abs(int(recovered[cy, cx, ch]) - 60160) <= self.TOL, \
+                f"channel {ch}: {recovered[cy, cx, ch]} (expected ~60160)"
+
+    def test_pure_red_to_full_uint16(self):
+        """Per-channel: pure red round-trips to (~65535, ~0, ~0)."""
+        width, height = 16, 4
+        rgb = self._const_rgb_uint8(width, height, (255, 0, 0))
+        recovered = self._round_trip(rgb, width, height, output_narrow_range=False)
+        cy, cx = height // 2, width // 2
+        assert abs(int(recovered[cy, cx, 0]) - 65535) <= self.TOL
+        assert int(recovered[cy, cx, 1]) <= self.TOL
+        assert int(recovered[cy, cx, 2]) <= self.TOL
+
+
+@pytest.mark.skipif(not CONVERSIONS_AVAILABLE, reason="Conversion functions not available")
+class TestYUV10Uint16RoundTrip:
+    """Exercises `yuv10_to_rgb_uint16` (the uint16-output decoder branch)."""
+
+    # 10-bit Y has 876 narrow codes; one code in narrow 16-bit output is 64.
+    # Allow 2 codes slack.
+    TOL = 128
+
+    @staticmethod
+    def _const_rgb_uint16(width, height, rgb_triplet_u16):
+        frame = np.zeros((height, width, 3), dtype=np.uint16)
+        frame[:, :, 0] = rgb_triplet_u16[0]
+        frame[:, :, 1] = rgb_triplet_u16[1]
+        frame[:, :, 2] = rgb_triplet_u16[2]
+        return frame
+
+    def _round_trip(self, rgb_uint16, width, height, output_narrow_range):
+        from blackmagic_io import rgb_uint16_to_yuv10, yuv10_to_rgb_uint16, Gamut
+        yuv = rgb_uint16_to_yuv10(rgb_uint16, width, height,
+                                  matrix=Gamut.Rec709,
+                                  input_narrow_range=False,
+                                  output_narrow_range=True)
+        return yuv10_to_rgb_uint16(yuv, width, height,
+                                   matrix=Gamut.Rec709,
+                                   input_narrow_range=True,
+                                   output_narrow_range=output_narrow_range)
+
+    def test_white_to_full_uint16(self):
+        width, height = 48, 4
+        rgb = self._const_rgb_uint16(width, height, (65535, 65535, 65535))
+        recovered = self._round_trip(rgb, width, height, output_narrow_range=False)
+        cy, cx = height // 2, width // 2
+        for ch in range(3):
+            assert abs(int(recovered[cy, cx, ch]) - 65535) <= self.TOL
+
+    def test_white_to_narrow_uint16(self):
+        width, height = 48, 4
+        rgb = self._const_rgb_uint16(width, height, (65535, 65535, 65535))
+        recovered = self._round_trip(rgb, width, height, output_narrow_range=True)
+        cy, cx = height // 2, width // 2
+        for ch in range(3):
+            assert abs(int(recovered[cy, cx, ch]) - 60160) <= self.TOL
+
+    def test_pure_red_to_full_uint16(self):
+        width, height = 48, 4
+        rgb = self._const_rgb_uint16(width, height, (65535, 0, 0))
+        recovered = self._round_trip(rgb, width, height, output_narrow_range=False)
+        cy, cx = height // 2, width // 2
+        assert abs(int(recovered[cy, cx, 0]) - 65535) <= self.TOL
+        assert int(recovered[cy, cx, 1]) <= self.TOL
+        assert int(recovered[cy, cx, 2]) <= self.TOL
+
+
+@pytest.mark.skipif(not CONVERSIONS_AVAILABLE, reason="Conversion functions not available")
+class TestRGBUnpack:
+    """Exercises `unpack_rgb10` and `unpack_rgb12`.
+
+    These extract bit fields from packed RGB buffers but were not directly
+    tested in CI (no parity-test analog because colour-science doesn't have
+    an RGB10/RGB12 reference).
+    """
+
+    def test_unpack_rgb10_narrow_white(self):
+        """Encode narrow white, unpack, assert R=G=B=940."""
+        from blackmagic_io import rgb_uint16_to_rgb10, unpack_rgb10
+        width, height = 12, 2
+        rgb = np.full((height, width, 3), 60160, dtype=np.uint16)  # narrow 16-bit white
+        packed = rgb_uint16_to_rgb10(rgb, width, height,
+                                     input_narrow_range=True, output_narrow_range=True)
+        unpacked = unpack_rgb10(packed, width, height)
+        assert (unpacked['r'] == 940).all()
+        assert (unpacked['g'] == 940).all()
+        assert (unpacked['b'] == 940).all()
+
+    def test_unpack_rgb10_pure_red(self):
+        """Per-channel: pure narrow red unpacks to (940, 64, 64)."""
+        from blackmagic_io import rgb_uint16_to_rgb10, unpack_rgb10
+        width, height = 12, 2
+        rgb = np.zeros((height, width, 3), dtype=np.uint16)
+        rgb[..., 0] = 60160  # narrow white in R
+        rgb[..., 1] = 4096   # narrow black in G
+        rgb[..., 2] = 4096   # narrow black in B
+        packed = rgb_uint16_to_rgb10(rgb, width, height,
+                                     input_narrow_range=True, output_narrow_range=True)
+        unpacked = unpack_rgb10(packed, width, height)
+        assert (unpacked['r'] == 940).all()
+        assert (unpacked['g'] == 64).all()
+        assert (unpacked['b'] == 64).all()
+
+    def test_unpack_rgb12_narrow_white(self):
+        """Encode narrow white, unpack, assert R=G=B=3760."""
+        from blackmagic_io import rgb_uint16_to_rgb12, unpack_rgb12
+        width, height = 16, 2
+        rgb = np.full((height, width, 3), 60160, dtype=np.uint16)
+        packed = rgb_uint16_to_rgb12(rgb, width, height,
+                                     input_narrow_range=True, output_narrow_range=True)
+        unpacked = unpack_rgb12(packed, width, height)
+        assert (unpacked['r'] == 3760).all()
+        assert (unpacked['g'] == 3760).all()
+        assert (unpacked['b'] == 3760).all()
+
+    def test_unpack_rgb12_pure_red(self):
+        """Per-channel: pure narrow red unpacks to (3760, 256, 256)."""
+        from blackmagic_io import rgb_uint16_to_rgb12, unpack_rgb12
+        width, height = 16, 2
+        rgb = np.zeros((height, width, 3), dtype=np.uint16)
+        rgb[..., 0] = 60160
+        rgb[..., 1] = 4096
+        rgb[..., 2] = 4096
+        packed = rgb_uint16_to_rgb12(rgb, width, height,
+                                     input_narrow_range=True, output_narrow_range=True)
+        unpacked = unpack_rgb12(packed, width, height)
+        assert (unpacked['r'] == 3760).all()
+        assert (unpacked['g'] == 256).all()
+        assert (unpacked['b'] == 256).all()
+
+
+@pytest.mark.skipif(not CONVERSIONS_AVAILABLE, reason="Conversion functions not available")
+class TestRowBytesForwarding:
+    """Verifies the wrapper-level `row_bytes=` argument is forwarded to C++.
+
+    The risk being guarded against is silent drop: a wrapper that accepts
+    `row_bytes=N` but doesn't pass it through. The check here uses v210
+    because it has the most impactful stride mismatch (the encoder writes
+    minimum-pack rows and the decoder default expects BMD's hardware
+    alignment).
+    """
+
+    def test_yuv10_explicit_row_bytes_matches_default(self):
+        """At width=48 (v210-aligned) explicit and default row_bytes agree."""
+        from blackmagic_io import rgb_float_to_yuv10, yuv10_to_rgb_float
+        width, height = 48, 2
+        rgb = np.full((height, width, 3), 0.5, dtype=np.float32)
+        packed = rgb_float_to_yuv10(rgb, width, height, output_narrow_range=True)
+        # Default row_bytes (((48+47)/48)*128 = 128) and explicit 128 must match.
+        from_default  = yuv10_to_rgb_float(packed, width, height, input_narrow_range=True)
+        from_explicit = yuv10_to_rgb_float(packed, width, height, input_narrow_range=True,
+                                           row_bytes=128)
+        assert np.array_equal(from_default, from_explicit)
+
+    def test_yuv10_non_aligned_width_requires_row_bytes(self):
+        """At width=12 (not v210-aligned) the encoder writes 32 bytes/row.
+
+        The decoder default ((12+47)/48)*128 = 128 mismatches; passing the
+        encoder's actual stride must succeed.
+        """
+        from blackmagic_io import rgb_float_to_yuv10, yuv10_to_rgb_float
+        width, height = 12, 2
+        rgb = np.full((height, width, 3), 0.5, dtype=np.float32)
+        packed = rgb_float_to_yuv10(rgb, width, height, output_narrow_range=True)
+        # Without explicit row_bytes, decoder rejects the buffer (too small).
+        with pytest.raises(RuntimeError, match="size too small"):
+            yuv10_to_rgb_float(packed, width, height, input_narrow_range=True)
+        # With the right row_bytes (32 bytes/row for width=12), decode succeeds.
+        recovered = yuv10_to_rgb_float(packed, width, height, input_narrow_range=True,
+                                       row_bytes=32)
+        # Sanity: mid-gray (0.5) round-trips to ~0.5
+        assert np.allclose(recovered, 0.5, atol=1.5 / 876.0)
+
+
+@pytest.mark.skipif(not CONVERSIONS_AVAILABLE, reason="Conversion functions not available")
+class TestRGBtoBGRA:
+    """Exercises `rgb_to_bgra` channel-swap helper."""
+
+    def test_channel_swap(self):
+        from blackmagic_io import rgb_to_bgra
+        width, height = 4, 2
+        rgb = np.zeros((height, width, 3), dtype=np.uint8)
+        rgb[:, :, 0] = 10   # R
+        rgb[:, :, 1] = 20   # G
+        rgb[:, :, 2] = 30   # B
+        bgra = rgb_to_bgra(rgb, width, height)
+        assert bgra.shape == (height, width, 4)
+        assert (bgra[..., 0] == 30).all(),  "B channel"
+        assert (bgra[..., 1] == 20).all(),  "G channel"
+        assert (bgra[..., 2] == 10).all(),  "R channel"
+        assert (bgra[..., 3] == 255).all(), "A channel"
+
+
 if __name__ == "__main__":
     pytest.main([__file__, "-v"])
