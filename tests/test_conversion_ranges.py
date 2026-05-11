@@ -960,5 +960,134 @@ class TestRGB12RoundTrip:
             f"Cross-range round-trip drift exceeds 1 narrow 12-bit code: {max_diff}"
 
 
+@pytest.mark.skipif(not CONVERSIONS_AVAILABLE, reason="Conversion functions not available")
+class TestRGB10FloatRoundTrip:
+    """Round-trip float RGB through `rgb_float_to_rgb10` + `rgb10_to_float`.
+
+    Float input is always [0, 1] full range. The encoder maps it to either
+    narrow or full 10-bit codes; the decoder reverses. At the test inputs
+    (0.0, 0.5, 1.0 per channel) the round-trip is exact through narrow
+    because 0.5 maps to 502 = (64+940)/2 and decodes back to 0.5 exactly.
+    Allow 1.5 codes of tolerance as a safety margin.
+    """
+
+    TOL_NARROW = 1.5 / 876.0
+    TOL_FULL   = 1.5 / 1023.0
+
+    @staticmethod
+    def _const_rgb_float(width, height, rgb_triplet):
+        frame = np.zeros((height, width, 3), dtype=np.float32)
+        frame[:, :, 0] = rgb_triplet[0]
+        frame[:, :, 1] = rgb_triplet[1]
+        frame[:, :, 2] = rgb_triplet[2]
+        return frame
+
+    def _round_trip(self, rgb_float, width, height, narrow):
+        from blackmagic_io import rgb_float_to_rgb10, rgb10_to_float
+        packed = rgb_float_to_rgb10(rgb_float, width, height,
+                                    output_narrow_range=narrow)
+        return rgb10_to_float(packed, width, height, input_narrow_range=narrow)
+
+    def test_white_narrow(self):
+        width, height = 12, 2
+        rgb = self._const_rgb_float(width, height, (1.0, 1.0, 1.0))
+        recovered = self._round_trip(rgb, width, height, narrow=True)
+        assert np.allclose(recovered, 1.0, atol=self.TOL_NARROW), \
+            f"White narrow drift: {np.max(np.abs(recovered - 1.0))}"
+
+    def test_black_narrow(self):
+        width, height = 12, 2
+        rgb = self._const_rgb_float(width, height, (0.0, 0.0, 0.0))
+        recovered = self._round_trip(rgb, width, height, narrow=True)
+        assert np.allclose(recovered, 0.0, atol=self.TOL_NARROW), \
+            f"Black narrow drift: {np.max(np.abs(recovered))}"
+
+    def test_mid_gray_narrow(self):
+        width, height = 12, 2
+        rgb = self._const_rgb_float(width, height, (0.5, 0.5, 0.5))
+        recovered = self._round_trip(rgb, width, height, narrow=True)
+        assert np.allclose(recovered, 0.5, atol=self.TOL_NARROW), \
+            f"Mid-gray narrow drift: {np.max(np.abs(recovered - 0.5))}"
+
+    def test_pure_red_narrow(self):
+        """Per-channel: pure red round-trips to (1, 0, 0). Rules out channel swap."""
+        width, height = 12, 2
+        rgb = self._const_rgb_float(width, height, (1.0, 0.0, 0.0))
+        recovered = self._round_trip(rgb, width, height, narrow=True)
+        cy, cx = height // 2, width // 2
+        assert abs(recovered[cy, cx, 0] - 1.0) < self.TOL_NARROW
+        assert abs(recovered[cy, cx, 1] - 0.0) < self.TOL_NARROW
+        assert abs(recovered[cy, cx, 2] - 0.0) < self.TOL_NARROW
+
+    def test_white_full(self):
+        width, height = 12, 2
+        rgb = self._const_rgb_float(width, height, (1.0, 1.0, 1.0))
+        recovered = self._round_trip(rgb, width, height, narrow=False)
+        assert np.allclose(recovered, 1.0, atol=self.TOL_FULL)
+
+
+@pytest.mark.skipif(not CONVERSIONS_AVAILABLE, reason="Conversion functions not available")
+class TestRGB12FloatRoundTrip:
+    """Round-trip float RGB through `rgb_float_to_rgb12` + `rgb12_to_float`.
+
+    Same structure as TestRGB10FloatRoundTrip at 12-bit precision. Width
+    must be a multiple of 8 because R12L packs 8 pixels per 36-byte group.
+    """
+
+    TOL_NARROW = 1.5 / 3504.0
+    TOL_FULL   = 1.5 / 4095.0
+
+    @staticmethod
+    def _const_rgb_float(width, height, rgb_triplet):
+        frame = np.zeros((height, width, 3), dtype=np.float32)
+        frame[:, :, 0] = rgb_triplet[0]
+        frame[:, :, 1] = rgb_triplet[1]
+        frame[:, :, 2] = rgb_triplet[2]
+        return frame
+
+    def _round_trip(self, rgb_float, width, height, narrow):
+        from blackmagic_io import rgb_float_to_rgb12, rgb12_to_float
+        packed = rgb_float_to_rgb12(rgb_float, width, height,
+                                    output_narrow_range=narrow)
+        return rgb12_to_float(packed, width, height, input_narrow_range=narrow)
+
+    def test_white_narrow(self):
+        width, height = 16, 2
+        rgb = self._const_rgb_float(width, height, (1.0, 1.0, 1.0))
+        recovered = self._round_trip(rgb, width, height, narrow=True)
+        assert np.allclose(recovered, 1.0, atol=self.TOL_NARROW), \
+            f"White narrow drift: {np.max(np.abs(recovered - 1.0))}"
+
+    def test_black_narrow(self):
+        width, height = 16, 2
+        rgb = self._const_rgb_float(width, height, (0.0, 0.0, 0.0))
+        recovered = self._round_trip(rgb, width, height, narrow=True)
+        assert np.allclose(recovered, 0.0, atol=self.TOL_NARROW), \
+            f"Black narrow drift: {np.max(np.abs(recovered))}"
+
+    def test_mid_gray_narrow(self):
+        width, height = 16, 2
+        rgb = self._const_rgb_float(width, height, (0.5, 0.5, 0.5))
+        recovered = self._round_trip(rgb, width, height, narrow=True)
+        assert np.allclose(recovered, 0.5, atol=self.TOL_NARROW), \
+            f"Mid-gray narrow drift: {np.max(np.abs(recovered - 0.5))}"
+
+    def test_pure_red_narrow(self):
+        """Per-channel: pure red round-trips to (1, 0, 0). Rules out channel swap."""
+        width, height = 16, 2
+        rgb = self._const_rgb_float(width, height, (1.0, 0.0, 0.0))
+        recovered = self._round_trip(rgb, width, height, narrow=True)
+        cy, cx = height // 2, width // 2
+        assert abs(recovered[cy, cx, 0] - 1.0) < self.TOL_NARROW
+        assert abs(recovered[cy, cx, 1] - 0.0) < self.TOL_NARROW
+        assert abs(recovered[cy, cx, 2] - 0.0) < self.TOL_NARROW
+
+    def test_white_full(self):
+        width, height = 16, 2
+        rgb = self._const_rgb_float(width, height, (1.0, 1.0, 1.0))
+        recovered = self._round_trip(rgb, width, height, narrow=False)
+        assert np.allclose(recovered, 1.0, atol=self.TOL_FULL)
+
+
 if __name__ == "__main__":
     pytest.main([__file__, "-v"])
