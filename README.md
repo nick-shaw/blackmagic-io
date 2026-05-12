@@ -15,8 +15,8 @@ Written by Nick Shaw, www.antlerpost.com, with a lot of help from [Claude Code](
 - **Solid Color Output**: Display solid colors for testing and calibration
 - **Dynamic Updates**: Update currently displayed frame
 - **Multiple Resolutions**: Support for all display modes supported by your DeckLink device (SD, HD, 2K, 4K, 8K, and PC modes)
-- **8 and 10-bit Y'CbCr Output**: 2vuy and v210 (default for uint16/float data)
-- **10 and 12-bit R'G'B' output**: 10 and 12-bit R'G'B' 4:4:4
+- **8 and 10-bit Y'CbCr 4:2:2 output** (10-bit is the default for uint16/float input)
+- **8, 10 and 12-bit R'G'B' 4:4:4 output** (8-bit HDMI only)
 - **HDR Support**: SMPTE ST 2086 / CEA-861.3 HDR static metadata
 - **Y'CbCr matrix control**: Rec.601 (SD only), Rec.709 (HD+), and Rec.2020 (HD+) matrix support
 
@@ -76,6 +76,10 @@ To use the library at runtime you also need Blackmagic Desktop Video installed o
 # Clone the repository
 git clone https://github.com/nick-shaw/blackmagic-io.git
 cd blackmagic-io
+
+# Switch to the development branch
+# (main holds released versions; work in progress lives on dev)
+git checkout dev
 
 # Initialize submodules (required for the advanced T-Pat example only)
 git submodule update --init --recursive
