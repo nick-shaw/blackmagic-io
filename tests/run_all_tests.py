@@ -42,12 +42,14 @@ TESTS = [
     ("test_support_query.py",          [],                      "DeckLink device"),
     ("test_conversion_ranges.py",      [],                      "no hardware (pure unit tests)"),
     ("test_colour_science_parity.py",  [],                      "no hardware (skipped if colour-science not installed)"),
+    ("test_bgra_layout.py",            [],                      "no hardware (pure unit tests)"),
     ("test_resolutions.py",            [],                      "DeckLink device"),
     ("test_rgb10_colorbars.py",        ["--no-wait"],           "DeckLink device"),
     ("test_rgb12_colorbars.py",        ["--no-wait"],           "DeckLink device"),
     ("test_loopback.py",               ["--no-display"],        "SDI BNC loopback cable"),
     ("test_sdi_metadata_loopback.py",  [],                      "SDI BNC loopback cable"),
     ("test_hdmi_metadata_loopback.py", [],                      "HDMI loopback cable"),
+    ("test_hdmi_bgra_loopback.py",     [],                      "HDMI loopback cable"),
 ]
 
 
