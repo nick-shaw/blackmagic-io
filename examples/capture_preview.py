@@ -27,32 +27,28 @@ def capture_high_quality_frame(input_device, narrow_range=False):
     """
     input_device.stop_capture()
 
-    if not input_device._input.start_capture(PixelFormat.YUV10.value):
+    if not input_device.start_capture(pixel_format=PixelFormat.YUV10):
         print("Failed to restart in YUV10 mode")
-        input_device._input.start_capture(PixelFormat.BGRA.value)
-        input_device._capturing = True
+        input_device.start_capture(pixel_format=PixelFormat.BGRA)
         return
-
-    input_device._capturing = True
 
     frame_with_metadata = input_device.capture_frame_with_metadata(timeout_ms=5000)
 
     if frame_with_metadata is None:
         print("Failed to capture high-quality frame")
         input_device.stop_capture()
-        input_device._input.start_capture(PixelFormat.BGRA.value)
-        input_device._capturing = True
+        input_device.start_capture(pixel_format=PixelFormat.BGRA)
         return
 
     rgb_float = frame_with_metadata['rgb']
 
     if narrow_range:
         # Narrow range: 0.0-1.0 maps to 64-940 in 10-bit, or 4096-60160 in 16-bit
-        rgb_uint16 = (rgb_float * (60160 - 4096) + 4096).astype(np.uint16)
+        rgb_uint16 = np.clip(rgb_float * (60160 - 4096) + 4096, 0, 65535).astype(np.uint16)
         range_str = "narrow"
     else:
         # Full range: 0.0-1.0 maps to 0-65535
-        rgb_uint16 = (rgb_float * 65535).astype(np.uint16)
+        rgb_uint16 = np.clip(rgb_float * 65535, 0, 65535).astype(np.uint16)
         range_str = "full"
 
     output_dir = Path("captures")
@@ -90,8 +86,7 @@ def capture_high_quality_frame(input_device, narrow_range=False):
     print(f"  EOTF: {frame_with_metadata['eotf']}")
 
     input_device.stop_capture()
-    input_device._input.start_capture(PixelFormat.BGRA.value)
-    input_device._capturing = True
+    input_device.start_capture(pixel_format=PixelFormat.BGRA)
 
 def simple_preview(device_index=0, scale=1.0, input_connection=None):
     """
