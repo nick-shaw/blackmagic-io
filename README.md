@@ -395,29 +395,33 @@ Immediately activates capture mode, which will:
 
 **Performance Note:** Requesting `PixelFormat.BGRA` enables real-time ~25fps preview by having the hardware deliver 8-bit BGRA frames directly, avoiding expensive colorspace conversions. This is ideal for monitoring and preview workflows. For quality capture workflows, use the default YUV10 format (or explicitly specify it) to capture full 10-bit precision, then use `capture_frame_as_rgb()` or `capture_frame_with_metadata()` for processing.
 
-**`capture_frame_as_uint8(timeout_ms=5000, input_narrow_range=True) -> Optional[np.ndarray]`**
+**`capture_frame_as_uint8(timeout_ms=5000, input_narrow_range=True, output_narrow_range=False) -> Optional[np.ndarray]`**
 Capture a single frame and convert to RGB uint8 (faster than float conversion).
 - `timeout_ms`: Timeout in milliseconds (default: 5000)
 - `input_narrow_range`: Whether input uses narrow range encoding (default: True)
-- Returns: RGB uint8 array (H×W×3) with values 0-255, or None if timeout/no signal
+- `output_narrow_range`: If False (default), output uint8 is full range (0-255, "ready to display"). If True, output is narrow-range RGB (16-235 per channel) — useful when feeding the result to further video processing that expects narrow-range conventions.
+- Returns: RGB uint8 array (H×W×3), or None if timeout/no signal
 - Automatically converts from any DeckLink pixel format to RGB
 - Faster than `capture_frame_as_rgb()` due to uint8 output, ideal for preview workflows
+- When the capture was initialised with `pixel_format=PixelFormat.BGRA` and the SDK delivers 10-bit RGB (the typical case for 8-bit RGB sources on HDMI), the library automatically right-shifts each channel by 2 to recover the exact 8-bit values before applying any range conversion.
 
-**`capture_frame_as_uint8_with_metadata(timeout_ms=5000, input_narrow_range=True) -> Optional[dict]`**
+**`capture_frame_as_uint8_with_metadata(timeout_ms=5000, input_narrow_range=True, output_narrow_range=False) -> Optional[dict]`**
 Capture a frame as RGB uint8 with format metadata (fast preview with metadata access).
 - `timeout_ms`: Timeout in milliseconds (default: 5000)
 - `input_narrow_range`: Whether input uses narrow range encoding (default: True)
+- `output_narrow_range`: If False (default), output uint8 is full range (0-255). If True, output is narrow-range RGB (16-235 per channel).
 - Returns: Dictionary with frame data and metadata, or None if timeout/no signal
 
 Dictionary keys:
-- `'rgb'`: RGB uint8 array (H×W×3), values 0-255
+- `'rgb'`: RGB uint8 array (H×W×3)
 - `'width'`: Frame width in pixels
 - `'height'`: Frame height in pixels
 - `'format'`: Pixel format name (e.g., "YUV10", "RGB10")
 - `'mode'`: Display mode name (e.g., "HD1080p25")
 - `'colorspace'`: Color matrix name (e.g., "Rec709", "Rec2020")
 - `'eotf'`: Transfer function name (e.g., "SDR", "PQ", "HLG")
-- `'input_narrow_range'`: Boolean indicating if input was narrow range
+- `'input_narrow_range'`: Boolean indicating the input range used for conversion
+- `'output_narrow_range'`: Boolean indicating the output range applied
 - `'hdr_metadata'`: Dictionary with HDR metadata (only present if HDR metadata is in the signal)
   - Same structure as `capture_frame_with_metadata()` below
 
