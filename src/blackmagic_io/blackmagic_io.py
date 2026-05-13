@@ -1311,11 +1311,14 @@ class BlackmagicInput:
                 rgb = np.stack([bgra_data[:, :, 2],
                                 bgra_data[:, :, 1],
                                 bgra_data[:, :, 0]], axis=2)
-                # BGRA-delivered bytes are always full range on tested
-                # hardware (the SDK has done any matrix and range conversion
-                # internally). Treat input as full range regardless of the
-                # user-supplied input_narrow_range, which describes the wire
-                # signal rather than the bytes the library receives.
+                # BGRA-delivered bytes are only ever produced from a Y'CbCr
+                # source on tested hardware (RGB sources come back as 10-bit
+                # RGB regardless of what was requested), and the SDK's hardware
+                # Y'CbCr → RGB conversion includes range expansion. So bytes
+                # arriving here are always full range. Treat input as full
+                # range regardless of the user-supplied input_narrow_range,
+                # which describes the wire signal rather than the bytes the
+                # library receives.
                 return _adjust_range_uint8(rgb, input_narrow_range=False,
                                            output_narrow_range=output_narrow_range)
 
@@ -1341,6 +1344,23 @@ class BlackmagicInput:
         pixel_format = captured_frame.format
 
         try:
+            # BGRA was requested but the SDK delivered 10-bit RGB (common for
+            # RGB sources on tested hardware). The original 8-bit values sit
+            # in the high 8 bits with zero LSBs; right-shift to recover them,
+            # then float-convert based on input_narrow_range.
+            if (self._requested_format == PixelFormat.BGRA
+                    and pixel_format == _decklink.PixelFormat.RGB10):
+                raw = np.frombuffer(frame_data, dtype=np.uint32).reshape(
+                    (height, captured_frame.row_bytes // 4)
+                )[:, :width]
+                r8 = (((raw >> 22) & 0x3FF) >> 2).astype(np.float32)
+                g8 = (((raw >> 12) & 0x3FF) >> 2).astype(np.float32)
+                b8 = (((raw >>  2) & 0x3FF) >> 2).astype(np.float32)
+                rgb = np.stack([r8, g8, b8], axis=2)
+                if input_narrow_range:
+                    return (rgb - _NARROW_8BIT_MIN) / (_NARROW_8BIT_MAX - _NARROW_8BIT_MIN)
+                return rgb / 255.0
+
             if pixel_format == _decklink.PixelFormat.YUV8:
                 return _decklink.yuv8_to_rgb_float(
                     frame_data, width, height,
@@ -1375,6 +1395,13 @@ class BlackmagicInput:
                 bgra_data = np.frombuffer(frame_data, dtype=np.uint8).reshape(
                     (height, width, 4)
                 )
+                # BGRA-delivered bytes are only ever produced from a Y'CbCr
+                # source on tested hardware (RGB sources come back as 10-bit
+                # RGB regardless of what was requested), and the SDK's hardware
+                # Y'CbCr → RGB conversion includes range expansion. So bytes
+                # arriving here are always full range. Divide by 255 regardless
+                # of input_narrow_range, which describes the wire signal rather
+                # than the bytes the library receives.
                 rgb_array = np.zeros((height, width, 3), dtype=np.float32)
                 rgb_array[:, :, 0] = bgra_data[:, :, 2] / 255.0  # R
                 rgb_array[:, :, 1] = bgra_data[:, :, 1] / 255.0  # G

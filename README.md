@@ -427,17 +427,20 @@ Dictionary keys:
 
 This function combines the performance of `capture_frame_as_uint8()` with metadata access, making it ideal for real-time preview applications that need to detect signal changes (resolution, colorspace, EOTF) without the overhead of float conversion.
 
-**`capture_frame_as_rgb(timeout_ms=5000) -> Optional[np.ndarray]`**
+**`capture_frame_as_rgb(timeout_ms=5000, input_narrow_range=True) -> Optional[np.ndarray]`**
 Capture a single frame and convert to RGB.
 - `timeout_ms`: Timeout in milliseconds (default: 5000)
-- Returns: RGB float32 array (H×W×3) with values 0.0-1.0, or None if timeout/no signal
+- `input_narrow_range`: Whether input uses narrow range encoding (default: True)
+- Returns: RGB float32 array (H×W×3) mapped to 0.0-1.0 (legal black to legal white per `input_narrow_range`), or None if timeout/no signal
 - Automatically converts from any DeckLink pixel format to RGB
-- Output is always full range (0.0-1.0)
+- When the capture was initialised with `pixel_format=PixelFormat.BGRA` and the SDK delivers 10-bit RGB (the typical case for 8-bit RGB sources on HDMI), the library automatically right-shifts each channel by 2 to recover the exact 8-bit values before float conversion. This avoids the small precision error that comes from decoding LSB-padded 8-bit content as if it were native 10-bit.
 
-**`capture_frame_with_metadata(timeout_ms=5000) -> Optional[dict]`**
+**`capture_frame_with_metadata(timeout_ms=5000, input_narrow_range=True) -> Optional[dict]`**
 Capture a frame with format metadata.
 - `timeout_ms`: Timeout in milliseconds (default: 5000)
+- `input_narrow_range`: Whether input uses narrow range encoding (default: True)
 - Returns: Dictionary with frame data and metadata, or None if timeout/no signal
+- BGRA-requested handling: same automatic right-shift as `capture_frame_as_rgb()` above.
 
 Dictionary keys:
 - `'rgb'`: RGB float32 array (H×W×3), values 0.0-1.0
@@ -1584,7 +1587,7 @@ When the user requests `pixel_format=PixelFormat.BGRA` at `start_capture`, the l
 
 ### BGRA capture and the hardware conversion assumption
 
-When capturing with `pixel_format=PixelFormat.BGRA` from a Y'CbCr source, the SDK performs the matrix conversion **and** range expansion in hardware, delivering full-range 8-bit BGRA. The library assumes BGRA-delivered frames from a Y'CbCr source are always full-range, and accounts for that when interpreting `input_narrow_range` (which describes the wire signal, not the bytes the library receives). This matches observed behaviour on tested hardware but isn't a documented guarantee; if a future driver or hardware delivered narrow-range BGRA from a Y'CbCr source, output from `capture_frame_as_uint8` / `capture_frame_as_rgb` would be slightly compressed. For BGRA-delivered frames originating from an R'G'B' source, no hardware conversion is performed and the bytes are delivered as-is.
+When capturing with `pixel_format=PixelFormat.BGRA`, the SDK on tested hardware delivers actual BGRA frames only when the source is Y'CbCr — performing the matrix conversion **and** range expansion in hardware, yielding full-range 8-bit BGRA. (R'G'B' sources are delivered as 10-bit R'G'B' regardless of what was requested; see the previous section for how the library handles that case.) The library therefore treats BGRA-delivered bytes as full range and applies any `input_narrow_range`-related conversion accordingly (`input_narrow_range` describes the wire signal, not the bytes the library receives). This matches observed behaviour on tested hardware but isn't a documented SDK guarantee; if a future driver or hardware delivered narrow-range BGRA from a Y'CbCr source, output from `capture_frame_as_uint8` / `capture_frame_as_rgb` would be slightly compressed.
 
 **Caveat — full-range Y'CbCr sources: behaviour unverified.** The SDK's hardware Y'CbCr → BGRA conversion has been observed to assume narrow range (64-940 luma in 10-bit mapped to 0-255 BGRA) with the conventional broadcast Y'CbCr sources we tested. Whether the SDK reads the HDMI AVI InfoFrame's YCC Quantization Range (YQ) field and handles correctly-flagged full-range Y'CbCr sources (e.g. computer GPU output configured for YCbCr-Full, certain pattern generators) differently is untested and unknown at this time. If YQ is ignored, full-range Y'CbCr values outside 64-940 would be clipped in hardware (0-63 → 0, 941-1023 → 255) before the library sees the frame; no software-side `input_narrow_range=False` could recover those values. To be safe with potentially full-range Y'CbCr sources, capture as `PixelFormat.YUV10` or `PixelFormat.YUV8` instead of `PixelFormat.BGRA` and convert with `input_narrow_range=False` at the library level — that path preserves the original code values regardless of how the hardware interprets YQ.
 
