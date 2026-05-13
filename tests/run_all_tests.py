@@ -50,6 +50,7 @@ TESTS = [
     ("test_sdi_metadata_loopback.py",  [],                      "SDI BNC loopback cable"),
     ("test_hdmi_metadata_loopback.py", [],                      "HDMI loopback cable"),
     ("test_hdmi_bgra_loopback.py",     [],                      "HDMI loopback cable"),
+    ("test_hdmi_bgra_ycbcr_source.py", [],                      "HDMI loopback cable"),
 ]
 
 

@@ -24,7 +24,7 @@ import time
 import decklink_io
 import numpy as np
 import pytest
-from blackmagic_io import create_test_pattern
+from blackmagic_io import BlackmagicInput, PixelFormat, create_test_pattern
 
 pytestmark = pytest.mark.hardware
 
@@ -238,6 +238,100 @@ def test_bgra_hdmi_loopback_ramp():
         input_device.stop_capture()
         output_device.stop_output()
         input_device.cleanup()
+        output_device.cleanup()
+
+
+def test_bgra_hdmi_loopback_via_wrapper():
+    """End-to-end via the BlackmagicInput wrapper rather than the raw API.
+
+    Exercises the BGRA-requested + RGB10-delivered branch of
+    `_convert_frame_to_uint8`. The wrapper sees that the user initialised
+    with `pixel_format=BGRA` but the SDK delivers `RGB10` (typical for 8-bit
+    RGB HDMI sources on tested hardware), and is expected to right-shift
+    each channel by 2 to recover the original 8-bit values before applying
+    any requested range conversion. Two cases:
+
+    1. `output_narrow_range=False` (default) — uint8 output should match the
+       source 75% bars byte-for-byte within ±1.
+    2. `output_narrow_range=True` — uint8 output should be the source values
+       compressed to narrow range at 8-bit precision (`value * 219/255 + 16`),
+       again within ±1.
+
+    Both cases pass `input_narrow_range=False` because the test pattern is
+    full-range 8-bit RGB (values 0-191 for 75% bars at full-range encoding).
+    The library's default of `input_narrow_range=True` would interpret the
+    bytes as narrow-range codes and apply an erroneous narrow→full stretch.
+    """
+    output_device = decklink_io.DeckLinkOutput()
+    assert output_device.initialize(OUTPUT_DEVICE_INDEX), \
+        "Failed to initialize output device"
+
+    try:
+        settings = output_device.get_video_settings(DISPLAY_MODE)
+        settings.format = decklink_io.PixelFormat.BGRA
+        assert output_device.setup_output(settings), \
+            "Failed to setup BGRA output"
+
+        expected_rgb, bgra = _build_bgra_frame(settings)
+        assert output_device.set_frame_data(bgra), \
+            "Failed to set BGRA frame data"
+        assert output_device.display_frame(), \
+            "Failed to display BGRA frame"
+
+        time.sleep(0.5)
+
+        with BlackmagicInput() as input_device:
+            assert input_device.initialize(
+                INPUT_DEVICE_INDEX,
+                input_connection=decklink_io.InputConnection.HDMI,
+                pixel_format=PixelFormat.BGRA,
+            ), "Failed to initialise BlackmagicInput on HDMI with BGRA"
+
+            # --- Case 1: default full-range uint8 output ---
+            captured_full = input_device.capture_frame_as_uint8(
+                input_narrow_range=False
+            )
+            assert captured_full is not None, \
+                "capture_frame_as_uint8 (default) returned None"
+
+            diff_full = np.abs(captured_full.astype(int) - expected_rgb.astype(int))
+            max_diff_full = int(diff_full.max())
+            mean_diff_full = float(diff_full.mean())
+            print(f"\nFull-range output: max diff = {max_diff_full}, "
+                  f"mean = {mean_diff_full:.3f}")
+            assert max_diff_full <= PIXEL_TOLERANCE, (
+                f"Full-range capture exceeded ±{PIXEL_TOLERANCE}: "
+                f"max diff = {max_diff_full}"
+            )
+
+            # --- Case 2: narrow-range output ---
+            captured_narrow = input_device.capture_frame_as_uint8(
+                input_narrow_range=False,
+                output_narrow_range=True,
+            )
+            assert captured_narrow is not None, \
+                "capture_frame_as_uint8 (narrow) returned None"
+
+            # Source is full-range 8-bit; expected output is the same values
+            # compressed to narrow range at 8-bit precision.
+            expected_narrow = np.clip(
+                np.round(expected_rgb.astype(np.float32) * 219.0 / 255.0 + 16.0),
+                0, 255,
+            ).astype(np.uint8)
+
+            diff_narrow = np.abs(
+                captured_narrow.astype(int) - expected_narrow.astype(int)
+            )
+            max_diff_narrow = int(diff_narrow.max())
+            mean_diff_narrow = float(diff_narrow.mean())
+            print(f"Narrow-range output: max diff = {max_diff_narrow}, "
+                  f"mean = {mean_diff_narrow:.3f}")
+            assert max_diff_narrow <= PIXEL_TOLERANCE, (
+                f"Narrow-range capture exceeded ±{PIXEL_TOLERANCE}: "
+                f"max diff = {max_diff_narrow}"
+            )
+    finally:
+        output_device.stop_output()
         output_device.cleanup()
 
 
