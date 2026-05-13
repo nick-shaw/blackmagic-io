@@ -410,7 +410,12 @@ public:
                 printf("10-bit");
             if (detectedSignalFlags & bmdDetectedVideoInput12BitDepth)
                 printf("12-bit");
-            printf("\x1b[K\n\n");  // Clear to end of line
+            printf("\x1b[K\n");  // Clear to end of line
+
+            printf("  Detection flags: 0x%llx\x1b[K\n",
+                   (unsigned long long)detectedSignalFlags);
+            printf("  Requested pixel format: %s\x1b[K\n\n",
+                   GetPixelFormatName(currentPixelFormat));
         }
 
         // Check if the video mode has changed
@@ -433,7 +438,11 @@ public:
         m_deckLinkInput->PauseStreams();
 
         // Enable video input with the properties of the new video stream
-        m_deckLinkInput->EnableVideoInput(newDisplayMode->GetDisplayMode(), currentPixelFormat, bmdVideoInputEnableFormatDetection);
+        HRESULT enableResult = m_deckLinkInput->EnableVideoInput(newDisplayMode->GetDisplayMode(), currentPixelFormat, bmdVideoInputEnableFormatDetection);
+        if (enableResult != S_OK) {
+            fprintf(stderr, "EnableVideoInput failed for %s - result = 0x%08x\n",
+                    GetPixelFormatName(currentPixelFormat), (unsigned int)enableResult);
+        }
 
         // Flush any queued video frames
         m_deckLinkInput->FlushStreams();
