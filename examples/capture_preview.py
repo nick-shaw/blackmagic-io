@@ -11,7 +11,7 @@ import time
 import json
 from pathlib import Path
 import imageio.v3 as iio
-from blackmagic_io import BlackmagicInput, PixelFormat
+from blackmagic_io import BlackmagicInput, InputConnection, PixelFormat
 
 def capture_high_quality_frame(input_device, narrow_range=False):
     """
@@ -93,16 +93,20 @@ def capture_high_quality_frame(input_device, narrow_range=False):
     input_device._input.start_capture(PixelFormat.BGRA.value)
     input_device._capturing = True
 
-def simple_preview(device_index=0, scale=1.0):
+def simple_preview(device_index=0, scale=1.0, input_connection=None):
     """
     Continuously capture and display frames using BGRA format.
 
     Args:
         device_index: DeckLink device to use
         scale: Display scale factor (e.g., 0.5 for half size)
+        input_connection: Optional InputConnection (e.g. InputConnection.SDI,
+            InputConnection.HDMI). If None, uses the device's current/default input.
     """
     with BlackmagicInput() as input_device:
-        if not input_device.initialize(device_index, pixel_format=PixelFormat.BGRA):
+        if not input_device.initialize(device_index,
+                                       input_connection=input_connection,
+                                       pixel_format=PixelFormat.BGRA):
             print("Failed to initialize device with BGRA format")
             return
 
@@ -242,19 +246,27 @@ def simple_preview(device_index=0, scale=1.0):
 
 
 if __name__ == "__main__":
-    import sys
+    import argparse
 
-    device_index = 0
-    scale = 0.5
+    parser = argparse.ArgumentParser(description="Live preview with high-quality capture.")
+    parser.add_argument("--device", "-d", type=int, default=0,
+                        help="DeckLink device index (default: 0)")
+    parser.add_argument("--scale", "-s", type=float, default=0.5,
+                        help="Display scale factor (default: 0.5)")
+    parser.add_argument("--input", "-i", choices=["sdi", "hdmi"], default=None,
+                        help="Input connection to use (default: device's current/default input)")
+    args = parser.parse_args()
 
-    if len(sys.argv) > 1:
-        device_index = int(sys.argv[1])
-    if len(sys.argv) > 2:
-        scale = float(sys.argv[2])
+    input_connection = None
+    if args.input == "sdi":
+        input_connection = InputConnection.SDI
+    elif args.input == "hdmi":
+        input_connection = InputConnection.HDMI
 
-    print(f"Starting preview on device {device_index} at {scale}x scale")
+    connection_note = f", {args.input.upper()} input" if args.input else ""
+    print(f"Starting preview on device {args.device} at {args.scale}x scale{connection_note}")
     print("Press 'c' to capture full range (0-65535)")
     print("Press Shift+'c' to capture narrow range (4096-60160)")
     print("Press 'q' or ESC to quit")
 
-    simple_preview(device_index, scale)
+    simple_preview(args.device, args.scale, input_connection=input_connection)
