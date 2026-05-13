@@ -2154,41 +2154,41 @@ PYBIND11_MODULE(decklink_io, m) {
           py::arg("rgb_array"), py::arg("width"), py::arg("height"));
 
     m.def("rgb_uint16_to_yuv10", &rgb_uint16_to_yuv10,
-          "Convert RGB uint16 numpy array to 10-bit YUV v210 format",
+          "Convert R'G'B' uint16 numpy array to 10-bit Y'CbCr v210 format",
           py::arg("rgb_array"), py::arg("width"), py::arg("height"),
           py::arg("matrix") = DeckLinkOutput::Gamut::Rec709,
           py::arg("input_narrow_range") = false,
           py::arg("output_narrow_range") = true);
 
     m.def("rgb_float_to_yuv10", &rgb_float_to_yuv10,
-          "Convert RGB float numpy array to 10-bit YUV v210 format",
+          "Convert R'G'B' float numpy array to 10-bit Y'CbCr v210 format",
           py::arg("rgb_array"), py::arg("width"), py::arg("height"),
           py::arg("matrix") = DeckLinkOutput::Gamut::Rec709,
           py::arg("output_narrow_range") = true);
 
     m.def("rgb_uint16_to_rgb10", &rgb_uint16_to_rgb10,
-          "Convert RGB uint16 numpy array to 10-bit RGB r210 format",
+          "Convert R'G'B' uint16 numpy array to 10-bit R'G'B' r210 format",
           py::arg("rgb_array"), py::arg("width"), py::arg("height"),
           py::arg("input_narrow_range") = true,
           py::arg("output_narrow_range") = true);
 
     m.def("rgb_float_to_rgb10", &rgb_float_to_rgb10,
-          "Convert RGB float numpy array to 10-bit RGB r210 format",
+          "Convert R'G'B' float numpy array to 10-bit R'G'B' r210 format",
           py::arg("rgb_array"), py::arg("width"), py::arg("height"),
           py::arg("output_narrow_range") = true);
 
     m.def("rgb_uint16_to_rgb12", &rgb_uint16_to_rgb12,
-          "Convert RGB uint16 numpy array to 12-bit RGB format",
+          "Convert R'G'B' uint16 numpy array to 12-bit R'G'B' format",
           py::arg("rgb_array"), py::arg("width"), py::arg("height"),
           py::arg("input_narrow_range") = false, py::arg("output_narrow_range") = false);
 
     m.def("rgb_float_to_rgb12", &rgb_float_to_rgb12,
-          "Convert RGB float numpy array to 12-bit RGB format",
+          "Convert R'G'B' float numpy array to 12-bit R'G'B' format",
           py::arg("rgb_array"), py::arg("width"), py::arg("height"),
           py::arg("output_narrow_range") = false);
 
     m.def("yuv10_to_rgb_uint16", &yuv10_to_rgb_uint16,
-          "Convert 10-bit YUV v210 format to RGB uint16 numpy array",
+          "Convert 10-bit Y'CbCr v210 format to R'G'B' uint16 numpy array",
           py::arg("yuv_array"), py::arg("width"), py::arg("height"),
           py::arg("matrix") = DeckLinkOutput::Gamut::Rec709,
           py::arg("input_narrow_range") = true,
@@ -2196,19 +2196,19 @@ PYBIND11_MODULE(decklink_io, m) {
           py::arg("row_bytes") = -1);
 
     m.def("yuv10_to_rgb_float", &yuv10_to_rgb_float,
-          "Convert 10-bit YUV v210 format to RGB float numpy array",
+          "Convert 10-bit Y'CbCr v210 format to R'G'B' float numpy array",
           py::arg("yuv_array"), py::arg("width"), py::arg("height"),
           py::arg("matrix") = DeckLinkOutput::Gamut::Rec709,
           py::arg("input_narrow_range") = true,
           py::arg("row_bytes") = -1);
 
     m.def("unpack_v210", &unpack_v210,
-          "Unpack 10-bit YUV v210 format to separate Y, Cb, Cr arrays (returns dict with 'y', 'cb', 'cr' keys)",
+          "Unpack 10-bit Y'CbCr v210 format to separate Y', Cb, Cr arrays (returns dict with 'y', 'cb', 'cr' keys)",
           py::arg("yuv_array"), py::arg("width"), py::arg("height"),
           py::arg("row_bytes") = -1);
 
     m.def("yuv8_to_rgb_uint16", &yuv8_to_rgb_uint16,
-          "Convert 8-bit YUV 2vuy format to RGB uint16 numpy array",
+          "Convert 8-bit Y'CbCr 2vuy format to R'G'B' uint16 numpy array",
           py::arg("yuv_array"), py::arg("width"), py::arg("height"),
           py::arg("matrix") = DeckLinkOutput::Gamut::Rec709,
           py::arg("input_narrow_range") = true,
@@ -2216,70 +2216,70 @@ PYBIND11_MODULE(decklink_io, m) {
           py::arg("row_bytes") = -1);
 
     m.def("yuv8_to_rgb_float", &yuv8_to_rgb_float,
-          "Convert 8-bit YUV 2vuy format to RGB float numpy array",
+          "Convert 8-bit Y'CbCr 2vuy format to R'G'B' float numpy array",
           py::arg("yuv_array"), py::arg("width"), py::arg("height"),
           py::arg("matrix") = DeckLinkOutput::Gamut::Rec709,
           py::arg("input_narrow_range") = true,
           py::arg("row_bytes") = -1);
 
     m.def("rgb_uint8_to_yuv8", &rgb_uint8_to_yuv8,
-          "Convert RGB uint8 numpy array to 8-bit YUV 2vuy format",
+          "Convert R'G'B' uint8 numpy array to 8-bit Y'CbCr 2vuy format",
           py::arg("rgb_array"), py::arg("width"), py::arg("height"),
           py::arg("matrix") = DeckLinkOutput::Gamut::Rec709,
           py::arg("input_narrow_range") = false,
           py::arg("output_narrow_range") = true);
 
     m.def("rgb_uint16_to_yuv8", &rgb_uint16_to_yuv8,
-          "Convert RGB uint16 numpy array to 8-bit YUV 2vuy format",
+          "Convert R'G'B' uint16 numpy array to 8-bit Y'CbCr 2vuy format",
           py::arg("rgb_array"), py::arg("width"), py::arg("height"),
           py::arg("matrix") = DeckLinkOutput::Gamut::Rec709,
           py::arg("input_narrow_range") = false,
           py::arg("output_narrow_range") = true);
 
     m.def("rgb_float_to_yuv8", &rgb_float_to_yuv8,
-          "Convert RGB float numpy array to 8-bit YUV 2vuy format",
+          "Convert R'G'B' float numpy array to 8-bit Y'CbCr 2vuy format",
           py::arg("rgb_array"), py::arg("width"), py::arg("height"),
           py::arg("matrix") = DeckLinkOutput::Gamut::Rec709,
           py::arg("output_narrow_range") = true);
 
     m.def("unpack_2vuy", &unpack_2vuy,
-          "Unpack 8-bit YUV 2vuy format to separate Y, Cb, Cr arrays (returns dict with 'y', 'cb', 'cr' keys)",
+          "Unpack 8-bit Y'CbCr 2vuy format to separate Y', Cb, Cr arrays (returns dict with 'y', 'cb', 'cr' keys)",
           py::arg("yuv_array"), py::arg("width"), py::arg("height"),
           py::arg("row_bytes") = -1);
 
     m.def("rgb10_to_uint16", &rgb10_to_uint16,
-          "Convert 10-bit RGB (R10l) format to RGB uint16 numpy array",
+          "Convert 10-bit R'G'B' (R10l) format to R'G'B' uint16 numpy array",
           py::arg("rgb_array"), py::arg("width"), py::arg("height"),
           py::arg("input_narrow_range") = true,
           py::arg("output_narrow_range") = false,
           py::arg("row_bytes") = -1);
 
     m.def("rgb10_to_float", &rgb10_to_float,
-          "Convert 10-bit RGB (R10l) format to RGB float numpy array",
+          "Convert 10-bit R'G'B' (R10l) format to R'G'B' float numpy array",
           py::arg("rgb_array"), py::arg("width"), py::arg("height"),
           py::arg("input_narrow_range") = true,
           py::arg("row_bytes") = -1);
 
     m.def("unpack_rgb10", &unpack_rgb10,
-          "Unpack 10-bit RGB (R10l) format to separate R, G, B arrays (returns dict with 'r', 'g', 'b' keys)",
+          "Unpack 10-bit R'G'B' (R10l) format to separate R', G', B' arrays (returns dict with 'r', 'g', 'b' keys)",
           py::arg("rgb_array"), py::arg("width"), py::arg("height"),
           py::arg("row_bytes") = -1);
 
     m.def("rgb12_to_uint16", &rgb12_to_uint16,
-          "Convert 12-bit RGB (R12L) format to RGB uint16 numpy array",
+          "Convert 12-bit R'G'B' (R12L) format to R'G'B' uint16 numpy array",
           py::arg("rgb_array"), py::arg("width"), py::arg("height"),
           py::arg("input_narrow_range") = false,
           py::arg("output_narrow_range") = false,
           py::arg("row_bytes") = -1);
 
     m.def("rgb12_to_float", &rgb12_to_float,
-          "Convert 12-bit RGB (R12L) format to RGB float numpy array",
+          "Convert 12-bit R'G'B' (R12L) format to R'G'B' float numpy array",
           py::arg("rgb_array"), py::arg("width"), py::arg("height"),
           py::arg("input_narrow_range") = false,
           py::arg("row_bytes") = -1);
 
     m.def("unpack_rgb12", &unpack_rgb12,
-          "Unpack 12-bit RGB (R12L) format to separate R, G, B arrays (returns dict with 'r', 'g', 'b' keys)",
+          "Unpack 12-bit R'G'B' (R12L) format to separate R', G', B' arrays (returns dict with 'r', 'g', 'b' keys)",
           py::arg("rgb_array"), py::arg("width"), py::arg("height"),
           py::arg("row_bytes") = -1);
 

@@ -27,7 +27,7 @@ _NARROW_8BIT_MAX = 235
 def _adjust_range_uint8(rgb: np.ndarray,
                         input_narrow_range: bool,
                         output_narrow_range: bool) -> np.ndarray:
-    """Convert 8-bit RGB values between narrow (16-235) and full (0-255) range.
+    """Convert 8-bit R'G'B' values between narrow (16-235) and full (0-255) range.
 
     Returns ``rgb`` unchanged when ``input_narrow_range == output_narrow_range``.
     Otherwise stretches narrow → full or compresses full → narrow, with
@@ -46,7 +46,7 @@ def _adjust_range_uint8(rgb: np.ndarray,
 
 
 class Matrix(Enum):
-    """RGB to Y'CbCr conversion matrix"""
+    """R'G'B' to Y'CbCr conversion matrix"""
     Rec601 = _decklink.Gamut.Rec601
     Rec709 = _decklink.Gamut.Rec709
     Rec2020 = _decklink.Gamut.Rec2020
@@ -298,7 +298,7 @@ class BlackmagicOutput:
 
         Args:
             frame_data: NumPy array containing image data
-                       - For RGB: shape should be (height, width, 3)
+                       - For R'G'B': shape should be (height, width, 3)
                        - For BGRA: shape should be (height, width, 4)
                        - Supported dtypes: uint8, uint16, float32, float64
             display_mode: Video resolution and frame rate
@@ -550,7 +550,7 @@ class BlackmagicOutput:
         Args:
             frame_data: Input frame data
             pixel_format: Target pixel format
-            matrix: RGB to Y'CbCr conversion matrix (only used for YUV10)
+            matrix: R'G'B' to Y'CbCr conversion matrix (only used for YUV10)
             input_narrow_range: For uint16 inputs, whether to interpret as narrow range
             output_narrow_range: Whether to output narrow range values
 
@@ -665,7 +665,7 @@ class BlackmagicOutput:
             - width: Frame width
             - height: Frame height
             - framerate: Frame rate
-            - rgb444_mode_enabled: Whether RGB 4:4:4 mode is enabled
+            - rgb444_mode_enabled: Whether R'G'B' 4:4:4 mode is enabled
         """
         info = self._device.get_current_output_info()
         return {
@@ -729,7 +729,7 @@ def create_test_pattern(width: int, height: int, pattern: str = 'gradient', grad
         grad_end: Optional float end value (default 1.0)
 
     Returns:
-        RGB frame data as NumPy array (float32, start-end range)
+        R'G'B' frame data as NumPy array (float32, start-end range)
     """
     frame = np.zeros((height, width, 3), dtype=np.float32)
 
@@ -771,7 +771,7 @@ class BlackmagicInput:
     High-level interface for capturing video from Blackmagic DeckLink devices.
 
     This class provides simplified video capture with automatic format detection
-    and conversion to RGB float arrays.
+    and conversion to R'G'B' float arrays.
 
     Usage:
         with BlackmagicInput() as input:
@@ -886,22 +886,22 @@ class BlackmagicInput:
                               timeout_ms: int = 5000,
                               input_narrow_range: bool = True,
                               output_narrow_range: bool = False) -> Optional[np.ndarray]:
-        """Capture a frame and convert to RGB uint8 array (faster than float).
+        """Capture a frame and convert to R'G'B' uint8 array (faster than float).
 
-        Automatically detects pixel format and converts to RGB uint8.
-        Uses colorspace metadata from the captured frame for YUV conversion.
+        Automatically detects pixel format and converts to R'G'B' uint8.
+        Uses colorspace metadata from the captured frame for Y'CbCr conversion.
 
         Args:
             timeout_ms: Capture timeout in milliseconds (default: 5000)
             input_narrow_range: Whether input uses narrow range encoding (default: True)
             output_narrow_range: If False (default), output uint8 values are
                 full range (0-255, "ready to display"). If True, output is
-                narrow-range RGB (16-235 per channel) — useful when feeding
+                narrow-range R'G'B' (16-235 per channel) — useful when feeding
                 the result to further video processing that expects
                 narrow-range conventions.
 
         Returns:
-            RGB array (H×W×3), dtype uint8, or None if capture failed
+            R'G'B' array (H×W×3), dtype uint8, or None if capture failed
         """
         if not self._capturing:
             if not self.start_capture():
@@ -918,21 +918,21 @@ class BlackmagicInput:
                                             timeout_ms: int = 5000,
                                             input_narrow_range: bool = True,
                                             output_narrow_range: bool = False) -> Optional[dict]:
-        """Capture a frame and convert to RGB uint8 with metadata (fast preview with metadata).
+        """Capture a frame and convert to R'G'B' uint8 with metadata (fast preview with metadata).
 
-        Automatically detects pixel format and converts to RGB uint8.
-        Uses colorspace metadata from the captured frame for YUV conversion.
+        Automatically detects pixel format and converts to R'G'B' uint8.
+        Uses colorspace metadata from the captured frame for Y'CbCr conversion.
 
         Args:
             timeout_ms: Capture timeout in milliseconds (default: 5000)
             input_narrow_range: Whether input uses narrow range encoding (default: True)
             output_narrow_range: If False (default), output uint8 values are
-                full range (0-255). If True, output is narrow-range RGB
+                full range (0-255). If True, output is narrow-range R'G'B'
                 (16-235 per channel).
 
         Returns:
             Dictionary with:
-                - 'rgb': RGB array (H×W×3), dtype uint8
+                - 'rgb': R'G'B' array (H×W×3), dtype uint8
                 - 'width': int
                 - 'height': int
                 - 'format': PixelFormat name
@@ -1043,10 +1043,10 @@ class BlackmagicInput:
     def capture_frame_as_rgb(self,
                             timeout_ms: int = 5000,
                             input_narrow_range: bool = True) -> Optional[np.ndarray]:
-        """Capture a frame and convert to RGB float array.
+        """Capture a frame and convert to R'G'B' float array.
 
-        Automatically detects pixel format and converts to RGB float (0.0-1.0).
-        Uses colorspace metadata from the captured frame for YUV conversion.
+        Automatically detects pixel format and converts to R'G'B' float (0.0-1.0).
+        Uses colorspace metadata from the captured frame for Y'CbCr conversion.
 
         Args:
             timeout_ms: Capture timeout in milliseconds (default: 5000)
@@ -1057,7 +1057,7 @@ class BlackmagicInput:
                 - RGB12: False = 0-4095 (convention) - override to False for RGB12 full range
 
         Returns:
-            RGB array (H×W×3), dtype float32, range 0.0-1.0, or None if capture failed
+            R'G'B' array (H×W×3), dtype float32, range 0.0-1.0, or None if capture failed
         """
         if not self._capturing:
             if not self.start_capture():
@@ -1080,7 +1080,7 @@ class BlackmagicInput:
 
         Returns:
             Dictionary with:
-                - 'rgb': RGB array (H×W×3), dtype float32, range 0.0-1.0
+                - 'rgb': R'G'B' array (H×W×3), dtype float32, range 0.0-1.0
                 - 'width': int
                 - 'height': int
                 - 'format': PixelFormat
@@ -1234,7 +1234,7 @@ class BlackmagicInput:
 
     def _convert_frame_to_uint8(self, captured_frame, input_narrow_range: bool,
                                 output_narrow_range: bool = False) -> Optional[np.ndarray]:
-        """Convert captured frame to RGB uint8 array.
+        """Convert captured frame to R'G'B' uint8 array.
 
         Args:
             captured_frame: CapturedFrame object from low-level API
@@ -1243,7 +1243,7 @@ class BlackmagicInput:
                 (16-235) or full-range (0-255). Default False.
 
         Returns:
-            RGB array (H×W×3), dtype uint8, or None if conversion failed
+            R'G'B' array (H×W×3), dtype uint8, or None if conversion failed
         """
         frame_data = np.array(captured_frame.data, dtype=np.uint8)
         width = captured_frame.width
@@ -1329,14 +1329,14 @@ class BlackmagicInput:
             return None
 
     def _convert_frame_to_rgb(self, captured_frame, input_narrow_range: bool) -> Optional[np.ndarray]:
-        """Convert captured frame to RGB float array.
+        """Convert captured frame to R'G'B' float array.
 
         Args:
             captured_frame: CapturedFrame object from low-level API
             input_narrow_range: Whether to interpret input as narrow range
 
         Returns:
-            RGB array (H×W×3), dtype float32, or None if conversion failed
+            R'G'B' array (H×W×3), dtype float32, or None if conversion failed
         """
         frame_data = np.array(captured_frame.data, dtype=np.uint8)
         width = captured_frame.width
