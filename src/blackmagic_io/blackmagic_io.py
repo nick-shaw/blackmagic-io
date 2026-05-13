@@ -757,6 +757,7 @@ class BlackmagicInput:
         self._input = _decklink.DeckLinkInput()
         self._initialized = False
         self._capturing = False
+        self._requested_format: Optional[PixelFormat] = None
 
     def __enter__(self):
         """Context manager entry."""
@@ -788,15 +789,31 @@ class BlackmagicInput:
         """
         if self._input.initialize(device_index, input_connection):
             self._initialized = True
-            if pixel_format is None:
-                capture_result = self._input.start_capture()
-            else:
-                capture_result = self._input.start_capture(pixel_format.value)
-            if capture_result:
-                self._capturing = True
-                return True
-            return False
+            return self.start_capture(pixel_format)
         return False
+
+    def start_capture(self, pixel_format: Optional[PixelFormat] = None) -> bool:
+        """Start (or restart) video capture.
+
+        Use this to change pixel format mid-session: call `stop_capture()` then
+        `start_capture(pixel_format=...)`.
+
+        Args:
+            pixel_format: Optional PixelFormat to request from hardware. If
+                None, the SDK default is used (YUV10 with format detection).
+                Pass PixelFormat.BGRA for fast preview workflows.
+
+        Returns:
+            True if capture started successfully, False otherwise.
+        """
+        if pixel_format is None:
+            result = self._input.start_capture()
+        else:
+            result = self._input.start_capture(pixel_format.value)
+        if result:
+            self._capturing = True
+            self._requested_format = pixel_format
+        return result
 
     def get_available_devices(self) -> List[str]:
         """Get list of available DeckLink devices.
@@ -854,9 +871,8 @@ class BlackmagicInput:
             RGB array (H×W×3), dtype uint8, range 0-255, or None if capture failed
         """
         if not self._capturing:
-            if not self._input.start_capture():
+            if not self.start_capture():
                 return None
-            self._capturing = True
 
         captured_frame = _decklink.CapturedFrame()
         if not self._input.capture_frame(captured_frame, timeout_ms):
@@ -900,9 +916,8 @@ class BlackmagicInput:
             Or None if capture failed
         """
         if not self._capturing:
-            if not self._input.start_capture():
+            if not self.start_capture():
                 return None
-            self._capturing = True
 
         captured_frame = _decklink.CapturedFrame()
         if not self._input.capture_frame(captured_frame, timeout_ms):
@@ -1005,9 +1020,8 @@ class BlackmagicInput:
             RGB array (H×W×3), dtype float32, range 0.0-1.0, or None if capture failed
         """
         if not self._capturing:
-            if not self._input.start_capture():
+            if not self.start_capture():
                 return None
-            self._capturing = True
 
         captured_frame = _decklink.CapturedFrame()
         if not self._input.capture_frame(captured_frame, timeout_ms):
@@ -1048,9 +1062,8 @@ class BlackmagicInput:
             Or None if capture failed
         """
         if not self._capturing:
-            if not self._input.start_capture():
+            if not self.start_capture():
                 return None
-            self._capturing = True
 
         captured_frame = _decklink.CapturedFrame()
         if not self._input.capture_frame(captured_frame, timeout_ms):
