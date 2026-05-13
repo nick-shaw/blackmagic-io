@@ -18,6 +18,33 @@ except ImportError:
     )
 
 
+# Narrow-range bounds for 8-bit RGB. Chroma's narrow upper bound is 240, but
+# this helper operates on RGB channels only.
+_NARROW_8BIT_MIN = 16
+_NARROW_8BIT_MAX = 235
+
+
+def _adjust_range_uint8(rgb: np.ndarray,
+                        input_narrow_range: bool,
+                        output_narrow_range: bool) -> np.ndarray:
+    """Convert 8-bit RGB values between narrow (16-235) and full (0-255) range.
+
+    Returns ``rgb`` unchanged when ``input_narrow_range == output_narrow_range``.
+    Otherwise stretches narrow → full or compresses full → narrow, with
+    rounding and clipping to the legal uint8 range.
+    """
+    if input_narrow_range == output_narrow_range:
+        return rgb
+    rgb_float = rgb.astype(np.float32)
+    if input_narrow_range and not output_narrow_range:
+        # narrow → full: 16-235 mapped to 0-255
+        rgb_float = (rgb_float - _NARROW_8BIT_MIN) * 255.0 / (_NARROW_8BIT_MAX - _NARROW_8BIT_MIN)
+    else:
+        # full → narrow: 0-255 mapped to 16-235
+        rgb_float = rgb_float * (_NARROW_8BIT_MAX - _NARROW_8BIT_MIN) / 255.0 + _NARROW_8BIT_MIN
+    return np.clip(np.round(rgb_float), 0, 255).astype(np.uint8)
+
+
 class Matrix(Enum):
     """RGB to Y'CbCr conversion matrix"""
     Rec601 = _decklink.Gamut.Rec601

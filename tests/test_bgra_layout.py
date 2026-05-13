@@ -1,9 +1,9 @@
 #!/usr/bin/env python3
-"""Buffer-layout tests for BGRA conversion.
+"""Buffer-layout and range-conversion tests for BGRA-related helpers.
 
 Verifies that rgb_to_bgra produces correctly-ordered bmdFormat8BitBGRA
-buffers without requiring hardware. Catches byte-order, stride, and alpha
-mistakes at the software boundary before frames hit the wire.
+buffers without requiring hardware, and that _adjust_range_uint8 maps
+between narrow (16-235) and full (0-255) range correctly.
 """
 
 import sys
@@ -12,6 +12,7 @@ import numpy as np
 import pytest
 
 import decklink_io
+from blackmagic_io.blackmagic_io import _adjust_range_uint8
 
 
 def test_single_pixel_byte_order():
@@ -81,6 +82,79 @@ def test_wrong_channel_count_raises():
     rgba_in = np.zeros((4, 4, 4), dtype=np.uint8)
     with pytest.raises(RuntimeError, match="HxWx3"):
         decklink_io.rgb_to_bgra(rgba_in, width=4, height=4)
+
+
+# --- _adjust_range_uint8 tests ---
+
+def test_adjust_range_identity_narrow():
+    rgb = np.array([[[64, 128, 192]]], dtype=np.uint8)
+    result = _adjust_range_uint8(rgb, input_narrow_range=True, output_narrow_range=True)
+    np.testing.assert_array_equal(result, rgb)
+
+
+def test_adjust_range_identity_full():
+    rgb = np.array([[[64, 128, 192]]], dtype=np.uint8)
+    result = _adjust_range_uint8(rgb, input_narrow_range=False, output_narrow_range=False)
+    np.testing.assert_array_equal(result, rgb)
+
+
+def test_adjust_range_narrow_to_full_endpoints():
+    # 16 (legal black) → 0, 235 (legal white) → 255
+    rgb = np.array([[[16, 235, 16]]], dtype=np.uint8)
+    result = _adjust_range_uint8(rgb, input_narrow_range=True, output_narrow_range=False)
+    assert tuple(result[0, 0]) == (0, 255, 0)
+
+
+def test_adjust_range_full_to_narrow_endpoints():
+    # 0 → 16, 255 → 235
+    rgb = np.array([[[0, 255, 0]]], dtype=np.uint8)
+    result = _adjust_range_uint8(rgb, input_narrow_range=False, output_narrow_range=True)
+    assert tuple(result[0, 0]) == (16, 235, 16)
+
+
+def test_adjust_range_narrow_to_full_midrange():
+    # 125 ≈ midpoint of [16, 235]; (125 - 16) * 255 / 219 = 126.92 → 127
+    rgb = np.array([[[125]]], dtype=np.uint8)
+    result = _adjust_range_uint8(rgb, input_narrow_range=True, output_narrow_range=False)
+    assert result[0, 0, 0] == 127
+
+
+def test_adjust_range_full_to_narrow_midrange():
+    # 128 ≈ midpoint of [0, 255]; 128 * 219 / 255 + 16 = 125.94 → 126
+    rgb = np.array([[[128]]], dtype=np.uint8)
+    result = _adjust_range_uint8(rgb, input_narrow_range=False, output_narrow_range=True)
+    assert result[0, 0, 0] == 126
+
+
+def test_adjust_range_narrow_to_full_clips_sub_blacks():
+    # Sub-black inputs (< 16) should clip to 0 after the stretch
+    rgb = np.array([[[0, 8, 15]]], dtype=np.uint8)
+    result = _adjust_range_uint8(rgb, input_narrow_range=True, output_narrow_range=False)
+    assert tuple(result[0, 0]) == (0, 0, 0)
+
+
+def test_adjust_range_narrow_to_full_clips_super_whites():
+    # Super-white inputs (> 235) should clip to 255
+    rgb = np.array([[[236, 245, 255]]], dtype=np.uint8)
+    result = _adjust_range_uint8(rgb, input_narrow_range=True, output_narrow_range=False)
+    assert tuple(result[0, 0]) == (255, 255, 255)
+
+
+def test_adjust_range_round_trip_narrow_full_narrow():
+    # Narrow values in legal range round-trip within ±1
+    rng = np.random.default_rng(42)
+    rgb = rng.integers(16, 236, (16, 16, 3), dtype=np.uint8)
+    full = _adjust_range_uint8(rgb, input_narrow_range=True, output_narrow_range=False)
+    back = _adjust_range_uint8(full, input_narrow_range=False, output_narrow_range=True)
+    diff = np.abs(back.astype(int) - rgb.astype(int))
+    assert diff.max() <= 1
+
+
+def test_adjust_range_output_shape_and_dtype():
+    rgb = np.zeros((480, 640, 3), dtype=np.uint8)
+    result = _adjust_range_uint8(rgb, input_narrow_range=True, output_narrow_range=False)
+    assert result.shape == rgb.shape
+    assert result.dtype == np.uint8
 
 
 if __name__ == "__main__":
