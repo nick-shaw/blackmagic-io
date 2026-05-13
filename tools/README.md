@@ -20,33 +20,16 @@ This tool reads the incoming signal on a Blackmagic DeckLink device and displays
 
 ## Building
 
-### Option 1: CMake (Recommended)
-```bash
-# Create build directory
-mkdir build && cd build
-
-# Configure and build
-cmake ..
-cmake --build .
-
-# The executable will be in the tools directory
-cd ..
-```
-
-### Option 2: Make (Legacy)
-#### macOS
 ```bash
 make
 ```
 
-#### Linux
-```bash
-make
-```
+Works on macOS, Linux, and Windows (with MinGW). The executable lands at `tools/pixel_reader`.
 
-#### Windows (MinGW)
+To rebuild from scratch:
+
 ```bash
-make
+make clean && make
 ```
 
 ## Usage

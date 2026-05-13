@@ -1550,6 +1550,46 @@ All 14 SMPTE ST 2086 / CEA-861.3 HDR static metadata fields are supported:
    - **Rec.601** is only supported for SD display modes (NTSC, PAL, etc.) and is the only matrix supported for SD
    - **Rec.709** and **Rec.2020** are only supported for HD and higher resolutions (720p, 1080p, 2K, 4K, 8K, etc.)
 
+## HDMI Input Notes
+
+This section documents behaviour observed on tested hardware (DeckLink UltraStudio 4K Mini) for HDMI input capture. SDI input is generally more deterministic; the notes below apply specifically to the HDMI path.
+
+### EDID is partially controllable
+
+The permutations of EDID negotiation between source and sink mean there is always some degree of uncertainty with HDMI capture; you should test your own setup to confirm behaviour.
+
+The DeckLink HDMI input advertises an EDID to source devices. The library writes the dynamic-range advertisement to enable SDR + HDR PQ + HLG (the SDK default omits HLG). Other EDID parameters are not exposed through the SDK and are therefore not available in this library.
+
+### Format detection at cold start
+
+Connect your source before starting capture for reliable format detection. The SDK's wire-format auto-detection runs cleanly at the start of a capture session and identifies the input as Y'CbCr or R'G'B' based on the source's HDMI signalling.
+
+### Some mid-stream source switches are not detected
+
+Most wire-format changes during an active capture — Y'CbCr ↔ R'G'B' transitions within the HDMI signalling protocol — are detected correctly by the SDK and the capture format updates accordingly.
+
+The exception is the HDMI ↔ DVI **protocol** switching exposed in the AJA Control Panel for AJA devices. On tested hardware the HDMI → DVI direction is not reliably detected — the SDK continues to interpret incoming bytes in the previous format until capture is restarted. The reverse direction (DVI → HDMI) is detected correctly. If you switch source protocol mid-capture, stop and restart capture.
+
+### 8-bit R'G'B' sources arrive as 10-bit R'G'B' with LSB padding
+
+Sources sending 8-bit R'G'B' over HDMI (DVI computer signals, AJA devices configured for DVI output in the AJA Control Panel, etc.) arrive as 10-bit R'G'B' with the source's 8-bit values in the high 8 bits and zero LSBs. No information is lost; this is a faithful representation.
+
+The maximum reachable 10-bit value from an 8-bit source is 1020 (= 255 × 4), not 1023. Naively treating LSB-padded 8-bit content as native 10-bit (dividing by 1023) gives values systematically ~0.3% lower than the equivalent 8-bit code divided by 255 — at every non-zero point, not just at peak. `(x<<2)/1023 ≠ x/255` for any `x` except zero; the two denominators are just incompatible.
+
+When the user requests `pixel_format=PixelFormat.BGRA` at `start_capture`, the library handles this automatically: each channel is right-shifted by 2 before float conversion (÷ 255) or uint8 extraction, so `capture_frame_as_rgb` and `capture_frame_as_uint8` recover the exact 0.0–1.0 (or 0–255) mapping for content originating from 8-bit.
+
+### BGRA capture and the hardware conversion assumption
+
+When capturing with `pixel_format=PixelFormat.BGRA` from a Y'CbCr source, the SDK performs the matrix conversion **and** range expansion in hardware, delivering full-range 8-bit BGRA. The library assumes BGRA-delivered frames from a Y'CbCr source are always full-range, and accounts for that when interpreting `input_narrow_range` (which describes the wire signal, not the bytes the library receives). This matches observed behaviour on tested hardware but isn't a documented guarantee; if a future driver or hardware delivered narrow-range BGRA from a Y'CbCr source, output from `capture_frame_as_uint8` / `capture_frame_as_rgb` would be slightly compressed. For BGRA-delivered frames originating from an R'G'B' source, no hardware conversion is performed and the bytes are delivered as-is.
+
+**Caveat — full-range Y'CbCr sources: behaviour unverified.** The SDK's hardware Y'CbCr → BGRA conversion has been observed to assume narrow range (64-940 luma in 10-bit mapped to 0-255 BGRA) with the conventional broadcast Y'CbCr sources we tested. Whether the SDK reads the HDMI AVI InfoFrame's YCC Quantization Range (YQ) field and handles correctly-flagged full-range Y'CbCr sources (e.g. computer GPU output configured for YCbCr-Full, certain pattern generators) differently is untested and unknown at this time. If YQ is ignored, full-range Y'CbCr values outside 64-940 would be clipped in hardware (0-63 → 0, 941-1023 → 255) before the library sees the frame; no software-side `input_narrow_range=False` could recover those values. To be safe with potentially full-range Y'CbCr sources, capture as `PixelFormat.YUV10` or `PixelFormat.YUV8` instead of `PixelFormat.BGRA` and convert with `input_narrow_range=False` at the library level — that path preserves the original code values regardless of how the hardware interprets YQ.
+
+**Caveat — narrow-range sub-blacks and super-whites are lost in BGRA.** Narrow-range Y'CbCr legitimately carries codes below 64 (sub-blacks, footroom) and above 940 (super-whites, headroom). The SDK's narrow-assumed Y'CbCr → BGRA conversion clips these to 0 or 255 at the BGRA output. If you then request `output_narrow_range=True` to recover an 8-bit R'G'B' representation, the nominal 16-235 range round-trips faithfully but the sub-black region (codes 0-15) and super-white region (236-255) will be empty — that signal was lost in hardware. Less serious than the full-range case (nominal content is preserved), but if you need to retain footroom/headroom information, capture as `PixelFormat.YUV10` or `PixelFormat.YUV8` and convert in software.
+
+### Y'CbCr → BGRA hardware conversion honours signalled matrix metadata
+
+When capturing as BGRA from a Y'CbCr source, the SDK's hardware Y'CbCr → R'G'B' conversion uses the matrix coefficients (Rec.601, Rec.709, or Rec.2020) signalled in the source's frame metadata. Verified via SDI and HDMI loopback with Rec.709 and Rec.2020 sources. Applications working with BGRA captures don't need to apply their own matrix conversion.
+
 ## Troubleshooting
 
 ### Common Issues
