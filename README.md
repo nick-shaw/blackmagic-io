@@ -1556,6 +1556,7 @@ All 14 SMPTE ST 2086 / CEA-861.3 HDR static metadata fields are supported:
 7. **Matrix / Resolution restrictions**:
    - **Rec.601** is only supported for SD display modes (NTSC, PAL, etc.) and is the only matrix supported for SD
    - **Rec.709** and **Rec.2020** are only supported for HD and higher resolutions (720p, 1080p, 2K, 4K, 8K, etc.)
+8. **HLG static metadata is suppressed on transmit by the Blackmagic SDK**: When EOTF is HLG, the SDK transmits zero values for all HDR static metadata fields (display primaries, white point, mastering display luminance, MaxCLL, MaxFALL) over HDMI, even when populated explicitly via `set_hdr_static_metadata()`. The receive side reads non-zero values faithfully when present in an incoming HLG signal, so the suppression is transmit-side, not receive-side. SDI conveys HDR static metadata via SMPTE ST 2108 ANC packets (separate from VPID, which carries only EOTF and matrix); the S2108 path is used for PQ. For HLG on SDI, the static metadata is not present in the captured signal. This is consistent with the view that HLG is display-referred but stricter than CTA-861.3 permits. See HDMI Input Notes for details.
 
 ## HDMI Input Notes
 
@@ -1596,6 +1597,14 @@ When capturing with `pixel_format=PixelFormat.BGRA`, the SDK on tested hardware 
 ### Y'CbCr → BGRA hardware conversion honours signalled matrix metadata
 
 When capturing as BGRA from a Y'CbCr source, the SDK's hardware Y'CbCr → R'G'B' conversion uses the matrix coefficients (Rec.601, Rec.709, or Rec.2020) signalled in the source's frame metadata. Verified via SDI and HDMI loopback with Rec.709 and Rec.2020 sources. Applications working with BGRA captures don't need to apply their own matrix conversion.
+
+### HLG static metadata: faithful on receive, suppressed on Blackmagic transmit
+
+The Blackmagic SDK reports HDR static metadata faithfully from HLG sources over HDMI. When an HLG source transmits a populated HDR Static Metadata InfoFrame — Rec.2020 primaries, D65 white point, mastering display luminance — those values arrive on the capture side intact. MaxCLL and MaxFALL may legitimately be zero for HLG content even when the other fields are populated, since HLG is display-referred. If you need mastering display information from an HLG source, the receive side will not strip it.
+
+However, when this library — or anything else built on the Blackmagic SDK — transmits HLG over HDMI, the SDK suppresses HDR static metadata. Even populating an `HdrStaticMetadata` struct explicitly via `set_hdr_static_metadata()` produces zero values on the wire, as confirmed by Blackmagic-to-Blackmagic loopback. If you capture HLG and the source is a Blackmagic-SDK-based transmitter, you will see all-zero static metadata. The behaviour is consistent with the view that HLG is display-referred and does not require mastering display information at the receiver, but it is stricter than CTA-861.3 permits.
+
+SDI uses a different mechanism: HDR static metadata is conveyed via SMPTE ST 2108 ANC packets, separate from VPID (which carries only colorimetric descriptors like EOTF and matrix). The S2108 path is used for PQ. For HLG on SDI, the static metadata is not present in the captured signal — only EOTF and matrix come through.
 
 ## Troubleshooting
 
@@ -1643,7 +1652,7 @@ This will show available devices and let you test various output modes.
 
 ### pixel_reader
 
-The `pixel_reader` tool captures and analyzes video input from a DeckLink device, displaying pixel values and metadata. This is useful for verifying output from the library by looping a DeckLink output back to its own input.
+The `pixel_reader` tool captures and analyses video input from a DeckLink device, displaying pixel values and metadata. This is useful for verifying output from the library by looping a DeckLink output back to its own input.
 
 **Build:**
 ```bash

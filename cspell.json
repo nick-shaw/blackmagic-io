@@ -23,11 +23,15 @@
     "bmdFormat",
     "BGRA",
     "Blackmagic",
+    "Bollaert",
     "CbCr",
+    "codesign",
     "colorbars",
     "colorspace",
     "DeckLink",
+    "EDID",
     "EOTF",
+    "footroom",
     "fourcc",
     "fullrange",
     "HDMI",
@@ -36,6 +40,7 @@
     "InfoFrame",
     "LogC",
     "LTC",
+    "luma",
     "narrowrange",
     "ndarray",
     "numpy",
@@ -54,6 +59,7 @@
     "timecodes",
     "tpat",
     "uint",
+    "usermod",
     "v210",
     "venv",
     "r210",
@@ -62,6 +68,7 @@
     "VPID",
     "YCbCr",
     "Yergin",
-    "YUV"
+    "YUV",
+    "Zach"
   ]
 }
