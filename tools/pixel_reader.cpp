@@ -651,7 +651,7 @@ public:
                     }
                 }
 
-                printf("\n\x1b[%dA", numLines);
+                printf("\n\x1b[J\x1b[%dA", numLines);
                 fflush(stdout);
             }
         }
