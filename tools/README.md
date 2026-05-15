@@ -24,7 +24,15 @@ This tool reads the incoming signal on a Blackmagic DeckLink device and displays
 make
 ```
 
-Works on macOS, Linux, and Windows (with MinGW). The executable lands at `tools/pixel_reader`.
+Works on macOS, Linux, and Windows. The executable lands at `tools/pixel_reader`.
+
+On Windows, `make` isn't part of the standard developer tooling (not in Visual Studio Build Tools, not in Git Bash). Install it separately via one of:
+
+- `choco install make` — if you have [Chocolatey](https://chocolatey.org/install)
+- `winget install GnuWin32.Make` — using the built-in Windows package manager
+- MSYS2 / MinGW — if you already have those
+
+The Visual Studio Build Tools install used for the main library build provides the C++ compiler the Makefile invokes; only `make` itself needs separate installation.
 
 To rebuild from scratch:
 
