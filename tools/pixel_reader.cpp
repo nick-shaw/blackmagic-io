@@ -52,6 +52,7 @@
 #elif defined(_WIN32)
     #include <windows.h>
     #include <comutil.h>
+    #include <string.h>
     #include "DeckLinkAPI.h"
     typedef int32_t INT32;
     typedef uint32_t UINT32;
@@ -59,7 +60,8 @@
     typedef uint16_t UINT16;
     typedef int64_t INT64;
     typedef uint64_t UINT64;
-    typedef bool BOOL;
+    // BOOL is provided by <windows.h>; do not redefine.
+    #define strcasecmp _stricmp
 
     #define Initialize() CoInitialize(NULL)
     #define GetDeckLinkIterator(iter) CoCreateInstance(CLSID_CDeckLinkIterator, NULL, CLSCTX_ALL, IID_IDeckLinkIterator, (void**)iter)
@@ -763,7 +765,7 @@ int main(int argc, char** argv)
 {
     int deviceIndex = -1;  // -1 means auto-select first input capable device
     bool listDevicesFlag = false;
-    BMDVideoConnection inputConnection = 0;  // 0 means use current/default input
+    BMDVideoConnection inputConnection = (BMDVideoConnection)0;  // 0 means use current/default input
     const char* inputConnectionStr = NULL;
 
     // Parse command line arguments
