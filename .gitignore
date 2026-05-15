@@ -22,6 +22,7 @@ Thumbs.db
 
 # Build artifacts
 *.o
+*.obj
 *.a
 *.dylib
 *.dll
