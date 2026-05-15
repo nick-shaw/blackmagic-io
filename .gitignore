@@ -37,6 +37,7 @@ tools/pixel_reader
 
 # Claude
 CLAUDE.md
+.claude/
 
 # Scratch Folder
 scratch/
