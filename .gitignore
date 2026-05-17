@@ -30,6 +30,7 @@ Thumbs.db
 
 # Tools binaries
 tools/pixel_reader
+tools/pixel_reader.exe
 
 # Large images
 *.tiff
