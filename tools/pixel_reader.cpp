@@ -53,7 +53,7 @@
     #include <windows.h>
     #include <comutil.h>
     #include <string.h>
-    #include "DeckLinkAPI.h"
+    #include "DeckLinkAPI_h.h"
     typedef int32_t INT32;
     typedef uint32_t UINT32;
     typedef uint8_t UINT8;
@@ -64,7 +64,14 @@
     #define strcasecmp _stricmp
 
     #define Initialize() CoInitialize(NULL)
-    #define GetDeckLinkIterator(iter) CoCreateInstance(CLSID_CDeckLinkIterator, NULL, CLSCTX_ALL, IID_IDeckLinkIterator, (void**)iter)
+    // CoCreateInstance returns HRESULT; the callers check the macro result for NULL like a
+    // pointer (matching the Mac/Linux convention). Make this macro evaluate to the iterator
+    // pointer on success (or NULL on failure) so those checks behave the same on Windows.
+    #define GetDeckLinkIterator(iter) ( \
+        SUCCEEDED(CoCreateInstance(CLSID_CDeckLinkIterator, NULL, CLSCTX_ALL, IID_IDeckLinkIterator, (void**)iter)) \
+            ? *(iter) \
+            : (*(iter) = NULL) \
+    )
     #define STRINGOBJ BSTR
     #define STRINGFREE(s) SysFreeString(s)
 
