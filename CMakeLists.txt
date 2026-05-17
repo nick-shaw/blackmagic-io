@@ -145,3 +145,30 @@ endif()
 
 # Install the module
 install(TARGETS decklink_io DESTINATION .)
+
+# Build pixel_reader command-line tool.
+# Reuses the per-platform DECKLINK_* variables set up for the Python module above
+# (include dir, generated DeckLinkAPI_i.c on Windows, PLATFORM_LIBS).
+# Not installed into the wheel — this is a developer tool, not part of the
+# published library. After `pip install -e .` it lands in tools/ ready to run.
+add_executable(pixel_reader
+    tools/pixel_reader.cpp
+    ${DECKLINK_SOURCES}
+)
+target_compile_features(pixel_reader PRIVATE cxx_std_17)
+target_include_directories(pixel_reader PRIVATE
+    ${DECKLINK_INCLUDE_DIR}
+    ${CMAKE_CURRENT_SOURCE_DIR}
+)
+if(PLATFORM_LIBS)
+    target_link_libraries(pixel_reader PRIVATE ${PLATFORM_LIBS})
+endif()
+if(CMAKE_SYSTEM_NAME STREQUAL "Darwin")
+    target_link_options(pixel_reader PRIVATE -framework CoreFoundation)
+elseif(CMAKE_SYSTEM_NAME STREQUAL "Windows")
+    target_compile_definitions(pixel_reader PRIVATE WIN32_LEAN_AND_MEAN NOMINMAX)
+endif()
+set_target_properties(pixel_reader PROPERTIES
+    RUNTIME_OUTPUT_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}/tools"
+)
+# Deliberately no install() — pixel_reader is a dev tool, not shipped in the wheel.
