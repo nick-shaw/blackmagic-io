@@ -503,7 +503,7 @@ except ImportError:
     # C++ extension not built yet
     pass
 
-__version__ = "0.17.0b4"
+__version__ = "0.17.0b5"
 __author__ = "Nick Shaw"
 
 __all__ = [
