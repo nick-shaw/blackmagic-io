@@ -12,6 +12,7 @@ import numpy as np
 import pytest
 
 import decklink_io
+from blackmagic_io import BlackmagicOutput, PixelFormat
 from blackmagic_io.blackmagic_io import _adjust_range_uint8
 
 
@@ -155,6 +156,52 @@ def test_adjust_range_output_shape_and_dtype():
     result = _adjust_range_uint8(rgb, input_narrow_range=True, output_narrow_range=False)
     assert result.shape == rgb.shape
     assert result.dtype == np.uint8
+
+
+# BGRA dtype-rejection tests. BGRA is intentionally uint8-only — passing
+# float / uint16 to the BGRA path used to silently truncate (`.astype(np.uint8)`),
+# producing near-black or low-byte-only output. The library now rejects with a
+# clear ValueError pointing users at YUV10 / RGB10 / RGB12 for higher-precision
+# data.
+
+def test_bgra_rejects_float32_dtype():
+    output = BlackmagicOutput()
+    float_rgb = np.zeros((2, 4, 3), dtype=np.float32)
+    with pytest.raises(ValueError, match="BGRA format.*uint8"):
+        output._prepare_frame_data(
+            float_rgb, PixelFormat.BGRA, matrix=None,
+            input_narrow_range=False, output_narrow_range=False,
+        )
+
+
+def test_bgra_rejects_float64_dtype():
+    output = BlackmagicOutput()
+    float_rgb = np.zeros((2, 4, 3), dtype=np.float64)
+    with pytest.raises(ValueError, match="BGRA format.*uint8"):
+        output._prepare_frame_data(
+            float_rgb, PixelFormat.BGRA, matrix=None,
+            input_narrow_range=False, output_narrow_range=False,
+        )
+
+
+def test_bgra_rejects_uint16_dtype():
+    output = BlackmagicOutput()
+    uint16_rgb = np.zeros((2, 4, 3), dtype=np.uint16)
+    with pytest.raises(ValueError, match="BGRA format.*uint8"):
+        output._prepare_frame_data(
+            uint16_rgb, PixelFormat.BGRA, matrix=None,
+            input_narrow_range=False, output_narrow_range=False,
+        )
+
+
+def test_bgra_rejects_bad_shape():
+    output = BlackmagicOutput()
+    rgb_2d = np.zeros((4, 3), dtype=np.uint8)  # missing channel axis
+    with pytest.raises(ValueError, match="HxWx3 .* HxWx4"):
+        output._prepare_frame_data(
+            rgb_2d, PixelFormat.BGRA, matrix=None,
+            input_narrow_range=False, output_narrow_range=False,
+        )
 
 
 if __name__ == "__main__":

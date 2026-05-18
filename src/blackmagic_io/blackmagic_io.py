@@ -297,10 +297,16 @@ class BlackmagicOutput:
         Display a static frame continuously.
 
         Args:
-            frame_data: NumPy array containing image data
-                       - For R'G'B': shape should be (height, width, 3)
-                       - For BGRA: shape should be (height, width, 4)
-                       - Supported dtypes: uint8, uint16, float32, float64
+            frame_data: NumPy array containing image data. The accepted shape and dtype
+                        depend on pixel_format:
+                        - PixelFormat.BGRA: shape (height, width, 3) R'G'B' or
+                          (height, width, 4) BGRA; dtype uint8 only. BGRA is intended
+                          for fast preview-quality work; for float or higher bit depth,
+                          use one of the YUV / RGB formats below to avoid double quantisation.
+                        - PixelFormat.YUV8: shape (height, width, 3) R'G'B';
+                          dtype uint8, uint16, float32, or float64.
+                        - PixelFormat.YUV10 / RGB10 / RGB12: shape (height, width, 3)
+                          R'G'B'; dtype uint16, float32, or float64.
             display_mode: Video resolution and frame rate
             pixel_format: Pixel format (default: YUV10, auto-detected as BGRA for uint8 data)
             matrix: R'G'B' to Y'CbCr conversion matrix (Rec601, Rec709 or Rec2020).
@@ -563,15 +569,19 @@ class BlackmagicOutput:
         settings = self._current_settings
 
         if pixel_format == PixelFormat.BGRA:
-            if frame_data.dtype != np.uint8:
-                frame_data = frame_data.astype(np.uint8)
-
-            if frame_data.ndim == 3 and frame_data.shape[2] == 3:
-                return _decklink.rgb_to_bgra(frame_data, settings.width, settings.height)
-            elif frame_data.ndim == 3 and frame_data.shape[2] == 4:
-                return frame_data
-            else:
+            if frame_data.ndim != 3 or frame_data.shape[2] not in (3, 4):
                 raise ValueError("For BGRA format, frame data must be HxWx3 (RGB) or HxWx4 (BGRA)")
+
+            if frame_data.dtype != np.uint8:
+                raise ValueError(
+                    "For BGRA format, frame data must be uint8 dtype. "
+                    "BGRA is intended for fast preview-quality work; use YUV10, RGB10, or RGB12 "
+                    "for float or uint16 input."
+                )
+
+            if frame_data.shape[2] == 3:
+                return _decklink.rgb_to_bgra(frame_data, settings.width, settings.height)
+            return frame_data
 
         elif pixel_format == PixelFormat.YUV8:
             if frame_data.ndim != 3 or frame_data.shape[2] != 3:
