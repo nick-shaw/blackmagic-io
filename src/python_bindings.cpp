@@ -1467,7 +1467,7 @@ py::array_t<uint16_t> rgb10_to_uint16(py::array_t<uint8_t> rgb_array, int width,
     double out_min   = output_narrow_range ? 64.0 * 64.0  : 0.0;       // 4096 or 0
     double out_range = output_narrow_range ? 876.0 * 64.0 : 65535.0;   // 56064 or 65535
 
-    bool use_bitshift = (input_narrow_range == output_narrow_range);
+    bool use_bitshift = (input_narrow_range && output_narrow_range);
 
     for (int y = 0; y < height; y++) {
         const uint32_t* src = reinterpret_cast<const uint32_t*>(src_base + y * row_bytes);
@@ -1482,7 +1482,7 @@ py::array_t<uint16_t> rgb10_to_uint16(py::array_t<uint8_t> rgb_array, int width,
             int pixel_idx = (y * width + x) * 3;
 
             if (use_bitshift) {
-                // Same range: 10-bit -> 16-bit by shifting up 6 bits (exact inverse of packing)
+                // Both narrow: 10-bit narrow -> 16-bit narrow by shifting up 6 bits (exact inverse of packing)
                 dst[pixel_idx]     = r10 << 6;
                 dst[pixel_idx + 1] = g10 << 6;
                 dst[pixel_idx + 2] = b10 << 6;
@@ -1638,7 +1638,7 @@ py::array_t<uint16_t> rgb12_to_uint16(py::array_t<uint8_t> rgb_array, int width,
     double out_min   = output_narrow_range ? 256.0 * 16.0  : 0.0;      // 4096 or 0
     double out_range = output_narrow_range ? 3504.0 * 16.0 : 65535.0;  // 56064 or 65535
 
-    bool use_bitshift = (input_narrow_range == output_narrow_range);
+    bool use_bitshift = (input_narrow_range && output_narrow_range);
 
     for (int y = 0; y < height; y++) {
         const uint32_t* row_src = reinterpret_cast<const uint32_t*>(src_base + y * row_bytes);
@@ -1686,7 +1686,7 @@ py::array_t<uint16_t> rgb12_to_uint16(py::array_t<uint8_t> rgb_array, int width,
                 int pixel_idx = (y * width + x + i) * 3;
 
                 if (use_bitshift) {
-                    // Same range: 12-bit -> 16-bit by shifting up 4 bits (exact inverse of packing)
+                    // Both narrow: 12-bit narrow -> 16-bit narrow by shifting up 4 bits (exact inverse of packing)
                     dst[pixel_idx]     = r[i] << 4;
                     dst[pixel_idx + 1] = g[i] << 4;
                     dst[pixel_idx + 2] = b[i] << 4;

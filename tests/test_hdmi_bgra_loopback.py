@@ -335,5 +335,63 @@ def test_bgra_hdmi_loopback_via_wrapper():
         output_device.cleanup()
 
 
+def test_bgra_hdmi_loopback_uint16_via_wrapper():
+    """End-to-end via `capture_frame_as_uint16` from a BGRA-requested input.
+
+    Exercises the new BGRA-source promotion branch of `_convert_frame_to_int`.
+    The wrapper sees an 8-bit-precision source and is expected to LSB-pad
+    the result via `<< 8` (so 0xff -> 0xff00). Compared against the source
+    uint8 array promoted the same way; tolerance is the ±1 uint8-code
+    tolerance from the uint8 variant, shifted into uint16 space.
+    """
+    output_device = decklink_io.DeckLinkOutput()
+    assert output_device.initialize(OUTPUT_DEVICE_INDEX), \
+        "Failed to initialize output device"
+
+    try:
+        settings = output_device.get_video_settings(DISPLAY_MODE)
+        settings.format = decklink_io.PixelFormat.BGRA
+        assert output_device.setup_output(settings), \
+            "Failed to setup BGRA output"
+
+        expected_rgb_uint8, bgra = _build_bgra_frame(settings)
+        assert output_device.set_frame_data(bgra), \
+            "Failed to set BGRA frame data"
+        assert output_device.display_frame(), \
+            "Failed to display BGRA frame"
+
+        time.sleep(0.5)
+
+        with BlackmagicInput() as input_device:
+            assert input_device.initialize(
+                INPUT_DEVICE_INDEX,
+                input_connection=decklink_io.InputConnection.HDMI,
+                pixel_format=PixelFormat.BGRA,
+            ), "Failed to initialise BlackmagicInput on HDMI with BGRA"
+
+            captured_uint16 = input_device.capture_frame_as_uint16(
+                input_narrow_range=False,
+            )
+            assert captured_uint16 is not None, \
+                "capture_frame_as_uint16 returned None"
+            assert captured_uint16.dtype == np.uint16, \
+                f"Expected uint16, got {captured_uint16.dtype}"
+
+            expected_uint16 = expected_rgb_uint8.astype(np.uint16) << 8
+            diff = np.abs(captured_uint16.astype(int) - expected_uint16.astype(int))
+            max_diff = int(diff.max())
+            mean_diff = float(diff.mean())
+            tolerance_uint16 = PIXEL_TOLERANCE << 8
+            print(f"\nuint16 BGRA capture: max diff = {max_diff}, "
+                  f"mean = {mean_diff:.3f}, tolerance = {tolerance_uint16}")
+            assert max_diff <= tolerance_uint16, (
+                f"uint16 BGRA capture exceeded ±{tolerance_uint16} "
+                f"({PIXEL_TOLERANCE} 8-bit codes): max diff = {max_diff}"
+            )
+    finally:
+        output_device.stop_output()
+        output_device.cleanup()
+
+
 if __name__ == "__main__":
     sys.exit(pytest.main([__file__, "-v", "-s"]))

@@ -428,6 +428,17 @@ Dictionary keys:
 
 This function combines the performance of `capture_frame_as_uint8()` with metadata access, making it ideal for real-time preview applications that need to detect signal changes (resolution, colorspace, EOTF) without the overhead of float conversion.
 
+**`capture_frame_as_uint16(timeout_ms=5000, input_narrow_range=True, output_narrow_range=False) -> Optional[np.ndarray]`**
+Capture a single frame and convert to R'G'B' uint16 (preserves native bit depth of the source).
+- `timeout_ms`: Timeout in milliseconds (default: 5000)
+- `input_narrow_range`: Whether input uses narrow range encoding (default: True)
+- `output_narrow_range`: If False (default), output uint16 is full range (0-65535 scaled). If True, output is narrow-range R'G'B' (10-bit narrow codes LSB-padded to 16-bit: 4096-60160).
+- Returns: R'G'B' uint16 array (H×W×3), or None if timeout/no signal
+- Higher-precision counterpart to `capture_frame_as_uint8()`. 10-bit (RGB10 / YUV10) and 12-bit (RGB12) sources keep their native precision in the uint16 result. 8-bit sources (BGRA, or RGB10-delivered-as-BGRA) are LSB-padded via `<< 8` — `0xff` maps to `0xff00`, so the underlying precision is still 8-bit even though the dtype is uint16.
+
+**`capture_frame_as_uint16_with_metadata(timeout_ms=5000, input_narrow_range=True, output_narrow_range=False) -> Optional[dict]`**
+Capture a frame as R'G'B' uint16 with format metadata. Higher-precision counterpart to `capture_frame_as_uint8_with_metadata()`; see that method for the per-key dictionary structure (only the `'rgb'` value's dtype changes from uint8 to uint16). See `capture_frame_as_uint16()` above for notes on bit-depth handling per source format.
+
 **`capture_frame_as_rgb(timeout_ms=5000, input_narrow_range=True) -> Optional[np.ndarray]`**
 Capture a single frame and convert to R'G'B'.
 - `timeout_ms`: Timeout in milliseconds (default: 5000)

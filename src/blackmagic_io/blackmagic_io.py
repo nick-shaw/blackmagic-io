@@ -921,8 +921,9 @@ class BlackmagicInput:
         if not self._input.capture_frame(captured_frame, timeout_ms):
             return None
 
-        return self._convert_frame_to_uint8(captured_frame, input_narrow_range,
-                                            output_narrow_range)
+        return self._convert_frame_to_int(captured_frame, bit_depth=8,
+                                          input_narrow_range=input_narrow_range,
+                                          output_narrow_range=output_narrow_range)
 
     def capture_frame_as_uint8_with_metadata(self,
                                             timeout_ms: int = 5000,
@@ -971,8 +972,156 @@ class BlackmagicInput:
         if not self._input.capture_frame(captured_frame, timeout_ms):
             return None
 
-        rgb_array = self._convert_frame_to_uint8(captured_frame, input_narrow_range,
-                                                 output_narrow_range)
+        rgb_array = self._convert_frame_to_int(captured_frame, bit_depth=8,
+                                               input_narrow_range=input_narrow_range,
+                                               output_narrow_range=output_narrow_range)
+        if rgb_array is None:
+            return None
+
+        pixel_format = PixelFormat(captured_frame.format)
+        colorspace = Matrix(captured_frame.colorspace)
+        eotf = Eotf(captured_frame.eotf)
+
+        display_mode = None
+        for mode in DisplayMode:
+            if mode.value == captured_frame.mode:
+                display_mode = mode
+                break
+
+        result = {
+            'rgb': rgb_array,
+            'width': captured_frame.width,
+            'height': captured_frame.height,
+            'format': pixel_format.name,
+            'mode': display_mode.name if display_mode else 'Unknown',
+            'colorspace': colorspace.name,
+            'eotf': eotf.name,
+            'input_narrow_range': input_narrow_range,
+            'output_narrow_range': output_narrow_range
+        }
+
+        if captured_frame.has_timecode:
+            result['timecode'] = {
+                'hours': captured_frame.timecode_hours,
+                'minutes': captured_frame.timecode_minutes,
+                'seconds': captured_frame.timecode_seconds,
+                'frames': captured_frame.timecode_frames,
+                'is_drop_frame': captured_frame.timecode_is_drop_frame
+            }
+
+        hdr_metadata = {}
+
+        if captured_frame.has_display_primaries:
+            hdr_metadata['display_primaries'] = {
+                'red': {
+                    'x': captured_frame.display_primaries_red_x,
+                    'y': captured_frame.display_primaries_red_y
+                },
+                'green': {
+                    'x': captured_frame.display_primaries_green_x,
+                    'y': captured_frame.display_primaries_green_y
+                },
+                'blue': {
+                    'x': captured_frame.display_primaries_blue_x,
+                    'y': captured_frame.display_primaries_blue_y
+                }
+            }
+
+        if captured_frame.has_white_point:
+            hdr_metadata['white_point'] = {
+                'x': captured_frame.white_point_x,
+                'y': captured_frame.white_point_y
+            }
+
+        if captured_frame.has_mastering_luminance:
+            hdr_metadata['mastering_luminance'] = {
+                'max': captured_frame.max_display_mastering_luminance,
+                'min': captured_frame.min_display_mastering_luminance
+            }
+
+        content_light = {}
+        if captured_frame.has_max_cll:
+            content_light['max_cll'] = captured_frame.max_content_light_level
+        if captured_frame.has_max_fall:
+            content_light['max_fall'] = captured_frame.max_frame_average_light_level
+        if content_light:
+            hdr_metadata['content_light'] = content_light
+
+        if hdr_metadata:
+            result['hdr_metadata'] = hdr_metadata
+
+        return result
+
+    def capture_frame_as_uint16(self,
+                                timeout_ms: int = 5000,
+                                input_narrow_range: bool = True,
+                                output_narrow_range: bool = False) -> Optional[np.ndarray]:
+        """Capture a frame and convert to R'G'B' uint16 array (preserves bit depth).
+
+        Higher-precision counterpart to `capture_frame_as_uint8`. 10-bit and 12-bit
+        sources keep their native precision in the uint16 result; 8-bit sources
+        (BGRA / RGB10-delivered-as-BGRA) are LSB-padded via `<< 8` so 0xff maps to
+        0xff00 — the underlying precision is still 8-bit.
+
+        Args:
+            timeout_ms: Capture timeout in milliseconds (default: 5000)
+            input_narrow_range: Whether input uses narrow range encoding (default: True)
+            output_narrow_range: If False (default), output uint16 values are
+                full range (0-65535 scaled). If True, output is narrow-range
+                R'G'B' (10-bit narrow codes LSB-padded to 16-bit: 4096-60160).
+
+        Returns:
+            R'G'B' array (H×W×3), dtype uint16, or None if capture failed
+        """
+        if not self._capturing:
+            if not self.start_capture():
+                return None
+
+        captured_frame = _decklink.CapturedFrame()
+        if not self._input.capture_frame(captured_frame, timeout_ms):
+            return None
+
+        return self._convert_frame_to_int(captured_frame, bit_depth=16,
+                                          input_narrow_range=input_narrow_range,
+                                          output_narrow_range=output_narrow_range)
+
+    def capture_frame_as_uint16_with_metadata(self,
+                                              timeout_ms: int = 5000,
+                                              input_narrow_range: bool = True,
+                                              output_narrow_range: bool = False) -> Optional[dict]:
+        """Capture a frame and convert to R'G'B' uint16 with metadata.
+
+        Higher-precision counterpart to `capture_frame_as_uint8_with_metadata`.
+        See `capture_frame_as_uint16` for notes on the bit-depth handling per source format.
+
+        Args:
+            timeout_ms: Capture timeout in milliseconds (default: 5000)
+            input_narrow_range: Whether input uses narrow range encoding (default: True)
+            output_narrow_range: If False (default), output uint16 values are
+                full range. If True, output is narrow-range R'G'B' (10-bit
+                narrow codes LSB-padded to 16-bit: 4096-60160).
+
+        Returns:
+            Dictionary with:
+                - 'rgb': R'G'B' array (H×W×3), dtype uint16
+                - 'width', 'height': int
+                - 'format', 'mode', 'colorspace', 'eotf': name strings
+                - 'input_narrow_range', 'output_narrow_range': bool
+                - 'timecode': dict if present
+                - 'hdr_metadata': dict if present
+            Or None if capture failed
+        """
+        if not self._capturing:
+            if not self.start_capture():
+                return None
+
+        captured_frame = _decklink.CapturedFrame()
+        if not self._input.capture_frame(captured_frame, timeout_ms):
+            return None
+
+        rgb_array = self._convert_frame_to_int(captured_frame, bit_depth=16,
+                                               input_narrow_range=input_narrow_range,
+                                               output_narrow_range=output_narrow_range)
         if rgb_array is None:
             return None
 
@@ -1242,23 +1391,43 @@ class BlackmagicInput:
             self._input.cleanup()
             self._initialized = False
 
-    def _convert_frame_to_uint8(self, captured_frame, input_narrow_range: bool,
-                                output_narrow_range: bool = False) -> Optional[np.ndarray]:
-        """Convert captured frame to R'G'B' uint8 array.
+    def _convert_frame_to_int(self, captured_frame, bit_depth: int,
+                              input_narrow_range: bool,
+                              output_narrow_range: bool = False) -> Optional[np.ndarray]:
+        """Convert captured frame to R'G'B' integer array.
 
         Args:
             captured_frame: CapturedFrame object from low-level API
+            bit_depth: 8 for uint8 output, 16 for uint16 output. 8-bit sources
+                (BGRA / RGB10-delivered-as-BGRA) are LSB-padded via `<< 8` when
+                bit_depth=16 (so 0xff -> 0xff00); the underlying precision is
+                still 8-bit.
             input_narrow_range: Whether to interpret input as narrow range
-            output_narrow_range: Whether output uint8 should be narrow-range
-                (16-235) or full-range (0-255). Default False.
+            output_narrow_range: Whether output should be narrow-range
+                (16-235 at 8-bit, 4096-60160 at 16-bit) or full-range. Default False.
 
         Returns:
-            R'G'B' array (H×W×3), dtype uint8, or None if conversion failed
+            R'G'B' array (H×W×3), dtype uint8 or uint16, or None if conversion failed
         """
+        if bit_depth not in (8, 16):
+            raise ValueError(f"bit_depth must be 8 or 16, got {bit_depth}")
+
         frame_data = np.array(captured_frame.data, dtype=np.uint8)
         width = captured_frame.width
         height = captured_frame.height
         pixel_format = captured_frame.format
+
+        def _promote_uint8(rgb_uint8):
+            """Promote an 8-bit-precision RGB array to the requested output bit depth."""
+            if bit_depth == 8:
+                return rgb_uint8
+            return rgb_uint8.astype(np.uint16) << 8
+
+        def _truncate_uint16(rgb_uint16):
+            """Reduce a 16-bit RGB array to the requested output bit depth."""
+            if bit_depth == 8:
+                return (rgb_uint16 >> 8).astype(np.uint8)
+            return rgb_uint16
 
         try:
             # BGRA was requested but the SDK delivered 10-bit RGB (common for
@@ -1274,7 +1443,9 @@ class BlackmagicInput:
                 g8 = (((raw >> 12) & 0x3FF) >> 2).astype(np.uint8)
                 b8 = (((raw >>  2) & 0x3FF) >> 2).astype(np.uint8)
                 rgb = np.stack([r8, g8, b8], axis=2)
-                return _adjust_range_uint8(rgb, input_narrow_range, output_narrow_range)
+                return _promote_uint8(
+                    _adjust_range_uint8(rgb, input_narrow_range, output_narrow_range)
+                )
 
             if pixel_format == _decklink.PixelFormat.YUV8:
                 rgb_uint16 = _decklink.yuv8_to_rgb_uint16(
@@ -1284,7 +1455,7 @@ class BlackmagicInput:
                     output_narrow_range=output_narrow_range,
                     row_bytes=captured_frame.row_bytes
                 )
-                return (rgb_uint16 >> 8).astype(np.uint8)
+                return _truncate_uint16(rgb_uint16)
 
             elif pixel_format == _decklink.PixelFormat.YUV10:
                 rgb_uint16 = _decklink.yuv10_to_rgb_uint16(
@@ -1294,7 +1465,7 @@ class BlackmagicInput:
                     output_narrow_range=output_narrow_range,
                     row_bytes=captured_frame.row_bytes
                 )
-                return (rgb_uint16 >> 8).astype(np.uint8)
+                return _truncate_uint16(rgb_uint16)
 
             elif pixel_format == _decklink.PixelFormat.RGB10:
                 rgb_uint16 = _decklink.rgb10_to_uint16(
@@ -1303,7 +1474,7 @@ class BlackmagicInput:
                     output_narrow_range=output_narrow_range,
                     row_bytes=captured_frame.row_bytes
                 )
-                return (rgb_uint16 >> 8).astype(np.uint8)
+                return _truncate_uint16(rgb_uint16)
 
             elif pixel_format == _decklink.PixelFormat.RGB12:
                 rgb_uint16 = _decklink.rgb12_to_uint16(
@@ -1312,7 +1483,7 @@ class BlackmagicInput:
                     output_narrow_range=output_narrow_range,
                     row_bytes=captured_frame.row_bytes
                 )
-                return (rgb_uint16 >> 8).astype(np.uint8)
+                return _truncate_uint16(rgb_uint16)
 
             elif pixel_format == _decklink.PixelFormat.BGRA:
                 bgra_data = np.frombuffer(frame_data, dtype=np.uint8).reshape(
@@ -1329,8 +1500,10 @@ class BlackmagicInput:
                 # range regardless of the user-supplied input_narrow_range,
                 # which describes the wire signal rather than the bytes the
                 # library receives.
-                return _adjust_range_uint8(rgb, input_narrow_range=False,
-                                           output_narrow_range=output_narrow_range)
+                return _promote_uint8(
+                    _adjust_range_uint8(rgb, input_narrow_range=False,
+                                        output_narrow_range=output_narrow_range)
+                )
 
             else:
                 return None
