@@ -1,8 +1,10 @@
-#!/usr/bin/env python3
-"""Smoke-run every hardware-dependent test script in non-interactive mode.
+"""Cable-check wrapper that runs the full hardware test suite via pytest.
 
-Runs each test script in turn to catch API regressions without requiring a
-human at the monitor. Aggregates pass/fail at the end.
+Confirms loopback cables are connected before invoking pytest, so the suite
+doesn't run halfway and only then discover that a cable was missing. After
+the cable-check, delegates to `pytest tests/` — which now runs everything in
+the suite, hardware and non-hardware tests alike, with native parametrise
+reporting.
 
 REQUIRED HARDWARE SETUP
 =======================
@@ -10,18 +12,20 @@ REQUIRED HARDWARE SETUP
 Before running this script, confirm:
 
   * A DeckLink device is connected and Blackmagic Desktop Video is installed.
-  * SDI BNC cable: looped from SDI OUT → SDI IN
-      Used by test_loopback.py and test_sdi_metadata_loopback.py.
-  * HDMI cable: looped from HDMI OUT → HDMI IN
-      Used by test_hdmi_metadata_loopback.py and test_hdmi_bgra_loopback.py.
-
-The script will prompt to confirm cables are in place before running anything.
+  * SDI BNC cable: looped from SDI OUT -> SDI IN
+      Used by test_loopback.py and the SDI half of test_hdr_metadata_loopback.py.
+  * HDMI cable: looped from HDMI OUT -> HDMI IN
+      Used by test_hdmi_bgra_loopback.py, test_hdmi_bgra_ycbcr_source.py, and
+      the HDMI half of test_hdr_metadata_loopback.py.
 
 Usage
 =====
 
-    python tests/run_all_tests.py        # interactive cable-check, then run all
+    python tests/run_all_tests.py        # interactive cable-check, then pytest
     python tests/run_all_tests.py --yes  # skip the cable-check prompt
+
+To run pytest directly without the cable-check (e.g. once you know both cables
+are in place), just invoke `pytest tests/` from the repo root.
 """
 
 import argparse
@@ -30,38 +34,28 @@ import subprocess
 import sys
 
 
-# (script_name, args, hardware_required_summary)
-TESTS = [
-    ("test_device_detection.py",       [],                      "DeckLink device"),
-    ("test_conversion_ranges.py",      [],                      "no hardware (pure unit tests)"),
-    ("test_colour_science_parity.py",  [],                      "no hardware (skipped if colour-science not installed)"),
-    ("test_bgra_layout.py",            [],                      "no hardware (pure unit tests)"),
-    ("test_resolutions.py",            [],                      "DeckLink device"),
-    ("test_loopback.py",               [],                      "SDI BNC loopback cable"),
-    ("test_hdr_metadata_loopback.py",  [],                      "both SDI and HDMI loopback cables"),
-    ("test_hdmi_bgra_loopback.py",     [],                      "HDMI loopback cable"),
-    ("test_hdmi_bgra_ycbcr_source.py", [],                      "HDMI loopback cable"),
-]
-
-
 def main():
-    parser = argparse.ArgumentParser(description="Smoke-run all hardware-dependent test scripts.")
+    parser = argparse.ArgumentParser(description="Hardware test suite with cable-check prompt.")
     parser.add_argument(
-        "--yes", action="store_true",
+        "--yes",
+        action="store_true",
         help="Skip the interactive cable-check prompt.",
+    )
+    parser.add_argument(
+        "extra",
+        nargs=argparse.REMAINDER,
+        help="Extra arguments passed through to pytest.",
     )
     args = parser.parse_args()
 
-    here = os.path.dirname(os.path.abspath(__file__))
-
     print("=" * 70)
-    print("Blackmagic IO — Hardware Smoke Test Suite")
+    print("Blackmagic IO - Hardware Test Suite")
     print("=" * 70)
     print()
     print("Required hardware:")
     print("  - A DeckLink device with Blackmagic Desktop Video installed")
-    print("  - SDI BNC cable looped from SDI OUT → SDI IN")
-    print("  - HDMI cable looped from HDMI OUT → HDMI IN")
+    print("  - SDI BNC cable looped from SDI OUT -> SDI IN")
+    print("  - HDMI cable looped from HDMI OUT -> HDMI IN")
     print()
 
     if not args.yes:
@@ -70,46 +64,10 @@ def main():
             print("Aborting. Connect both cables and rerun.")
             return 1
 
-    results = []
-    for script, script_args, _ in TESTS:
-        path = os.path.join(here, script)
-        if not os.path.exists(path):
-            print(f"\n[skip] {script} not found at {path}")
-            results.append((script, None))
-            continue
-
-        print(f"\n{'=' * 70}")
-        cmd_display = " ".join([script] + script_args)
-        print(f"Running: {cmd_display}")
-        print("=" * 70)
-
-        try:
-            result = subprocess.run([sys.executable, path] + script_args, cwd=here)
-            results.append((script, result.returncode == 0))
-        except KeyboardInterrupt:
-            print(f"\n[interrupted] {script}")
-            results.append((script, False))
-            break
-
-    print("\n" + "=" * 70)
-    print("SMOKE TEST SUMMARY")
-    print("=" * 70)
-    for script, ok in results:
-        if ok is None:
-            status = "-  SKIP"
-        elif ok:
-            status = "[PASS]"
-        else:
-            status = "[FAIL]"
-        print(f"  {status}  {script}")
-    print("=" * 70)
-
-    failed = [s for s, ok in results if ok is False]
-    if failed:
-        print(f"\n{len(failed)} script(s) failed.")
-        return 1
-    print("\nAll scripts passed.")
-    return 0
+    tests_dir = os.path.dirname(os.path.abspath(__file__))
+    cmd = [sys.executable, "-m", "pytest", tests_dir] + args.extra
+    print(f"\nRunning: {' '.join(cmd)}\n")
+    return subprocess.run(cmd).returncode
 
 
 if __name__ == "__main__":
