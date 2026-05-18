@@ -38,8 +38,7 @@ TESTS = [
     ("test_bgra_layout.py",            [],                      "no hardware (pure unit tests)"),
     ("test_resolutions.py",            [],                      "DeckLink device"),
     ("test_loopback.py",               [],                      "SDI BNC loopback cable"),
-    ("test_sdi_metadata_loopback.py",  [],                      "SDI BNC loopback cable"),
-    ("test_hdmi_metadata_loopback.py", [],                      "HDMI loopback cable"),
+    ("test_hdr_metadata_loopback.py",  [],                      "both SDI and HDMI loopback cables"),
     ("test_hdmi_bgra_loopback.py",     [],                      "HDMI loopback cable"),
     ("test_hdmi_bgra_ycbcr_source.py", [],                      "HDMI loopback cable"),
 ]

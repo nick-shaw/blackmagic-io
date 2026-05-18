@@ -1,18 +1,17 @@
-#!/usr/bin/env python3
-"""Test dynamic resolution support by outputting test images in various resolutions.
+"""Verify dynamic resolution support by displaying a frame in each requested mode.
 
-Each requested mode is checked against the device's capabilities first. Modes
-the device does not support are SKIPPED (not counted as failures). Modes the
-device claims to support but fail to display are FAILures.
-
-Exit code: 0 if no failures (skips are fine), non-zero if any real failure.
+Each requested mode is checked against the device's capabilities first.
+Modes the device does not support are SKIPPED. Modes the device claims to
+support but fail to display are FAILures.
 """
 
-import sys
 import time
+
 import numpy as np
 import pytest
+
 from blackmagic_io import BlackmagicOutput, DisplayMode, PixelFormat
+
 
 pytestmark = pytest.mark.hardware
 
@@ -27,74 +26,41 @@ TEST_MODES = [
 ]
 
 
-def main():
-    print("Testing dynamic resolution support with hardware output:\n")
-
-    output = BlackmagicOutput()
-    if not output.initialize(device_index=0):
-        print("ERROR: Failed to initialize DeckLink device")
-        print("Make sure a DeckLink device is connected.")
-        return 1
-
-    print("✓ DeckLink device initialized\n")
-    print("Testing resolutions:\n")
-
-    ok_count = 0
-    skip_count = 0
-    fail_count = 0
-
-    for mode in TEST_MODES:
-        try:
-            info = output.get_display_mode_info(mode)
-            width = info["width"]
-            height = info["height"]
-            framerate = info["framerate"]
-
-            label = f"{mode.name:20s} -> {width:4d}x{height:4d} @ {framerate:6.2f}fps"
-
-            if not output.is_pixel_format_supported(mode, PixelFormat.BGRA):
-                print(f"{label} ... — SKIP (mode not supported by this device)")
-                skip_count += 1
-                continue
-
-            # Create vertical color bars
-            frame = np.zeros((height, width, 3), dtype=np.uint8)
-            bar_width = width // 8
-            colors = [
-                [255, 255, 255],  # White
-                [255, 255, 0],    # Yellow
-                [0, 255, 255],    # Cyan
-                [0, 255, 0],      # Green
-                [255, 0, 255],    # Magenta
-                [255, 0, 0],      # Red
-                [0, 0, 255],      # Blue
-                [0, 0, 0],        # Black
-            ]
-            for i, color in enumerate(colors):
-                x_start = i * bar_width
-                x_end = min((i + 1) * bar_width, width)
-                frame[:, x_start:x_end] = color
-
-            if output.display_static_frame(frame, mode):
-                time.sleep(1.0)  # Let hardware settle after mode change
-                print(f"{label} ... ✓ OK")
-                ok_count += 1
-                time.sleep(3)  # Display for 3 seconds for visual inspection
-                output.stop()
-                time.sleep(1.0)  # Give hardware time to fully stop
-            else:
-                print(f"{label} ... ✗ FAIL (display_static_frame returned False despite reported support)")
-                fail_count += 1
-
-        except Exception as e:
-            print(f"{mode.name} ... ✗ ERROR: {e}")
-            fail_count += 1
-
-    output.cleanup()
-
-    print(f"\n{ok_count} ok, {skip_count} skipped, {fail_count} failed")
-    return 0 if fail_count == 0 else 1
+@pytest.fixture(scope="module")
+def output_device():
+    out = BlackmagicOutput()
+    assert out.initialize(device_index=0), "Failed to initialise DeckLink device"
+    yield out
+    out.cleanup()
 
 
-if __name__ == "__main__":
-    sys.exit(main())
+def _make_colorbars(width, height):
+    frame = np.zeros((height, width, 3), dtype=np.uint8)
+    bar_width = width // 8
+    colors = [
+        [255, 255, 255], [255, 255, 0], [0, 255, 255], [0, 255, 0],
+        [255, 0, 255], [255, 0, 0], [0, 0, 255], [0, 0, 0],
+    ]
+    for i, color in enumerate(colors):
+        x_start = i * bar_width
+        x_end = min((i + 1) * bar_width, width)
+        frame[:, x_start:x_end] = color
+    return frame
+
+
+@pytest.mark.parametrize("mode", TEST_MODES, ids=lambda m: m.name)
+def test_display_mode(output_device, mode):
+    """Verify display_static_frame succeeds for each supported mode."""
+    if not output_device.is_pixel_format_supported(mode, PixelFormat.BGRA):
+        pytest.skip(f"{mode.name} not supported by this device")
+
+    info = output_device.get_display_mode_info(mode)
+    frame = _make_colorbars(info["width"], info["height"])
+    try:
+        assert output_device.display_static_frame(frame, mode), (
+            f"display_static_frame returned False for {mode.name} despite reported support"
+        )
+        time.sleep(0.5)  # let hardware transmit a few frames before tearing down
+    finally:
+        output_device.stop()
+        time.sleep(0.5)  # let hardware fully stop before the next case
