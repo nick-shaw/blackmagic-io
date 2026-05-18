@@ -168,7 +168,14 @@ if(CMAKE_SYSTEM_NAME STREQUAL "Darwin")
 elseif(CMAKE_SYSTEM_NAME STREQUAL "Windows")
     target_compile_definitions(pixel_reader PRIVATE WIN32_LEAN_AND_MEAN NOMINMAX)
 endif()
+# Set per-config output dirs too: multi-config generators (Visual Studio,
+# Xcode, Ninja Multi-Config) otherwise append a $<CONFIG> subdir to the
+# generic property, landing the binary in tools/Release/ instead of tools/.
 set_target_properties(pixel_reader PROPERTIES
-    RUNTIME_OUTPUT_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}/tools"
+    RUNTIME_OUTPUT_DIRECTORY                "${CMAKE_CURRENT_SOURCE_DIR}/tools"
+    RUNTIME_OUTPUT_DIRECTORY_DEBUG          "${CMAKE_CURRENT_SOURCE_DIR}/tools"
+    RUNTIME_OUTPUT_DIRECTORY_RELEASE        "${CMAKE_CURRENT_SOURCE_DIR}/tools"
+    RUNTIME_OUTPUT_DIRECTORY_RELWITHDEBINFO "${CMAKE_CURRENT_SOURCE_DIR}/tools"
+    RUNTIME_OUTPUT_DIRECTORY_MINSIZEREL     "${CMAKE_CURRENT_SOURCE_DIR}/tools"
 )
 # Deliberately no install() — pixel_reader is a dev tool, not shipped in the wheel.
