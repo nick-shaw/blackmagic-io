@@ -969,12 +969,15 @@ int main(int argc, char** argv)
         goto bail;
     }
 
-    // Determine whether the DeckLink device supports input format detection
-    result = deckLinkAttributes->GetFlag(BMDDeckLinkSupportsInputFormatDetection, &supported);
-    if ((result != S_OK) || (supported == false))
-    {
-        fprintf(stderr, "Device does not support automatic mode detection\n");
-        goto bail;
+    // Determine whether the DeckLink device supports input format detection.
+    // Only required when --mode wasn't supplied — manual mode bypasses detection.
+    if (manualMode == bmdModeUnknown) {
+        result = deckLinkAttributes->GetFlag(BMDDeckLinkSupportsInputFormatDetection, &supported);
+        if ((result != S_OK) || (supported == false))
+        {
+            fprintf(stderr, "Device does not support automatic mode detection (use --mode to specify the mode manually)\n");
+            goto bail;
+        }
     }
 
     // Get the configuration interface and keep it alive
