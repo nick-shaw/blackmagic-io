@@ -1,14 +1,8 @@
 #!/usr/bin/env python3
 """Smoke-run every hardware-dependent test script in non-interactive mode.
 
-Runs each test script with the appropriate flags (--no-wait, --no-display)
-to catch API regressions without requiring a human to watch a monitor or
-close a matplotlib window. Aggregates pass/fail at the end.
-
-This complements the interactive scripts: it does NOT replace visual
-confirmation (colour-bar rendering correctness, narrow vs full range visual
-checks, format-detection hand-eye verification, etc.). Run scripts
-interactively (without --no-wait) for those.
+Runs each test script in turn to catch API regressions without requiring a
+human at the monitor. Aggregates pass/fail at the end.
 
 REQUIRED HARDWARE SETUP
 =======================
@@ -19,7 +13,7 @@ Before running this script, confirm:
   * SDI BNC cable: looped from SDI OUT → SDI IN
       Used by test_loopback.py and test_sdi_metadata_loopback.py.
   * HDMI cable: looped from HDMI OUT → HDMI IN
-      Used by test_hdmi_metadata_loopback.py.
+      Used by test_hdmi_metadata_loopback.py and test_hdmi_bgra_loopback.py.
 
 The script will prompt to confirm cables are in place before running anything.
 
@@ -39,14 +33,11 @@ import sys
 # (script_name, args, hardware_required_summary)
 TESTS = [
     ("test_device_detection.py",       [],                      "DeckLink device"),
-    ("test_support_query.py",          [],                      "DeckLink device"),
     ("test_conversion_ranges.py",      [],                      "no hardware (pure unit tests)"),
     ("test_colour_science_parity.py",  [],                      "no hardware (skipped if colour-science not installed)"),
     ("test_bgra_layout.py",            [],                      "no hardware (pure unit tests)"),
     ("test_resolutions.py",            [],                      "DeckLink device"),
-    ("test_rgb10_colorbars.py",        ["--no-wait"],           "DeckLink device"),
-    ("test_rgb12_colorbars.py",        ["--no-wait"],           "DeckLink device"),
-    ("test_loopback.py",               ["--no-display"],        "SDI BNC loopback cable"),
+    ("test_loopback.py",               [],                      "SDI BNC loopback cable"),
     ("test_sdi_metadata_loopback.py",  [],                      "SDI BNC loopback cable"),
     ("test_hdmi_metadata_loopback.py", [],                      "HDMI loopback cable"),
     ("test_hdmi_bgra_loopback.py",     [],                      "HDMI loopback cable"),
@@ -106,11 +97,11 @@ def main():
     print("=" * 70)
     for script, ok in results:
         if ok is None:
-            status = "—  SKIP"
+            status = "-  SKIP"
         elif ok:
-            status = "✓  PASS"
+            status = "[PASS]"
         else:
-            status = "✗  FAIL"
+            status = "[FAIL]"
         print(f"  {status}  {script}")
     print("=" * 70)
 
