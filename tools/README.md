@@ -20,25 +20,21 @@ This tool reads the incoming signal on a Blackmagic DeckLink device and displays
 
 ## Building
 
-```bash
-make
-```
-
-Works on macOS, Linux, and Windows. The executable lands at `tools/pixel_reader`.
-
-On Windows, `make` isn't part of the standard developer tooling (not in Visual Studio Build Tools, not in Git Bash). Install it separately via one of:
-
-- `choco install make` — if you have [Chocolatey](https://chocolatey.org/install)
-- `winget install GnuWin32.Make` — using the built-in Windows package manager
-- MSYS2 / MinGW — if you already have those
-
-The Visual Studio Build Tools install used for the main library build provides the C++ compiler the Makefile invokes; only `make` itself needs separate installation.
-
-To rebuild from scratch:
+`pixel_reader` is built automatically as part of the main library build. From the repository root:
 
 ```bash
-make clean && make
+pip install -e .
 ```
+
+This runs the project's CMake build, which produces both the Python module and `pixel_reader` as a side effect. The executable lands at `tools/pixel_reader` (or `tools/pixel_reader.exe` on Windows). The same toolchain that compiles the library compiles the tool — no separate installation needed.
+
+For an incremental rebuild without re-running the full pip install, invoke CMake directly against the existing build directory:
+
+```bash
+cmake --build build/<py-tag> --target pixel_reader
+```
+
+Substitute `<py-tag>` with whichever build directory scikit-build-core created (e.g. `cp313-cp313-macosx_13_0_arm64`, `cp314-cp314-win_amd64`).
 
 ## Usage
 
@@ -133,7 +129,7 @@ Note: The buffer format variants (little/big-endian, different packing) are SDK 
 
 - macOS (tested)
 - Linux (untested, but should work)
-- Windows (untested, requires DeckLink SDK and appropriate build tools)
+- Windows (build verified via MSVC + Windows SDK; same toolchain as the main library)
 
 ## Dependencies
 

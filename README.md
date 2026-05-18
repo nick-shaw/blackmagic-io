@@ -29,7 +29,7 @@ Written by Nick Shaw, www.antlerpost.com, with a lot of help from [Claude Code](
 - **HDMI EDID Configuration**: Advertises SDR, HDR PQ, and HDR HLG support over HDMI by default so HDR sources transmit HDR Static Metadata (the SDK default omits HLG); the advertised bitmask is configurable via `set_hdmi_input_dynamic_ranges()`
 
 ### General
-- **Cross-Platform**: Works on Windows, macOS, and Linux (this is in theory – only macOS build fully tested so far)
+- **Cross-Platform**: Works on Windows, macOS, and Linux (mainly tested on macOS; basic Windows testing has confirmed library output and pixel_reader build with hardware; Linux untested with hardware)
 
 ## Requirements
 
