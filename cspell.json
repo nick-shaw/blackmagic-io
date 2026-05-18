@@ -28,6 +28,7 @@
     "codesign",
     "COINIT",
     "colorbars",
+    "comsuppw",
     "colorspace",
     "DeckLink",
     "EDID",
@@ -73,6 +74,7 @@
     "VITC",
     "VPID",
     "YCbCr",
+    "vendored",
     "Yergin",
     "YUV",
     "Zach"

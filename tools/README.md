@@ -46,6 +46,8 @@ Substitute `<py-tag>` with whichever build directory scikit-build-core created (
 
 - `-d <index>`: Select DeckLink device by index (see `-l` for device list). Default: first device with input capability
 - `-i <input>`: Select input connection (sdi, hdmi, optical, component, composite, svideo). Default: uses currently active input on the device
+- `--mode <name>`: Force a specific display mode and disable input format auto-detection. Required on cards that don't claim `BMDDeckLinkSupportsInputFormatDetection` (e.g. older DeckLinks). Supported names: NTSC, PAL, 720p50, 720p59.94, 720p60, 1080i50, 1080i59.94, 1080p25, 1080p29.97, 1080p30, 1080p50, 1080p59.94, 1080p60
+- `-m`: Print all HDR metadata (display primaries, white point, mastering display luminance, content light levels) in addition to the matrix and EOTF
 - `-l`: List all available DeckLink devices with their input capabilities and available inputs
 - `-h`: Show help message
 
@@ -74,6 +76,12 @@ Substitute `<py-tag>` with whichever build directory scikit-build-core created (
 
 # Use device 0, SDI input, read pixel at (100, 200)
 ./pixel_reader -d 0 -i sdi 100 200
+
+# Force 1080i50 mode (disables auto-detection; required on older cards)
+./pixel_reader -i sdi --mode 1080i50
+
+# Print full HDR metadata when present
+./pixel_reader -m
 
 # Show help
 ./pixel_reader -h
@@ -122,7 +130,7 @@ Note: The buffer format variants (little/big-endian, different packing) are SDK 
 
 ### Limitations
 
-- Requires a DeckLink device with input format detection support
+- By default, requires a DeckLink device that claims `BMDDeckLinkSupportsInputFormatDetection`. Older cards without this capability can still be used by passing `--mode <name>` to specify the input mode explicitly.
 - Coordinates must be within the input frame dimensions
 
 ## Platform Support
@@ -133,9 +141,9 @@ Note: The buffer format variants (little/big-endian, different packing) are SDK 
 
 ## Dependencies
 
-- Blackmagic DeckLink SDK 14.1 (included in decklink_sdk directory)
-- C++11 compatible compiler
-- Platform-specific libraries (CoreFoundation on macOS, pthread/dl on Linux, ole32/oleaut32 on Windows)
+- Blackmagic DeckLink SDK 14.1 (vendored under `_vendor/decklink_sdk/`)
+- C++17 compatible compiler (MSVC for Windows, Clang or GCC for macOS / Linux)
+- Platform-specific libraries (CoreFoundation on macOS, pthread/dl on Linux, ole32/oleaut32/comsuppw on Windows)
 
 ## License
 
