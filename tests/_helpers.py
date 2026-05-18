@@ -1,8 +1,8 @@
 """Shared helpers for hardware-dependent test scripts.
 
-Provides common CLI flags and helpers so interactive tests can be run
+Provides a `--no-wait` CLI flag so interactive tests can be run
 non-interactively as smoke tests (catch API-shape regressions without
-requiring a human to watch a monitor or close a matplotlib window).
+requiring a human at the monitor).
 """
 
 import argparse
@@ -22,12 +22,6 @@ def add_test_args(parser=None):
         help="Skip interactive Ctrl+C waits between test phases. Each phase "
              "holds briefly then auto-advances. Use to smoke-test the API "
              "without visual confirmation.",
-    )
-    parser.add_argument(
-        "--no-display",
-        action="store_true",
-        help="Skip matplotlib visual displays of test results. Print the "
-             "pass/fail summary only.",
     )
     return parser
 

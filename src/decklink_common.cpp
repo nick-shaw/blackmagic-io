@@ -13,6 +13,9 @@ namespace DeckLink {
 
 IDeckLinkIterator* CreateDeckLinkIteratorInstance() {
 #ifdef _WIN32
+    // CoCreateInstance requires COM to be initialised on this thread.
+    // S_OK, S_FALSE, and RPC_E_CHANGED_MODE all leave a usable apartment.
+    CoInitializeEx(nullptr, COINIT_MULTITHREADED);
     IDeckLinkIterator* iterator = nullptr;
     HRESULT result = CoCreateInstance(CLSID_CDeckLinkIterator, nullptr, CLSCTX_ALL,
                                      IID_IDeckLinkIterator, (void**)&iterator);

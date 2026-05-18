@@ -22,6 +22,7 @@ Thumbs.db
 
 # Build artifacts
 *.o
+*.obj
 *.a
 *.dylib
 *.dll
@@ -29,6 +30,7 @@ Thumbs.db
 
 # Tools binaries
 tools/pixel_reader
+tools/pixel_reader.exe
 
 # Large images
 *.tiff
@@ -37,6 +39,7 @@ tools/pixel_reader
 
 # Claude
 CLAUDE.md
+.claude/
 
 # Scratch Folder
 scratch/

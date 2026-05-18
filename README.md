@@ -15,21 +15,21 @@ Written by Nick Shaw, www.antlerpost.com, with a lot of help from [Claude Code](
 - **Solid Color Output**: Display solid colors for testing and calibration
 - **Dynamic Updates**: Update currently displayed frame
 - **Multiple Resolutions**: Support for all display modes supported by your DeckLink device (SD, HD, 2K, 4K, 8K, and PC modes)
-- **8 and 10-bit Y'CbCr Output**: 2vuy and v210 (default for uint16/float data)
-- **10 and 12-bit R'G'B' output**: 10 and 12-bit R'G'B' 4:4:4
+- **8 and 10-bit Y'CbCr 4:2:2 output** (`PixelFormat.YUV8`, `PixelFormat.YUV10`; 10-bit is the default for uint16/float input)
+- **8, 10 and 12-bit R'G'B' 4:4:4 output** (`PixelFormat.BGRA`, `PixelFormat.RGB10`, `PixelFormat.RGB12`; 8-bit HDMI only)
 - **HDR Support**: SMPTE ST 2086 / CEA-861.3 HDR static metadata
 - **Y'CbCr matrix control**: Rec.601 (SD only), Rec.709 (HD+), and Rec.2020 (HD+) matrix support
 
 ### Input
 - **Video Capture**: Capture video frames from DeckLink devices
-- **Automatic Format Conversion**: Convert all DeckLink pixel formats to RGB float
+- **Automatic Format Conversion**: Convert all DeckLink pixel formats to R'G'B' float
 - **Format Detection**: Automatic detection of input signal format (resolution, frame rate, colorspace, EOTF)
 - **Metadata Access**: Access to format metadata (pixel format, colorspace, EOTF, source range)
 - **Timecode Capture**: Automatic extraction of embedded timecode (RP188 VITC/LTC/HFRTC)
 - **HDMI EDID Configuration**: Advertises SDR, HDR PQ, and HDR HLG support over HDMI by default so HDR sources transmit HDR Static Metadata (the SDK default omits HLG); the advertised bitmask is configurable via `set_hdmi_input_dynamic_ranges()`
 
 ### General
-- **Cross-Platform**: Works on Windows, macOS, and Linux (this is in theory – only macOS build fully tested so far)
+- **Cross-Platform**: Works on Windows, macOS, and Linux (mainly tested on macOS; basic Windows testing has confirmed library output and pixel_reader build with hardware; Linux untested with hardware)
 
 ## Requirements
 
@@ -76,6 +76,10 @@ To use the library at runtime you also need Blackmagic Desktop Video installed o
 # Clone the repository
 git clone https://github.com/nick-shaw/blackmagic-io.git
 cd blackmagic-io
+
+# Switch to the development branch
+# (main holds released versions; work in progress lives on dev)
+git checkout dev
 
 # Initialize submodules (required for the advanced T-Pat example only)
 git submodule update --init --recursive
@@ -139,7 +143,7 @@ with BlackmagicInput() as input_device:
     # Initialize device (uses first available device)
     input_device.initialize()
 
-    # Capture frame as RGB float array (0.0-1.0 range)
+    # Capture frame as R'G'B' float array (0.0-1.0 range)
     rgb_frame = input_device.capture_frame_as_rgb(timeout_ms=5000)
 
     if rgb_frame is not None:
@@ -189,7 +193,7 @@ with BlackmagicInput() as input_device:
                 print(f"Mastering Luminance: {hdr['mastering_luminance']['max']:.1f} / "
                       f"{hdr['mastering_luminance']['min']:.4f} cd/m²")
 
-        # Access RGB data
+        # Access R'G'B' data
         rgb = frame_data['rgb']  # float32 array (H×W×3)
         # Process frame...
 ```
@@ -277,9 +281,10 @@ Check if a pixel format is supported for a given display mode.
 
 **`display_static_frame(frame_data, display_mode, pixel_format=PixelFormat.YUV10, matrix=None, hdr_metadata=None, input_narrow_range=False, output_narrow_range=True) -> bool`**
 Display a static frame continuously.
-- `frame_data`: NumPy array with image data:
-  - RGB: shape (height, width, 3), dtype uint8 / uint16 / float32 / float64
-  - BGRA: shape (height, width, 4), dtype uint8
+- `frame_data`: NumPy array with image data. Accepted shape and dtype depend on `pixel_format`:
+  - `BGRA` (fast preview): shape (height, width, 3) R'G'B' or (height, width, 4) BGRA; dtype `uint8` only. For float or higher bit depth, use one of the formats below — BGRA is converted to 8-bit Y'CbCr (2vuy) over SDI on tested hardware, so passing higher-precision data here causes double quantisation.
+  - `YUV8`: shape (height, width, 3) R'G'B'; dtype `uint8`, `uint16`, `float32`, or `float64`.
+  - `YUV10` / `RGB10` / `RGB12`: shape (height, width, 3) R'G'B'; dtype `uint16`, `float32`, or `float64`.
 - `display_mode`: Video resolution and frame rate
 - `pixel_format`: Pixel format (default: YUV10, automatically uses BGRA for uint8 data)
 - `matrix`: Optional R'G'B' to Y'CbCr conversion matrix (`Matrix.Rec601`, `Matrix.Rec709` or `Matrix.Rec2020`). Only used with YUV10 format. If not specified, auto-detects based on resolution: SD modes (NTSC, PAL) use Rec.601, HD and higher use Rec.709
@@ -297,7 +302,7 @@ Display a solid color continuously.
   - Float values (0.0-1.0): Interpreted as normalized full range values
 - `display_mode`: Video resolution and frame rate
 - `pixel_format`: Pixel format (default: YUV10)
-- `matrix`: RGB to Y'CbCr conversion matrix (Rec601, Rec709 or Rec2020). Only applies when pixel_format is YUV10. If not specified, auto-detects based on resolution: SD modes (NTSC, PAL) use Rec.601, HD and higher use Rec.709
+- `matrix`: R'G'B' to Y'CbCr conversion matrix (Rec601, Rec709 or Rec2020). Only applies when pixel_format is YUV10. If not specified, auto-detects based on resolution: SD modes (NTSC, PAL) use Rec.601, HD and higher use Rec.709
 - `hdr_metadata`: Optional HDR metadata dict with 'eotf' (and optional 'static_metadata') keys
 - `input_narrow_range`: Whether to interpret integer `color` values as narrow range (float is always interpreted as full range). Default: False
 - `output_narrow_range`: Whether to output a narrow range signal. Default: True
@@ -391,48 +396,66 @@ Immediately activates capture mode, which will:
 
 **Performance Note:** Requesting `PixelFormat.BGRA` enables real-time ~25fps preview by having the hardware deliver 8-bit BGRA frames directly, avoiding expensive colorspace conversions. This is ideal for monitoring and preview workflows. For quality capture workflows, use the default YUV10 format (or explicitly specify it) to capture full 10-bit precision, then use `capture_frame_as_rgb()` or `capture_frame_with_metadata()` for processing.
 
-**`capture_frame_as_uint8(timeout_ms=5000, input_narrow_range=True) -> Optional[np.ndarray]`**
-Capture a single frame and convert to RGB uint8 (faster than float conversion).
+**`capture_frame_as_uint8(timeout_ms=5000, input_narrow_range=True, output_narrow_range=False) -> Optional[np.ndarray]`**
+Capture a single frame and convert to R'G'B' uint8 (faster than float conversion).
 - `timeout_ms`: Timeout in milliseconds (default: 5000)
 - `input_narrow_range`: Whether input uses narrow range encoding (default: True)
-- Returns: RGB uint8 array (H×W×3) with values 0-255, or None if timeout/no signal
-- Automatically converts from any DeckLink pixel format to RGB
+- `output_narrow_range`: If False (default), output uint8 is full range (0-255, "ready to display"). If True, output is narrow-range R'G'B' (16-235 per channel) — useful when feeding the result to further video processing that expects narrow-range conventions.
+- Returns: R'G'B' uint8 array (H×W×3), or None if timeout/no signal
+- Automatically converts from any DeckLink pixel format to R'G'B'
 - Faster than `capture_frame_as_rgb()` due to uint8 output, ideal for preview workflows
+- When the capture was initialised with `pixel_format=PixelFormat.BGRA` and the SDK delivers 10-bit R'G'B' (the typical case for 8-bit R'G'B' sources on HDMI), the library automatically right-shifts each channel by 2 to recover the exact 8-bit values before applying any range conversion.
 
-**`capture_frame_as_uint8_with_metadata(timeout_ms=5000, input_narrow_range=True) -> Optional[dict]`**
-Capture a frame as RGB uint8 with format metadata (fast preview with metadata access).
+**`capture_frame_as_uint8_with_metadata(timeout_ms=5000, input_narrow_range=True, output_narrow_range=False) -> Optional[dict]`**
+Capture a frame as R'G'B' uint8 with format metadata (fast preview with metadata access).
 - `timeout_ms`: Timeout in milliseconds (default: 5000)
 - `input_narrow_range`: Whether input uses narrow range encoding (default: True)
+- `output_narrow_range`: If False (default), output uint8 is full range (0-255). If True, output is narrow-range R'G'B' (16-235 per channel).
 - Returns: Dictionary with frame data and metadata, or None if timeout/no signal
 
 Dictionary keys:
-- `'rgb'`: RGB uint8 array (H×W×3), values 0-255
+- `'rgb'`: R'G'B' uint8 array (H×W×3)
 - `'width'`: Frame width in pixels
 - `'height'`: Frame height in pixels
 - `'format'`: Pixel format name (e.g., "YUV10", "RGB10")
 - `'mode'`: Display mode name (e.g., "HD1080p25")
 - `'colorspace'`: Color matrix name (e.g., "Rec709", "Rec2020")
 - `'eotf'`: Transfer function name (e.g., "SDR", "PQ", "HLG")
-- `'input_narrow_range'`: Boolean indicating if input was narrow range
+- `'input_narrow_range'`: Boolean indicating the input range used for conversion
+- `'output_narrow_range'`: Boolean indicating the output range applied
 - `'hdr_metadata'`: Dictionary with HDR metadata (only present if HDR metadata is in the signal)
   - Same structure as `capture_frame_with_metadata()` below
 
 This function combines the performance of `capture_frame_as_uint8()` with metadata access, making it ideal for real-time preview applications that need to detect signal changes (resolution, colorspace, EOTF) without the overhead of float conversion.
 
-**`capture_frame_as_rgb(timeout_ms=5000) -> Optional[np.ndarray]`**
-Capture a single frame and convert to RGB.
+**`capture_frame_as_uint16(timeout_ms=5000, input_narrow_range=True, output_narrow_range=False) -> Optional[np.ndarray]`**
+Capture a single frame and convert to R'G'B' uint16 (preserves native bit depth of the source).
 - `timeout_ms`: Timeout in milliseconds (default: 5000)
-- Returns: RGB float32 array (H×W×3) with values 0.0-1.0, or None if timeout/no signal
-- Automatically converts from any DeckLink pixel format to RGB
-- Output is always full range (0.0-1.0)
+- `input_narrow_range`: Whether input uses narrow range encoding (default: True)
+- `output_narrow_range`: If False (default), output uint16 is full range (0-65535 scaled). If True, output is narrow-range R'G'B' (10-bit narrow codes LSB-padded to 16-bit: 4096-60160).
+- Returns: R'G'B' uint16 array (H×W×3), or None if timeout/no signal
+- Higher-precision counterpart to `capture_frame_as_uint8()`. 10-bit (RGB10 / YUV10) and 12-bit (RGB12) sources keep their native precision in the uint16 result. 8-bit sources (BGRA, or RGB10-delivered-as-BGRA) are LSB-padded via `<< 8` — `0xff` maps to `0xff00`, so the underlying precision is still 8-bit even though the dtype is uint16.
 
-**`capture_frame_with_metadata(timeout_ms=5000) -> Optional[dict]`**
+**`capture_frame_as_uint16_with_metadata(timeout_ms=5000, input_narrow_range=True, output_narrow_range=False) -> Optional[dict]`**
+Capture a frame as R'G'B' uint16 with format metadata. Higher-precision counterpart to `capture_frame_as_uint8_with_metadata()`; see that method for the per-key dictionary structure (only the `'rgb'` value's dtype changes from uint8 to uint16). See `capture_frame_as_uint16()` above for notes on bit-depth handling per source format.
+
+**`capture_frame_as_rgb(timeout_ms=5000, input_narrow_range=True) -> Optional[np.ndarray]`**
+Capture a single frame and convert to R'G'B'.
+- `timeout_ms`: Timeout in milliseconds (default: 5000)
+- `input_narrow_range`: Whether input uses narrow range encoding (default: True)
+- Returns: R'G'B' float32 array (H×W×3) mapped to 0.0-1.0 (legal black to legal white per `input_narrow_range`), or None if timeout/no signal
+- Automatically converts from any DeckLink pixel format to R'G'B'
+- When the capture was initialised with `pixel_format=PixelFormat.BGRA` and the SDK delivers 10-bit R'G'B' (the typical case for 8-bit R'G'B' sources on HDMI), the library automatically right-shifts each channel by 2 to recover the exact 8-bit values before float conversion. This avoids the small precision error that comes from decoding LSB-padded 8-bit content as if it were native 10-bit.
+
+**`capture_frame_with_metadata(timeout_ms=5000, input_narrow_range=True) -> Optional[dict]`**
 Capture a frame with format metadata.
 - `timeout_ms`: Timeout in milliseconds (default: 5000)
+- `input_narrow_range`: Whether input uses narrow range encoding (default: True)
 - Returns: Dictionary with frame data and metadata, or None if timeout/no signal
+- BGRA-requested handling: same automatic right-shift as `capture_frame_as_rgb()` above.
 
 Dictionary keys:
-- `'rgb'`: RGB float32 array (H×W×3), values 0.0-1.0
+- `'rgb'`: R'G'B' float32 array (H×W×3), values 0.0-1.0
 - `'width'`: Frame width in pixels
 - `'height'`: Frame height in pixels
 - `'format'`: Pixel format name (e.g., "YUV10", "RGB10")
@@ -578,7 +601,7 @@ class OutputInfo:
     width: int                        # Frame width in pixels
     height: int                       # Frame height in pixels
     framerate: float                  # Frame rate (e.g., 25.0, 29.97, 60.0)
-    rgb444_mode_enabled: bool         # Whether RGB 4:4:4 mode is enabled
+    rgb444_mode_enabled: bool         # Whether R'G'B' 4:4:4 mode is enabled
     display_mode_name: str            # Human-readable display mode name
     pixel_format_name: str            # Human-readable pixel format name
 ```
@@ -948,7 +971,7 @@ with BlackmagicOutput() as output:
 
 **`PixelFormat`**
 - `BGRA`: 8-bit BGRA (automatically used for uint8 data)
-  - **Note**: Over SDI, BGRA data is output as narrow range 8-bit Y'CbCr 4:2:2, not RGB. The BGRA name refers to the input buffer format, not the SDI wire format.
+  - **Note**: Over SDI, BGRA data is output as narrow range 8-bit Y'CbCr 4:2:2, not R'G'B'. The BGRA name refers to the input buffer format, not the SDI wire format.
 - `YUV8`: 8-bit Y'CbCr 4:2:2 (2vuy) - direct 8-bit Y'CbCr output
   - uint8 input: Configurable interpretation via `input_narrow_range` parameter
   - uint16 input: Configurable interpretation via `input_narrow_range` parameter
@@ -975,9 +998,9 @@ with BlackmagicOutput() as output:
 
 - **YUV10**: The library can encode full range Y'CbCr (0-1023) with `output_narrow_range=False`, but cannot set the full range flag in the VPID. Downstream devices may well assume narrow range.
 
-- **RGB10**: The convention is that 10-bit RGB is narrow range, as described in the Blackmagic SDK, so using `output_narrow_range=False` may cause downstream devices to misinterpret the signal.
+- **RGB10**: The convention is that 10-bit R'G'B' is narrow range, as described in the Blackmagic SDK, so using `output_narrow_range=False` may cause downstream devices to misinterpret the signal.
 
-- **RGB12**: The convention is that 12-bit RGB is full range, as described in the Blackmagic SDK, so using `output_narrow_range=True` may cause downstream devices to misinterpret the signal.
+- **RGB12**: The convention is that 12-bit R'G'B' is full range, as described in the Blackmagic SDK, so using `output_narrow_range=True` may cause downstream devices to misinterpret the signal.
 
 The `output_narrow_range` parameter controls the **actual encoded values** in the output stream, not metadata signaling. Use it when you know the downstream device will correctly interpret the range, or when the receiving device allows manual range configuration.
 
@@ -1205,7 +1228,7 @@ with BlackmagicOutput() as output:
 
 ### Example 6: 8-bit BGRA Output
 
-For simple applications or quick testing, 8-bit RGB data can be used directly without conversion to float or uint16. Note that 8-bit data is always treated as full range RGB input and output as narrow range 8-bit Y'CbCr 4:2:2 over SDI.
+For simple applications or quick testing, 8-bit R'G'B' data can be used directly without conversion to float or uint16. Note that 8-bit data is always treated as full range R'G'B' input and output as narrow range 8-bit Y'CbCr 4:2:2 over SDI.
 
 ```python
 import numpy as np
@@ -1540,11 +1563,60 @@ All 14 SMPTE ST 2086 / CEA-861.3 HDR static metadata fields are supported:
 2. **Low-level API call order**: When using the low-level API, `set_hdr_metadata()` must be called before `setup_output()`
 3. **Frame-level metadata**: Metadata is embedded in every video frame, not set globally
 4. **Matrix consistency**: When using the simplified API, the same `matrix` parameter is used for both metadata and R'G'B' →Y'CbCr conversion. With the low-level API, ensure consistency between `set_hdr_metadata()` and conversion functions.
-5. **Transfer function**: The library only sets the metadata - you must apply the actual transfer function (PQ / HLG curve) to your RGB data before conversion
+5. **Transfer function**: The library only sets the metadata - you must apply the actual transfer function (PQ / HLG curve) to your R'G'B' data before conversion
 6. **All 14 metadata fields supported**: The library implements all SMPTE ST 2086 / CEA-861.3 HDR metadata fields including display primaries, white point, mastering display luminance, and content light levels
 7. **Matrix / Resolution restrictions**:
    - **Rec.601** is only supported for SD display modes (NTSC, PAL, etc.) and is the only matrix supported for SD
    - **Rec.709** and **Rec.2020** are only supported for HD and higher resolutions (720p, 1080p, 2K, 4K, 8K, etc.)
+8. **HLG static metadata is suppressed on transmit by the Blackmagic SDK**: When EOTF is HLG, the SDK transmits zero values for all HDR static metadata fields (display primaries, white point, mastering display luminance, MaxCLL, MaxFALL) over HDMI, even when populated explicitly via `set_hdr_static_metadata()`. The receive side reads non-zero values faithfully when present in an incoming HLG signal, so the suppression is transmit-side, not receive-side. SDI conveys HDR static metadata via SMPTE ST 2108 ANC packets (separate from VPID, which carries only EOTF and matrix); the S2108 path is used for PQ. For HLG on SDI, the static metadata is not present in the captured signal. This is consistent with the view that HLG is display-referred but stricter than CTA-861.3 permits. See HDMI Input Notes for details.
+
+## HDMI Input Notes
+
+This section documents behaviour observed on tested hardware (DeckLink UltraStudio 4K Mini) for HDMI input capture. SDI input is generally more deterministic; the notes below apply specifically to the HDMI path.
+
+### EDID is partially controllable
+
+The permutations of EDID negotiation between source and sink mean there is always some degree of uncertainty with HDMI capture; you should test your own setup to confirm behaviour.
+
+The DeckLink HDMI input advertises an EDID to source devices. The library writes the dynamic-range advertisement to enable SDR + HDR PQ + HLG (the SDK default omits HLG). Other EDID parameters are not exposed through the SDK and are therefore not available in this library.
+
+### Format detection at cold start
+
+Connect your source before starting capture for reliable format detection. The SDK's wire-format auto-detection runs cleanly at the start of a capture session and identifies the input as Y'CbCr or R'G'B' based on the source's HDMI signalling.
+
+### Some mid-stream source switches are not detected
+
+Most wire-format changes during an active capture — Y'CbCr ↔ R'G'B' transitions within the HDMI signalling protocol — are detected correctly by the SDK and the capture format updates accordingly.
+
+The exception is the HDMI ↔ DVI **protocol** switching exposed in the AJA Control Panel for AJA devices. On tested hardware the HDMI → DVI direction is not reliably detected — the SDK continues to interpret incoming bytes in the previous format until capture is restarted. The reverse direction (DVI → HDMI) is detected correctly. If you switch source protocol mid-capture, stop and restart capture.
+
+### 8-bit R'G'B' sources arrive as 10-bit R'G'B' with LSB padding
+
+Sources sending 8-bit R'G'B' over HDMI (DVI computer signals, AJA devices configured for DVI output in the AJA Control Panel, etc.) arrive as 10-bit R'G'B' with the source's 8-bit values in the high 8 bits and zero LSBs. No information is lost; this is a faithful representation.
+
+The maximum reachable 10-bit value from an 8-bit source is 1020 (= 255 × 4), not 1023. Naively treating LSB-padded 8-bit content as native 10-bit (dividing by 1023) gives values systematically ~0.3% lower than the equivalent 8-bit code divided by 255 — at every non-zero point, not just at peak. `(x<<2)/1023 ≠ x/255` for any `x` except zero; the two denominators are just incompatible.
+
+When the user requests `pixel_format=PixelFormat.BGRA` at `start_capture`, the library handles this automatically: each channel is right-shifted by 2 before float conversion (÷ 255) or uint8 extraction, so `capture_frame_as_rgb` and `capture_frame_as_uint8` recover the exact 0.0–1.0 (or 0–255) mapping for content originating from 8-bit.
+
+### BGRA capture and the hardware conversion assumption
+
+When capturing with `pixel_format=PixelFormat.BGRA`, the SDK on tested hardware delivers actual BGRA frames only when the source is Y'CbCr — performing the matrix conversion **and** range expansion in hardware, yielding full-range 8-bit BGRA. (R'G'B' sources are delivered as 10-bit R'G'B' regardless of what was requested; see the previous section for how the library handles that case.) The library therefore treats BGRA-delivered bytes as full range and applies any `input_narrow_range`-related conversion accordingly (`input_narrow_range` describes the wire signal, not the bytes the library receives). This matches observed behaviour on tested hardware but isn't a documented SDK guarantee; if a future driver or hardware delivered narrow-range BGRA from a Y'CbCr source, output from `capture_frame_as_uint8` / `capture_frame_as_rgb` would be slightly compressed.
+
+**Caveat — full-range Y'CbCr sources: behaviour unverified.** The SDK's hardware Y'CbCr → BGRA conversion has been observed to assume narrow range (64-940 luma in 10-bit mapped to 0-255 BGRA) with the conventional broadcast Y'CbCr sources we tested. Whether the SDK reads the HDMI AVI InfoFrame's YCC Quantization Range (YQ) field and handles correctly-flagged full-range Y'CbCr sources (e.g. computer GPU output configured for Y'CbCr-Full, certain pattern generators) differently is untested and unknown at this time. If YQ is ignored, full-range Y'CbCr values outside 64-940 would be clipped in hardware (0-63 → 0, 941-1023 → 255) before the library sees the frame; no software-side `input_narrow_range=False` could recover those values. To be safe with potentially full-range Y'CbCr sources, capture as `PixelFormat.YUV10` or `PixelFormat.YUV8` instead of `PixelFormat.BGRA` and convert with `input_narrow_range=False` at the library level — that path preserves the original code values regardless of how the hardware interprets YQ.
+
+**Caveat — narrow-range sub-blacks and super-whites are lost in BGRA.** Narrow-range Y'CbCr legitimately carries codes below 64 (sub-blacks, footroom) and above 940 (super-whites, headroom). The SDK's narrow-assumed Y'CbCr → BGRA conversion clips these to 0 or 255 at the BGRA output. If you then request `output_narrow_range=True` to recover an 8-bit R'G'B' representation, the nominal 16-235 range round-trips faithfully but the sub-black region (codes 0-15) and super-white region (236-255) will be empty — that signal was lost in hardware. Less serious than the full-range case (nominal content is preserved), but if you need to retain footroom/headroom information, capture as `PixelFormat.YUV10` or `PixelFormat.YUV8` and convert in software.
+
+### Y'CbCr → BGRA hardware conversion honours signalled matrix metadata
+
+When capturing as BGRA from a Y'CbCr source, the SDK's hardware Y'CbCr → R'G'B' conversion uses the matrix coefficients (Rec.601, Rec.709, or Rec.2020) signalled in the source's frame metadata. Verified via SDI and HDMI loopback with Rec.709 and Rec.2020 sources. Applications working with BGRA captures don't need to apply their own matrix conversion.
+
+### HLG static metadata: faithful on receive, suppressed on Blackmagic transmit
+
+The Blackmagic SDK reports HDR static metadata faithfully from HLG sources over HDMI. When an HLG source transmits a populated HDR Static Metadata InfoFrame — Rec.2020 primaries, D65 white point, mastering display luminance — those values arrive on the capture side intact. MaxCLL and MaxFALL may legitimately be zero for HLG content even when the other fields are populated, since HLG is display-referred. If you need mastering display information from an HLG source, the receive side will not strip it.
+
+However, when this library — or anything else built on the Blackmagic SDK — transmits HLG over HDMI, the SDK suppresses HDR static metadata. Even populating an `HdrStaticMetadata` struct explicitly via `set_hdr_static_metadata()` produces zero values on the wire, as confirmed by Blackmagic-to-Blackmagic loopback. If you capture HLG and the source is a Blackmagic-SDK-based transmitter, you will see all-zero static metadata. The behaviour is consistent with the view that HLG is display-referred and does not require mastering display information at the receiver, but it is stricter than CTA-861.3 permits.
+
+SDI uses a different mechanism: HDR static metadata is conveyed via SMPTE ST 2108 ANC packets, separate from VPID (which carries only colorimetric descriptors like EOTF and matrix). The S2108 path is used for PQ. For HLG on SDI, the static metadata is not present in the captured signal — only EOTF and matrix come through.
 
 ## Troubleshooting
 
@@ -1592,7 +1664,7 @@ This will show available devices and let you test various output modes.
 
 ### pixel_reader
 
-The `pixel_reader` tool captures and analyzes video input from a DeckLink device, displaying pixel values and metadata. This is useful for verifying output from the library by looping a DeckLink output back to its own input.
+The `pixel_reader` tool captures and analyses video input from a DeckLink device, displaying pixel values and metadata. This is useful for verifying output from the library by looping a DeckLink output back to its own input.
 
 **Build:**
 ```bash
@@ -1607,7 +1679,7 @@ make
 See `tools/README.md` for more detail.
 
 The tool displays:
-- **Pixel format** and **color space** (RGB 4:4:4, YCbCr 4:2:2, etc.)
+- **Pixel format** and **color space** (R'G'B' 4:4:4, Y'CbCr 4:2:2, etc.)
 - **Resolution** and **frame rate**
 - **Metadata**: EOTF (SDR / PQ / HLG), matrix (Rec.601 / Rec.709 / Rec.2020)
 - **Pixel values** at selected coordinates in native format (code values)

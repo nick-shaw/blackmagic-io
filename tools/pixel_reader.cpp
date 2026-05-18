@@ -52,17 +52,26 @@
 #elif defined(_WIN32)
     #include <windows.h>
     #include <comutil.h>
-    #include "DeckLinkAPI.h"
+    #include <string.h>
+    #include "DeckLinkAPI_h.h"
     typedef int32_t INT32;
     typedef uint32_t UINT32;
     typedef uint8_t UINT8;
     typedef uint16_t UINT16;
     typedef int64_t INT64;
     typedef uint64_t UINT64;
-    typedef bool BOOL;
+    // BOOL is provided by <windows.h>; do not redefine.
+    #define strcasecmp _stricmp
 
     #define Initialize() CoInitialize(NULL)
-    #define GetDeckLinkIterator(iter) CoCreateInstance(CLSID_CDeckLinkIterator, NULL, CLSCTX_ALL, IID_IDeckLinkIterator, (void**)iter)
+    // CoCreateInstance returns HRESULT; the callers check the macro result for NULL like a
+    // pointer (matching the Mac/Linux convention). Make this macro evaluate to the iterator
+    // pointer on success (or NULL on failure) so those checks behave the same on Windows.
+    #define GetDeckLinkIterator(iter) ( \
+        SUCCEEDED(CoCreateInstance(CLSID_CDeckLinkIterator, NULL, CLSCTX_ALL, IID_IDeckLinkIterator, (void**)iter)) \
+            ? *(iter) \
+            : (*(iter) = NULL) \
+    )
     #define STRINGOBJ BSTR
     #define STRINGFREE(s) SysFreeString(s)
 
@@ -410,7 +419,12 @@ public:
                 printf("10-bit");
             if (detectedSignalFlags & bmdDetectedVideoInput12BitDepth)
                 printf("12-bit");
-            printf("\x1b[K\n\n");  // Clear to end of line
+            printf("\x1b[K\n");  // Clear to end of line
+
+            printf("  Detection flags: 0x%llx\x1b[K\n",
+                   (unsigned long long)detectedSignalFlags);
+            printf("  Requested pixel format: %s\x1b[K\n\n",
+                   GetPixelFormatName(currentPixelFormat));
         }
 
         // Check if the video mode has changed
@@ -433,7 +447,11 @@ public:
         m_deckLinkInput->PauseStreams();
 
         // Enable video input with the properties of the new video stream
-        m_deckLinkInput->EnableVideoInput(newDisplayMode->GetDisplayMode(), currentPixelFormat, bmdVideoInputEnableFormatDetection);
+        HRESULT enableResult = m_deckLinkInput->EnableVideoInput(newDisplayMode->GetDisplayMode(), currentPixelFormat, bmdVideoInputEnableFormatDetection);
+        if (enableResult != S_OK) {
+            fprintf(stderr, "EnableVideoInput failed for %s - result = 0x%08x\n",
+                    GetPixelFormatName(currentPixelFormat), (unsigned int)enableResult);
+        }
 
         // Flush any queued video frames
         m_deckLinkInput->FlushStreams();
@@ -642,7 +660,7 @@ public:
                     }
                 }
 
-                printf("\n\x1b[%dA", numLines);
+                printf("\n\x1b[J\x1b[%dA", numLines);
                 fflush(stdout);
             }
         }
@@ -650,12 +668,46 @@ public:
     }
 };
 
+// Mode name → BMDDisplayMode lookup used by the --mode flag.
+// When --mode is supplied, format auto-detection is disabled and the SDK is
+// asked for the exact mode. Required for cards without input format detection
+// (e.g. older DeckLinks); also useful for forcing a known mode on any card.
+struct ModeName { const char* name; BMDDisplayMode mode; };
+static const ModeName kModeNames[] = {
+    {"NTSC",       bmdModeNTSC},
+    {"PAL",        bmdModePAL},
+    {"720p50",     bmdModeHD720p50},
+    {"720p59.94",  bmdModeHD720p5994},
+    {"720p60",     bmdModeHD720p60},
+    {"1080i50",    bmdModeHD1080i50},
+    {"1080i59.94", bmdModeHD1080i5994},
+    {"1080p25",    bmdModeHD1080p25},
+    {"1080p29.97", bmdModeHD1080p2997},
+    {"1080p30",    bmdModeHD1080p30},
+    {"1080p50",    bmdModeHD1080p50},
+    {"1080p59.94", bmdModeHD1080p5994},
+    {"1080p60",    bmdModeHD1080p6000},
+};
+
+static BMDDisplayMode lookup_mode(const char* name) {
+    for (size_t i = 0; i < sizeof(kModeNames) / sizeof(kModeNames[0]); ++i) {
+        if (strcasecmp(name, kModeNames[i].name) == 0) {
+            return kModeNames[i].mode;
+        }
+    }
+    return bmdModeUnknown;
+}
+
 void print_usage(const char* programName) {
     printf("Usage: %s [options] [x y]\n", programName);
     printf("Options:\n");
     printf("  -d <index>    Select DeckLink device by index (0-based, default: first with input capability)\n");
     printf("  -i <input>    Select input connection: sdi, hdmi, optical, component, composite, svideo\n");
     printf("                (default: uses currently active input)\n");
+    printf("  --mode <name> Force a specific display mode and disable input format auto-detection.\n");
+    printf("                Required on cards that don't support format detection (e.g. older DeckLinks).\n");
+    printf("                Supported names: NTSC, PAL, 720p50, 720p59.94, 720p60, 1080i50, 1080i59.94,\n");
+    printf("                1080p25, 1080p29.97, 1080p30, 1080p50, 1080p59.94, 1080p60.\n");
     printf("  -m            Print all HDR metadata (primaries, white point, mastering display, content light)\n");
     printf("  -l            List available DeckLink devices and exit\n");
     printf("  -h            Show this help message\n");
@@ -667,6 +719,7 @@ void print_usage(const char* programName) {
     printf("  %s 100 200              # Use first input device, read pixel at (100, 200)\n", programName);
     printf("  %s -d 1 100 200         # Use second device, read pixel at (100, 200)\n", programName);
     printf("  %s -i hdmi              # Use HDMI input\n", programName);
+    printf("  %s --mode 1080i50       # Force 1080i50 (disables auto-detection)\n", programName);
     printf("  %s -m                   # Print all HDR metadata\n", programName);
     printf("  %s -d 0 -i sdi 100 200  # Use first device, SDI input, pixel at (100, 200)\n", programName);
     printf("  %s -l                   # List all devices\n", programName);
@@ -754,8 +807,9 @@ int main(int argc, char** argv)
 {
     int deviceIndex = -1;  // -1 means auto-select first input capable device
     bool listDevicesFlag = false;
-    BMDVideoConnection inputConnection = 0;  // 0 means use current/default input
+    BMDVideoConnection inputConnection = (BMDVideoConnection)0;  // 0 means use current/default input
     const char* inputConnectionStr = NULL;
+    BMDDisplayMode manualMode = bmdModeUnknown;  // bmdModeUnknown = use format auto-detection
 
     // Parse command line arguments
     int argIndex = 1;
@@ -800,6 +854,20 @@ int main(int argc, char** argv)
             } else if (strcmp(argv[argIndex], "-m") == 0) {
                 printHDRMetadata = true;
                 argIndex++;
+            } else if (strcmp(argv[argIndex], "--mode") == 0) {
+                if (argIndex + 1 < argc) {
+                    manualMode = lookup_mode(argv[argIndex + 1]);
+                    if (manualMode == bmdModeUnknown) {
+                        fprintf(stderr, "Error: Unknown display mode '%s'\n", argv[argIndex + 1]);
+                        fprintf(stderr, "Run with -h for the list of supported mode names.\n");
+                        return 1;
+                    }
+                    argIndex += 2;
+                } else {
+                    fprintf(stderr, "Error: --mode requires a mode name\n");
+                    print_usage(argv[0]);
+                    return 1;
+                }
             } else if (strcmp(argv[argIndex], "-l") == 0) {
                 listDevicesFlag = true;
                 argIndex++;
@@ -901,12 +969,15 @@ int main(int argc, char** argv)
         goto bail;
     }
 
-    // Determine whether the DeckLink device supports input format detection
-    result = deckLinkAttributes->GetFlag(BMDDeckLinkSupportsInputFormatDetection, &supported);
-    if ((result != S_OK) || (supported == false))
-    {
-        fprintf(stderr, "Device does not support automatic mode detection\n");
-        goto bail;
+    // Determine whether the DeckLink device supports input format detection.
+    // Only required when --mode wasn't supplied — manual mode bypasses detection.
+    if (manualMode == bmdModeUnknown) {
+        result = deckLinkAttributes->GetFlag(BMDDeckLinkSupportsInputFormatDetection, &supported);
+        if ((result != S_OK) || (supported == false))
+        {
+            fprintf(stderr, "Device does not support automatic mode detection (use --mode to specify the mode manually)\n");
+            goto bail;
+        }
     }
 
     // Get the configuration interface and keep it alive
@@ -975,8 +1046,16 @@ int main(int argc, char** argv)
         goto bail;
     }
 
-    // Enable video input with a default video mode and the automatic format detection feature enabled
-    result = deckLinkInput->EnableVideoInput(bmdModeNTSC, bmdFormat10BitYUV, bmdVideoInputEnableFormatDetection);
+    // Enable video input. When --mode wasn't supplied, ask the SDK to auto-detect the
+    // incoming format. When --mode was supplied, request that exact mode without detection
+    // (some older cards don't support input format detection).
+    {
+        BMDDisplayMode startMode = (manualMode == bmdModeUnknown) ? bmdModeNTSC : manualMode;
+        BMDVideoInputFlags inputFlags = (manualMode == bmdModeUnknown)
+            ? bmdVideoInputEnableFormatDetection
+            : bmdVideoInputFlagDefault;
+        result = deckLinkInput->EnableVideoInput(startMode, bmdFormat10BitYUV, inputFlags);
+    }
     if (result != S_OK)
     {
         fprintf(stderr, "Could not enable video input - result = %08x\n", (unsigned int)result);

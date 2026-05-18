@@ -16,19 +16,15 @@ pytestmark = pytest.mark.hardware
 def test_device_enumeration():
     """Test device enumeration"""
     print("Testing device enumeration...")
-    
+
     output = BlackmagicOutput()
     devices = output.get_available_devices()
-    
+
     print(f"Found {len(devices)} DeckLink devices:")
     for i, device in enumerate(devices):
         print(f"  {i}: {device}")
-    
-    if len(devices) == 0:
-        print("No DeckLink devices found. This is expected if no hardware is connected.")
-        return False
-    else:
-        return True
+
+    assert len(devices) > 0, "No DeckLink devices found"
 
 def test_display_modes(max_modes=5):
     """Test available display modes for each device
