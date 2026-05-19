@@ -22,13 +22,15 @@ Written by Nick Shaw, www.antlerpost.com, with a lot of help from [Claude Code](
 
 ### Input
 - **Video Capture**: Capture video frames from DeckLink devices
-- **Automatic Format Conversion**: Convert all DeckLink pixel formats to R'G'B' float
-- **Format Detection**: Automatic detection of input signal format (resolution, frame rate, colorspace, EOTF)
-- **Metadata Access**: Access to format metadata (pixel format, colorspace, EOTF, source range)
+- **Automatic Format Conversion**: Convert all DeckLink pixel formats to R'G'B' float, uint16 or uint8 (for fast preview path)
+- **Format Detection**: Automatic detection of signal properties (resolution, frame rate, pixel format / bit depth)
+- **Metadata Access**: Access to signal metadata (Y'CbCr matrix, EOTF, HDR static metadata when present)
+- **Range Interpretation**: Explicit user-specified narrow/full range parameters on every input and output conversion path, with correct mapping between range conventions. The DeckLink SDK does not surface source signal range via metadata, so the library defers to the caller rather than guessing.
 - **Timecode Capture**: Automatic extraction of embedded timecode (RP188 VITC/LTC/HFRTC)
 - **HDMI EDID Configuration**: Advertises SDR, HDR PQ, and HDR HLG support over HDMI by default so HDR sources transmit HDR Static Metadata (the SDK default omits HLG); the advertised bitmask is configurable via `set_hdmi_input_dynamic_ranges()`
 
 ### General
+- **Device Enumeration**: List connected DeckLink devices with their names and capabilities
 - **Cross-Platform**: Works on Windows, macOS, and Linux (mainly tested on macOS; basic Windows testing has confirmed library output and pixel_reader build with hardware; Linux untested with hardware)
 
 ## Requirements
