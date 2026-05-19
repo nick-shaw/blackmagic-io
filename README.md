@@ -1006,6 +1006,12 @@ with BlackmagicOutput() as output:
 
 The `output_narrow_range` parameter controls the **actual encoded values** in the output stream, not metadata signaling. Use it when you know the downstream device will correctly interpret the range, or when the receiving device allows manual range configuration.
 
+#### SDI sync-code clamping (SDI only)
+
+Independent of the range-signalling question above, SDI 10-bit reserves code values 0-3 and 1020-1023 for sync words (per SMPTE ST 425-1), so the legal active-video range on the SDI wire is 4-1019. If you drive an SDI output with the canonical full-range extents — for example float `1.0` → wire code 1023 — the SDI hardware clamps the wire to 1019 (and 0 to 4) before transmission. A loopback capture from such a signal returns `round(1019/1023 × 65535) = 65279` for full white and `round(4/1023 × 65535) = 256` for full black, rather than the canonical 65535 / 0.
+
+This is a property of the SDI link itself, not the library. **HDMI is unaffected**: the HDMI (TMDS / FRL) transport carries sync information in separate periods rather than reserved code values, so the full active codespace (0-1023 for 10-bit, 0-4095 for 12-bit) is preserved end-to-end. Verified empirically by `tests/test_hdmi_full_range_round_trip.py`: full white over HDMI round-trips bit-exact to captured uint16 65535. If you need the full extents preserved on the wire, use HDMI; if you must use SDI, expect the wire-level clamp.
+
 **`Matrix`** (High-level API)
 - `Rec709`: ITU-R BT.709 R'G'B' to Y'CbCr conversion matrix (standard HD)
 - `Rec2020`: ITU-R BT.2020 R'G'B' to Y'CbCr conversion matrix (wide color gamut for HDR)
@@ -1702,6 +1708,26 @@ Use this tool to verify that matrix and EOTF metadata are being set correctly by
 - Requires build-essential package
 - May need to configure udev rules for device access
 - Some distributions require additional video group membership
+
+## Running the Tests
+
+The test suite lives in `tests/` and is run with pytest:
+
+```bash
+pytest tests/                    # everything (skips hardware tests if no DeckLink)
+pytest tests/ -m "not hardware"  # non-hardware tests only (math, byte layouts, etc.)
+pytest tests/ -m "hardware"      # hardware loopback tests only
+```
+
+The non-hardware tests run anywhere — they exercise the C++ conversion functions, byte ordering, range helpers, and similar pure-software paths. CI runs these on every push across macOS, Linux, and Windows.
+
+The hardware loopback tests require:
+
+- A DeckLink device (any model) with Blackmagic Desktop Video installed.
+- An **SDI BNC cable** looped from `SDI OUT` → `SDI IN`.
+- An **HDMI cable** looped from `HDMI OUT` → `HDMI IN`.
+
+Both cables are needed to run the full hardware suite. Individual test files declare which transport they use in their module docstring — `test_loopback.py` and `test_capture_as_uint16.py` exercise SDI; `test_hdmi_bgra_loopback.py`, `test_hdmi_bgra_ycbcr_source.py`, and `test_hdmi_full_range_round_trip.py` exercise HDMI; `test_hdr_metadata_loopback.py` parametrises over both. Without the required cable a hardware test will time out waiting for a capture, so it's worth confirming both cables are in place before invoking the full suite.
 
 ## Contributing
 
