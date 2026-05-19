@@ -98,16 +98,27 @@ def main():
 
         (image, bits, name) = render_tpat(args.tpat_in)
 
+        # The TPAT's range tag declares what its encoded code values mean
+        # (interpretation/input range). `-r` declares the desired output range.
+        # When the TPAT has a range tag, `-r` overrides only the output; the
+        # interpretation stays as the TPAT says. When the TPAT has no tag,
+        # `-r` (or the default) provides both.
+        tpat_narrow = (
+            str(tpat_data['range']).lower() == 'narrow'
+            if 'range' in tpat_data else None
+        )
         if args.r is not None:
-            narrow_range = str(args.r).lower() == 'narrow'
-        elif 'range' in tpat_data:
-            narrow_range = str(tpat_data['range']).lower() == 'narrow'
+            output_narrow_range = str(args.r).lower() == 'narrow'
+            input_narrow_range = (
+                tpat_narrow if tpat_narrow is not None else output_narrow_range
+            )
         else:
-            narrow_range = True
+            input_narrow_range = tpat_narrow if tpat_narrow is not None else True
+            output_narrow_range = input_narrow_range
 
         # Promote N-bit integer codes to uint16 in the canonical representation
-        # for the declared range. Narrow uses `<< (16 - bits)` (narrow at N-bit
-        # IS narrow at 16-bit scaled by 2^(16-bits), exact). Full uses
+        # for the declared input range. Narrow uses `<< (16 - bits)` (narrow at
+        # N-bit IS narrow at 16-bit scaled by 2^(16-bits), exact). Full uses
         # bit-replication, which maps the per-bit-depth maximum to 65535 exactly
         # and produces correct values through RGB10 `>> 6`, RGB12 `>> 4`, and
         # YUV float `* / 65535` consumers. Unconditional `<< (16 - bits)` would
@@ -115,7 +126,7 @@ def main():
         if bits < 16:
             image = image.astype(np.uint16)
             shift = 16 - bits
-            if narrow_range:
+            if input_narrow_range:
                 image = image << shift
             else:
                 image = (image << shift) | (image >> (2 * bits - 16))
@@ -156,8 +167,8 @@ def main():
                 pixel_format,
                 matrix=matrix,
                 hdr_metadata=eotf,
-                input_narrow_range=narrow_range,
-                output_narrow_range=narrow_range
+                input_narrow_range=input_narrow_range,
+                output_narrow_range=output_narrow_range
             )
 
             print("Displaying:", name)
