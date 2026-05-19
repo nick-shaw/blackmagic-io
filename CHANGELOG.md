@@ -7,6 +7,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+- `BlackmagicOutput.display_solid_color()` produced wrong wire codes for full-range integer input on non-RGB10 outputs. The 10-bit code → uint16 packing used unconditional `<< 6`, which is the canonical narrow-range representation but undershoots the canonical full-range one (10-bit `1023 << 6 = 65472`, not `65535`). The RGB10 same-range encoder's `>> 6` cancelled this exactly, masking the bug for RGB10 output. RGB12 (`>> 4`) and YUV (float `/ 65535`) consumers exposed it: full-range 10-bit white (1023) produced wire Y' = 939 instead of 940 for YUV10 narrow output, and the wire RGB12 code was 4092 instead of 4095 for full→full. Packing now branches on `input_narrow_range`: narrow uses `<< 6` (canonical narrow); full uses bit-replication `(c << 6) | (c >> 4)` (canonical full, mapping `1023 → 65535` exactly). Every downstream output path (RGB10, RGB12, YUV8/YUV10) now produces correct wire codes for both ranges. The same fix is applied to `examples/advanced/display_tpat.py:101`, generalised across bit depths — narrow uses `<< (16 - bits)`, full uses `(image << (16 - bits)) | (image >> (2 * bits - 16))`. The bug was latent before 0.17.0b5 (the symmetric capture-side bug compensated in test round-trips) and was inadvertently shipped after the 0.17.0b5 release fixed only the capture-side decoder.
+
 ## [0.17.0b5] - 2026-05-18
 
 ### Added

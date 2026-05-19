@@ -97,8 +97,31 @@ def main():
             tpat_data = json.load(f)
 
         (image, bits, name) = render_tpat(args.tpat_in)
-        if bits < 32:
-            image = image.astype(np.uint16) << (16 - bits)
+
+        if args.r is not None:
+            narrow_range = str(args.r).lower() == 'narrow'
+        elif 'range' in tpat_data:
+            narrow_range = str(tpat_data['range']).lower() == 'narrow'
+        else:
+            narrow_range = True
+
+        # Promote N-bit integer codes to uint16 in the canonical representation
+        # for the declared range. Narrow uses `<< (16 - bits)` (narrow at N-bit
+        # IS narrow at 16-bit scaled by 2^(16-bits), exact). Full uses
+        # bit-replication, which maps the per-bit-depth maximum to 65535 exactly
+        # and produces correct values through RGB10 `>> 6`, RGB12 `>> 4`, and
+        # YUV float `* / 65535` consumers. Unconditional `<< (16 - bits)` would
+        # be wrong for full input via YUV and RGB12.
+        if bits < 16:
+            image = image.astype(np.uint16)
+            shift = 16 - bits
+            if narrow_range:
+                image = image << shift
+            else:
+                image = (image << shift) | (image >> (2 * bits - 16))
+        elif bits < 32:
+            image = image.astype(np.uint16)
+
         with BlackmagicOutput() as output:
 
             display_mode = DISPLAY_MODES[args.display_mode]
@@ -107,13 +130,6 @@ def main():
                 str(args.p).lower(),
                 PixelFormat.YUV10
             )
-
-            if args.r is not None:
-                narrow_range = str(args.r).lower() == 'narrow'
-            elif 'range' in tpat_data:
-                narrow_range = str(tpat_data['range']).lower() == 'narrow'
-            else:
-                narrow_range = True
 
             if args.m is not None:
                 matrix_str = str(args.m).lower()

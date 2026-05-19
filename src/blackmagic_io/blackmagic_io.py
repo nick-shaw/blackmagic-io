@@ -447,12 +447,25 @@ class BlackmagicOutput:
 
         is_float = isinstance(color[0], float)
 
+        def pack(codes):
+            # Promote 10-bit integer codes to uint16 in the canonical
+            # representation for the declared range. Narrow input maps
+            # `<< 6` (narrow 16-bit IS narrow 10-bit scaled by 64, exact).
+            # Full input uses bit-replication `(c << 6) | (c >> 4)`, which
+            # maps 1023 → 65535 exactly and produces correct values through
+            # every downstream path (RGB10 `>> 6`, RGB12 `>> 4`, YUV float
+            # `* / 65535`). Unconditional `<< 6` would be wrong for full
+            # input via YUV (off by one) and RGB12 (off by three).
+            if input_narrow_range:
+                return tuple(int(c) << 6 for c in codes)
+            return tuple(((int(c) << 6) | (int(c) >> 4)) for c in codes)
+
         if patch is None:
             if is_float:
                 frame_data = np.full((settings.height, settings.width, 3),
                                    color, dtype=np.float32)
             else:
-                color_uint16 = tuple(int(c) << 6 for c in color)
+                color_uint16 = pack(color)
                 frame_data = np.full((settings.height, settings.width, 3),
                                    color_uint16, dtype=np.uint16)
         else:
@@ -470,10 +483,10 @@ class BlackmagicOutput:
                                    background_color, dtype=np.float32)
                 patch_color = color
             else:
-                bg_uint16 = tuple(int(c) << 6 for c in background_color)
+                bg_uint16 = pack(background_color)
                 frame_data = np.full((settings.height, settings.width, 3),
                                    bg_uint16, dtype=np.uint16)
-                patch_color = tuple(int(c) << 6 for c in color)
+                patch_color = pack(color)
 
             patch_pixel_width = int(patch_width * settings.width)
             patch_pixel_height = int(patch_height * settings.height)
