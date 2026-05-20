@@ -1578,11 +1578,11 @@ All 14 SMPTE ST 2086 / CEA-861.3 HDR static metadata fields are supported:
 7. **Matrix / Resolution restrictions**:
    - **Rec.601** is only supported for SD display modes (NTSC, PAL, etc.) and is the only matrix supported for SD
    - **Rec.709** and **Rec.2020** are only supported for HD and higher resolutions (720p, 1080p, 2K, 4K, 8K, etc.)
-8. **HLG static metadata is suppressed on transmit by the Blackmagic SDK**: When EOTF is HLG, the SDK transmits zero values for all HDR static metadata fields (display primaries, white point, mastering display luminance, MaxCLL, MaxFALL) over HDMI, even when populated explicitly via `set_hdr_static_metadata()`. The receive side reads non-zero values faithfully when present in an incoming HLG signal, so the suppression is transmit-side, not receive-side. SDI conveys HDR static metadata via SMPTE ST 2108 ANC packets (separate from VPID, which carries only EOTF and matrix); the S2108 path is used for PQ. For HLG on SDI, the static metadata is not present in the captured signal. This is consistent with the view that HLG is display-referred but stricter than CTA-861.3 permits. See HDMI Input Notes for details.
+8. **HLG static metadata is suppressed on transmit by the Blackmagic SDK**: When EOTF is HLG, the SDK transmits zero values for all HDR static metadata fields (display primaries, white point, mastering display luminance, MaxCLL, MaxFALL) over HDMI, even when populated explicitly via `set_hdr_static_metadata()`. The receive side reads non-zero values faithfully when present in an incoming HLG signal, so the suppression is transmit-side, not receive-side. SDI conveys HDR static metadata via SMPTE ST 2108 ANC packets (separate from VPID, which carries only EOTF and matrix); the S2108 path is used for PQ. For HLG on SDI, the static metadata is not present in the captured signal. This is consistent with the view that HLG is display-referred but stricter than CTA-861.3 permits. See HDMI Notes for details.
 
-## HDMI Input Notes
+## HDMI Notes
 
-This section documents behaviour observed on tested hardware (DeckLink UltraStudio 4K Mini) for HDMI input capture. SDI input is generally more deterministic; the notes below apply specifically to the HDMI path.
+This section documents behaviour observed on tested hardware (DeckLink UltraStudio 4K Mini) for the HDMI path, both input and output. SDI is generally more deterministic; the notes below apply specifically to HDMI.
 
 ### EDID is partially controllable
 
@@ -1619,6 +1619,12 @@ When capturing with `pixel_format=PixelFormat.BGRA`, the SDK on tested hardware 
 ### Y'CbCr → BGRA hardware conversion honours signalled matrix metadata
 
 When capturing as BGRA from a Y'CbCr source, the SDK's hardware Y'CbCr → R'G'B' conversion uses the matrix coefficients (Rec.601, Rec.709, or Rec.2020) signalled in the source's frame metadata. Verified via SDI and HDMI loopback with Rec.709 and Rec.2020 sources. Applications working with BGRA captures don't need to apply their own matrix conversion.
+
+### RGB range signalling on transmit (AVI InfoFrame Q)
+
+The Blackmagic SDK does not expose the HDMI AVI InfoFrame's RGB Quantization Range (Q) field for control.
+
+Empirical observation on an LG OLED: with HDMI Black Level set to Auto, the displayed result matched the manual Limited setting across RGB10 and RGB12. The Full setting produced a different result. This suggests that the Q field may be fixed to signalling **Limited** (narrow) range.
 
 ### HLG static metadata: faithful on receive, suppressed on Blackmagic transmit
 
