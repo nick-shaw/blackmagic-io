@@ -31,7 +31,7 @@ def _adjust_range_uint8(rgb: np.ndarray,
 
     Returns ``rgb`` unchanged when ``input_narrow_range == output_narrow_range``.
     Otherwise stretches narrow → full or compresses full → narrow, with
-    rounding and clipping to the legal uint8 range.
+    rounding and clipping to the valid uint8 range.
     """
     if input_narrow_range == output_narrow_range:
         return rgb

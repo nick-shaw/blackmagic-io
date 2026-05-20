@@ -30,7 +30,7 @@ specific value-preservation cases and a parametrised matrix of all
    range, and asserts the captured uint16 equals the canonical 16-bit
    code for the output range. Input values are chosen per range
    combination so the encoder always writes wire codes within the SDI
-   legal range (4-1019), making the SDI wire a clean passthrough — the
+   permitted range (4-1019), making the SDI wire a clean passthrough — the
    test isolates the library's encode/decode pipeline from SDI clamping
    behaviour. RGB10/RGB12 paths are bit-exact (zero tolerance); YUV8/
    YUV10 paths in full output allow ±1 to absorb matrix-rounding float
@@ -253,20 +253,20 @@ RANGE_COMBINATIONS = [
 ]
 
 # 10-bit input code values for the bit-exact round-trip matrix below. SDI
-# 10-bit reserves codes 0-3 and 1020-1023 for sync words, so the legal
+# 10-bit reserves codes 0-3 and 1020-1023 for sync words, so the permitted
 # wire range is 4-1019. The inputs are chosen so that every test path
-# produces wire codes WITHIN that legal range — no SDI clamping is
+# produces wire codes WITHIN that permitted range — no SDI clamping is
 # involved. The tests then verify the library's encode/decode pipeline
 # in isolation, with the SDI wire acting as a clean passthrough.
 #
 # Per (input_narrow, output_narrow) combination, the chosen input is the
-# largest (or smallest) 10-bit code that produces an SDI-legal wire code
+# largest (or smallest) 10-bit code that produces an SDI-permitted wire code
 # at the encoder output:
 #
-#   (input_narrow=True,  output_narrow=True):  940 / 64   — wire narrow 940 / 64 (canonical narrow extent, well within SDI legal)
+#   (input_narrow=True,  output_narrow=True):  940 / 64   — wire narrow 940 / 64 (canonical narrow extent, well within SDI permitted)
 #   (input_narrow=False, output_narrow=True):  1023 / 0   — wire narrow 940 / 64 (full → narrow via cross-range scaling; output narrow so no clamp)
-#   (input_narrow=True,  output_narrow=False): 937 / 67   — wire full 1019 / 4   (sub-canonical narrow → SDI-legal full via cross-range scaling)
-#   (input_narrow=False, output_narrow=False): 1019 / 4   — wire full 1019 / 4   (SDI-legal extent for full input, avoids clamping)
+#   (input_narrow=True,  output_narrow=False): 937 / 67   — wire full 1019 / 4   (sub-canonical narrow → SDI-permitted full via cross-range scaling)
+#   (input_narrow=False, output_narrow=False): 1019 / 4   — wire full 1019 / 4   (SDI-permitted extent for full input, avoids clamping)
 #
 # `display_solid_color` always takes 10-bit code values per its docstring.
 
@@ -287,7 +287,7 @@ INPUT_LOW_10BIT = {
 # Expected captured uint16 for "high" and "low" greyscale, indexed by
 # output range. Narrow output produces the canonical narrow 16-bit codes
 # (940 << 6 = 60160 and 64 << 6 = 4096). Full output produces values
-# scaled from the wire's SDI-legal extents (1019/1023 × 65535 ≈ 65279,
+# scaled from the wire's SDI-permitted extents (1019/1023 × 65535 ≈ 65279,
 # 4/1023 × 65535 ≈ 256). All bit-exact apart from a small ±1 matrix
 # rounding for the YUV paths in full output.
 EXPECTED_HIGH_UINT16 = {True: 60160, False: round(1019 / 1023 * 65535)}  # 60160, 65279
@@ -331,11 +331,11 @@ def test_display_solid_color_greyscale_bit_exact(
     value matches the canonical 16-bit code for the output range.
 
     Input values are chosen so that the encoder always writes wire codes
-    within the SDI legal range (4-1019), so the SDI wire acts as a clean
+    within the SDI permitted range (4-1019), so the SDI wire acts as a clean
     passthrough and the test isolates the library's encode/decode
     pipeline rather than the SDI hardware's clamping behaviour. The
     canonical 16-bit extents 0/65535 are not used directly for full
-    output because SDI would clamp them; SDI-legal extents 4/1019 (and
+    output because SDI would clamp them; SDI-permitted extents 4/1019 (and
     their narrow-input cross-range equivalents 67/937) are used instead.
 
     RGB10 and RGB12 paths round-trip via integer bit-shift / bit-
@@ -344,13 +344,13 @@ def test_display_solid_color_greyscale_bit_exact(
     16-bit code level when the result lands near a half-step rounding
     boundary. Narrow output is always bit-exact even for YUV because
     the matrix produces exact codes for greyscale and the narrow
-    extents are inside SDI legal range.
+    extents are inside SDI permitted range.
 
     The 0.17.0b5-shipped packing bug (full-range `<< 6` undershoot)
     would have failed the narrow-output rows by 64 16-bit codes — well
     outside any tolerance — because the encoder produced Y' = 939 (etc.)
     instead of 940 for full-input narrow-output paths. The full-output
-    rows now also catch the bug because they use SDI-legal extents that
+    rows now also catch the bug because they use SDI-permitted extents that
     bypass the masking effect of SDI clamping.
     """
     range_key = (input_narrow, output_narrow)

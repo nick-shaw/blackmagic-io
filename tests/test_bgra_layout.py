@@ -100,7 +100,7 @@ def test_adjust_range_identity_full():
 
 
 def test_adjust_range_narrow_to_full_endpoints():
-    # 16 (legal black) → 0, 235 (legal white) → 255
+    # 16 (nominal black) → 0, 235 (nominal white) → 255
     rgb = np.array([[[16, 235, 16]]], dtype=np.uint8)
     result = _adjust_range_uint8(rgb, input_narrow_range=True, output_narrow_range=False)
     assert tuple(result[0, 0]) == (0, 255, 0)
@@ -142,7 +142,7 @@ def test_adjust_range_narrow_to_full_clips_super_whites():
 
 
 def test_adjust_range_round_trip_narrow_full_narrow():
-    # Narrow values in legal range round-trip within ±1
+    # Narrow values in nominal range round-trip within ±1
     rng = np.random.default_rng(42)
     rgb = rng.integers(16, 236, (16, 16, 3), dtype=np.uint8)
     full = _adjust_range_uint8(rgb, input_narrow_range=True, output_narrow_range=False)

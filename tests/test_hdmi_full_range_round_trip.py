@@ -4,7 +4,7 @@ SDI 10-bit reserves codes 0-3 and 1020-1023 for sync words, so the library's
 canonical full-range extents (0, 1023) emerge from the SDI wire as (4, 1019)
 — the wire physically can't carry the reserved codes. The companion test
 file `test_capture_as_uint16.py` works around this by choosing inputs that
-produce SDI-legal wire codes.
+produce SDI-permitted wire codes.
 
 HDMI does not have this constraint. HDMI (TMDS / FRL) transports the full
 active codespace in-band, with sync information carried in separate periods

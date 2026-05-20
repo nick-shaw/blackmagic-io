@@ -445,7 +445,7 @@ Capture a frame as R'G'B' uint16 with format metadata. Higher-precision counterp
 Capture a single frame and convert to R'G'B'.
 - `timeout_ms`: Timeout in milliseconds (default: 5000)
 - `input_narrow_range`: Whether input uses narrow range encoding (default: True)
-- Returns: R'G'B' float32 array (H×W×3) mapped to 0.0-1.0 (legal black to legal white per `input_narrow_range`), or None if timeout/no signal
+- Returns: R'G'B' float32 array (H×W×3) mapped to 0.0-1.0 (nominal black to nominal white per `input_narrow_range`), or None if timeout/no signal
 - Automatically converts from any DeckLink pixel format to R'G'B'
 - When the capture was initialised with `pixel_format=PixelFormat.BGRA` and the SDK delivers 10-bit R'G'B' (the typical case for 8-bit R'G'B' sources on HDMI), the library automatically right-shifts each channel by 2 to recover the exact 8-bit values before float conversion. This avoids the small precision error that comes from decoding LSB-padded 8-bit content as if it were native 10-bit.
 
@@ -1006,11 +1006,13 @@ with BlackmagicOutput() as output:
 
 The `output_narrow_range` parameter controls the **actual encoded values** in the output stream, not metadata signaling. Use it when you know the downstream device will correctly interpret the range, or when the receiving device allows manual range configuration.
 
-#### SDI sync-code clamping (SDI only)
+#### SDI Protected Code Values (SDI only)
 
-Independent of the range-signalling question above, SDI 10-bit reserves code values 0-3 and 1020-1023 for sync words (per SMPTE ST 425-1), so the legal active-video range on the SDI wire is 4-1019. If you drive an SDI output with the canonical full-range extents — for example float `1.0` → wire code 1023 — the SDI hardware clamps the wire to 1019 (and 0 to 4) before transmission. A loopback capture from such a signal returns `round(1019/1023 × 65535) = 65279` for full white and `round(4/1023 × 65535) = 256` for full black, rather than the canonical 65535 / 0.
+Independent of the range-signalling question above, SDI 10-bit reserves code values 0-3 and 1020-1023 for sync words (per SMPTE ST 425-1), so the permitted active-video range on the SDI wire is 4-1019. If you drive an SDI output with the canonical full-range extents — for example float `1.0` → wire code 1023 — the SDI hardware clamps the wire to 1019 (and 0 to 4) before transmission.
 
 This is a property of the SDI link itself, not the library. **HDMI is unaffected**: the HDMI (TMDS / FRL) transport carries sync information in separate periods rather than reserved code values, so the full active codespace (0-1023 for 10-bit, 0-4095 for 12-bit) is preserved end-to-end. Verified empirically by `tests/test_hdmi_full_range_round_trip.py`: full white over HDMI round-trips bit-exact to captured uint16 65535. If you need the full extents preserved on the wire, use HDMI; if you must use SDI, expect the wire-level clamp.
+
+**SDI Full:** Because `output_narrow_range=False` passes values through unscaled and the SDI hardware clamps codes outside 4-1019 at the wire, an "SDI Full" signal can be produced by pre-scaling your data so its extents land inside the active-video range — e.g. mapping `[0.0, 1.0]` to `[4/1023, 1019/1023]` for 10-bit (or the equivalent for 12-bit) and then outputting with `output_narrow_range=False`.
 
 **`Matrix`** (High-level API)
 - `Rec709`: ITU-R BT.709 R'G'B' to Y'CbCr conversion matrix (standard HD)
