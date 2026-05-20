@@ -3,17 +3,17 @@
 test_loopback.py exercises Rec.709 only (HD1080p25 default). Rec.601 and
 Rec.2020 matrix correctness is otherwise covered only by the offline
 colour-science parity test, which can't catch hardware-level signalling
-bugs (wrong VPID colorspace, mis-tagged frames). These tests push float
+bugs (wrong VPID matrix, mis-tagged frames). These tests push float
 RGB through the YUV converters at each matrix, capture over SDI, and
 verify the round-trip via `capture_frame_as_rgb` — which decodes using
-the captured frame's tagged colorspace, so a wrong tag would either
-fail the matrix decode or report the wrong Matrix enum.
+the captured frame's tagged matrix, so a wrong tag would either fail
+the matrix decode or report the wrong Matrix enum.
 
 - Rec.601: NTSC (720x486) + YUV8. The high-level API auto-selects Rec.601
   for SD modes, and the SDK signals Rec.601 in the VPID for SD content.
 - Rec.2020: HD1080p25 + YUV10 with explicit Matrix.Rec2020. The high-level
-  set_hdr_metadata path signals Rec.2020 colorimetry even without an HDR
-  EOTF, so the capture decodes with the right matrix.
+  display_static_frame path signals Rec.2020 in the VPID via set_matrix()
+  even without an HDR EOTF, so the capture decodes with the right matrix.
 
 Requires an SDI loopback cable. Skips if the device cannot output the
 requested combination.
@@ -38,7 +38,7 @@ OUTPUT_DEVICE_INDEX = 0
 INPUT_DEVICE_INDEX = 0
 CAPTURE_TIMEOUT_MS = 10000
 
-# (label, display_mode, pixel_format, matrix, expected_colorspace_name,
+# (label, display_mode, pixel_format, matrix, expected_matrix_name,
 #  mean_tol, max_tol)
 CASES = [
     (
@@ -71,13 +71,13 @@ def output_device():
 
 
 @pytest.mark.parametrize(
-    "label,display_mode,pixel_format,matrix,expected_colorspace,mean_tol,max_tol",
+    "label,display_mode,pixel_format,matrix,expected_matrix,mean_tol,max_tol",
     CASES,
     ids=[c[0] for c in CASES],
 )
 def test_yuv_matrix_loopback(
     output_device, label, display_mode, pixel_format, matrix,
-    expected_colorspace, mean_tol, max_tol,
+    expected_matrix, mean_tol, max_tol,
 ):
     """Float RGB → YUV (matrix) → SDI → YUV → float RGB round-trips, and the
     captured frame is tagged with the matching Matrix enum."""
@@ -108,9 +108,9 @@ def test_yuv_matrix_loopback(
         result = input_device.capture_frame_with_metadata(timeout_ms=CAPTURE_TIMEOUT_MS)
         assert result is not None, f"capture_frame_with_metadata returned None for {label}"
 
-        assert result["colorspace"] == expected_colorspace, (
-            f"{label}: expected colorspace {expected_colorspace}, "
-            f"got {result['colorspace']}"
+        assert result["matrix"] == expected_matrix, (
+            f"{label}: expected matrix {expected_matrix}, "
+            f"got {result['matrix']}"
         )
 
         captured = result["rgb"]

@@ -170,7 +170,7 @@ with BlackmagicInput() as input_device:
     if frame_data is not None:
         print(f"Resolution: {frame_data['width']}x{frame_data['height']}")
         print(f"Format: {frame_data['format']}")
-        print(f"Colorspace: {frame_data['colorspace']}")
+        print(f"Matrix: {frame_data['matrix']}")
         print(f"EOTF: {frame_data['eotf']}")
         print(f"Narrow range source: {frame_data['input_narrow_range']}")
 
@@ -421,14 +421,14 @@ Dictionary keys:
 - `'height'`: Frame height in pixels
 - `'format'`: Pixel format name (e.g., "YUV10", "RGB10")
 - `'mode'`: Display mode name (e.g., "HD1080p25")
-- `'colorspace'`: Color matrix name (e.g., "Rec709", "Rec2020")
+- `'matrix'`: Y'CbCr matrix name (e.g., "Rec709", "Rec2020")
 - `'eotf'`: Transfer function name (e.g., "SDR", "PQ", "HLG")
 - `'input_narrow_range'`: Boolean indicating the input range used for conversion
 - `'output_narrow_range'`: Boolean indicating the output range applied
 - `'hdr_metadata'`: Dictionary with HDR metadata (only present if HDR metadata is in the signal)
   - Same structure as `capture_frame_with_metadata()` below
 
-This function combines the performance of `capture_frame_as_uint8()` with metadata access, making it ideal for real-time preview applications that need to detect signal changes (resolution, colorspace, EOTF) without the overhead of float conversion.
+This function combines the performance of `capture_frame_as_uint8()` with metadata access, making it ideal for real-time preview applications that need to detect signal changes (resolution, matrix, EOTF) without the overhead of float conversion.
 
 **`capture_frame_as_uint16(timeout_ms=5000, input_narrow_range=True, output_narrow_range=False) -> Optional[np.ndarray]`**
 Capture a single frame and convert to R'G'B' uint16 (preserves native bit depth of the source).
@@ -462,7 +462,7 @@ Dictionary keys:
 - `'height'`: Frame height in pixels
 - `'format'`: Pixel format name (e.g., "YUV10", "RGB10")
 - `'mode'`: Display mode name (e.g., "1080p25")
-- `'colorspace'`: Color matrix name (e.g., "Rec709", "Rec2020")
+- `'matrix'`: Y'CbCr matrix name (e.g., "Rec709", "Rec2020")
 - `'eotf'`: Transfer function name (e.g., "SDR", "PQ", "HLG")
 - `'input_narrow_range'`: Boolean indicating if input was narrow range
 - `'hdr_metadata'`: Dictionary with HDR metadata (only present if HDR metadata is in the signal)
@@ -521,16 +521,16 @@ Check if a pixel format is supported for a given display mode.
 **`get_video_settings(display_mode) -> VideoSettings`**
 Get video settings object for a display mode.
 
-**`set_hdr_metadata(colorimetry: Gamut, eotf: Eotf)`**
-Set HDR metadata with default values. Must be called before `setup_output()`.
+**`set_matrix(matrix: Matrix)`**
+Set the Y'CbCr matrix (Rec.601/709/2020) used for YUV encoding and signalled on the wire (VPID for SDI, AVI InfoFrame for HDMI). Not HDR-specific — every Y'CbCr signal needs a matrix. Also default-fills HDR Static Metadata primaries / white point / mastering luminance from the matrix name (only meaningful for PQ output; the SDK zeroes the InfoFrame for HLG and SDR). Call `set_static_metadata()` afterwards to override the defaults. Must be called before `setup_output()`.
 
-**`set_hdr_static_metadata(colorimetry: Gamut, eotf: Eotf, static_metadata: HdrStaticMetadata)`**
-Set HDR Static Metadata (per SMPTE ST 2086 / CEA-861.3 Type 1) with explicit display primaries, white point, mastering display luminance, and content light level fields. Must be called before `setup_output()`.
+**`set_eotf(eotf: Eotf)`**
+Set the EOTF (`SDR`, `PQ`, or `HLG`). Setting to non-`SDR` triggers HDR Static Metadata InfoFrame transmission on the next emitted frame; setting back to `SDR` suppresses it. Must be called before `setup_output()`.
 
-**`clear_hdr_metadata()`**
-Clear HDR metadata and reset to SDR. Call before `setup_output()` if you want to ensure no HDR metadata is present.
+**`set_static_metadata(static_metadata: HdrStaticMetadata)`**
+Set HDR Static Metadata (per SMPTE ST 2086 / CEA-861.3 Type 1) with explicit display primaries, white point, mastering display luminance, and content light level fields. Overrides the defaults set by `set_matrix()`. Only meaningful for PQ output. Must be called before `setup_output()`.
 
-**HDMI vs SDI when changing HDR metadata mid-stream:** SDI carries metadata per-frame in the VPID, so SDI consumers see updated metadata on the very next frame after a `set_hdr_metadata*()` call. On HDMI, the HDR Static Metadata InfoFrame is sticky — it does not update until new video data is sent — so after changing metadata mid-stream you must call `display_frame()` again for HDMI consumers to see the new values. The frame contents do not need to change; pushing the same frame is enough to refresh the InfoFrame.
+**HDMI vs SDI when changing HDR metadata mid-stream:** SDI carries metadata per-frame in the VPID, so SDI consumers see updated metadata on the very next frame after a setter call. On HDMI, the HDR Static Metadata InfoFrame is sticky — it does not update until new video data is sent — so after changing metadata mid-stream you must call `display_frame()` again for HDMI consumers to see the new values. The frame contents do not need to change; pushing the same frame is enough to refresh the InfoFrame.
 
 **`setup_output(settings: VideoSettings) -> bool`**
 Setup output with detailed settings.
@@ -566,7 +566,7 @@ class VideoSettings:
     width: int             # Frame width in pixels
     height: int            # Frame height in pixels
     framerate: float       # Frame rate (e.g., 25.0, 29.97, 60.0)
-    colorimetry: Gamut     # Y'CbCr matrix (Rec601 / Rec709 / Rec2020)
+    matrix: Matrix         # Y'CbCr matrix (Rec601 / Rec709 / Rec2020)
     eotf: Eotf             # Transfer function (SDR / PQ / HLG)
 ```
 
@@ -640,7 +640,7 @@ class CapturedFrame:
     valid: bool                       # Whether frame is valid
 
     # Format metadata
-    colorspace: Gamut                 # Color matrix (Rec601/Rec709/Rec2020)
+    matrix: Matrix                    # Y'CbCr matrix (Rec601/Rec709/Rec2020)
     eotf: Eotf                        # Transfer function (SDR/PQ/HLG)
     has_metadata: bool                # Whether metadata is present
 
@@ -1014,13 +1014,18 @@ This is a property of the SDI link itself, not the library. **HDMI is unaffected
 
 **SDI Full:** Because `output_narrow_range=False` passes values through unscaled and the SDI hardware clamps codes outside 4-1019 at the wire, an "SDI Full" signal can be produced by pre-scaling your data so its extents land inside the active-video range — e.g. mapping `[0.0, 1.0]` to `[4/1023, 1019/1023]` for 10-bit (or the equivalent for 12-bit) and then outputting with `output_narrow_range=False`.
 
-**`Matrix`** (High-level API)
-- `Rec709`: ITU-R BT.709 R'G'B' to Y'CbCr conversion matrix (standard HD)
-- `Rec2020`: ITU-R BT.2020 R'G'B' to Y'CbCr conversion matrix (wide color gamut for HDR)
+**`Matrix`**
+The Y'CbCr matrix — the coefficient set used for R'G'B' ↔ Y'CbCr conversion, and signalled on the wire (VPID for SDI, AVI InfoFrame for HDMI). Not HDR-specific: every Y'CbCr signal needs a matrix.
+- `Rec601`: ITU-R BT.601 (SD)
+- `Rec709`: ITU-R BT.709 (standard HD)
+- `Rec2020`: ITU-R BT.2020 (UHD / HDR)
 
-**`Gamut`** (Low-level API, same values as Matrix)
-- `Rec709`: ITU-R BT.709 colorimetry (standard HD)
-- `Rec2020`: ITU-R BT.2020 colorimetry (wide color gamut for HDR)
+**`Gamut`**
+The HDR static-metadata colorimetry-bundle identifier — display primaries and white point conveyed via the HDR Static Metadata InfoFrame. Only meaningful for PQ output on tested hardware; the SDK zeroes the InfoFrame for HLG and SDR.
+- `Rec709`: BT.709 primaries + D65 white point
+- `Rec2020`: BT.2020 primaries + D65 white point
+
+Best practice for real HDR delivery is to call `set_static_metadata()` with explicit primaries (e.g. P3-D65 inside a Rec.2020 container) rather than relying on the matrix-name defaults that `set_matrix()` fills.
 
 **`Eotf`**
 - `SDR`: Standard Dynamic Range (BT.1886 transfer function)
@@ -1303,8 +1308,9 @@ frame = np.zeros((1080, 1920, 3), dtype=np.float32)
 output = dl.DeckLinkOutput()
 output.initialize()
 
-# Set HDR metadata BEFORE setup_output()
-output.set_hdr_metadata(dl.Gamut.Rec2020, dl.Eotf.HLG)
+# Set signal metadata BEFORE setup_output()
+output.set_matrix(dl.Matrix.Rec2020)
+output.set_eotf(dl.Eotf.HLG)
 
 # Setup output
 settings = output.get_video_settings(dl.DisplayMode.HD1080p25)
@@ -1363,9 +1369,11 @@ frame = np.zeros((1080, 1920, 3), dtype=np.float32)
 output = dl.DeckLinkOutput()
 output.initialize()
 
-# IMPORTANT: Set HDR metadata BEFORE setup_output()
-# This embeds HDR metadata (including Rec.2020 primaries, EOTF, mastering display info) in frames
-output.set_hdr_metadata(dl.Gamut.Rec2020, dl.Eotf.PQ)
+# IMPORTANT: Set signal metadata BEFORE setup_output()
+# set_matrix() also default-fills Rec.2020 primaries / D65 / mastering luminance
+# in the HDR Static Metadata InfoFrame for PQ output.
+output.set_matrix(dl.Matrix.Rec2020)
+output.set_eotf(dl.Eotf.PQ)
 
 # Setup output settings
 settings = output.get_video_settings(dl.DisplayMode.HD1080p25)
@@ -1373,7 +1381,7 @@ settings.format = dl.PixelFormat.YUV10
 output.setup_output(settings)
 
 # Convert to Y'CbCr with Rec.2020 matrix
-yuv_data = dl.rgb_float_to_yuv10(frame, 1920, 1080, dl.Gamut.Rec2020)
+yuv_data = dl.rgb_float_to_yuv10(frame, 1920, 1080, dl.Matrix.Rec2020)
 output.set_frame_data(yuv_data)
 
 # Display the frame
@@ -1447,7 +1455,7 @@ with BlackmagicOutput() as output:
 
 ## HDR Metadata
 
-HDR metadata is embedded into each video frame using the DeckLink SDK's `IDeckLinkVideoFrameMetadataExtensions` interface. When you call `set_hdr_metadata()`, the library automatically wraps each output frame with the specified metadata.
+HDR metadata is embedded into each video frame using the DeckLink SDK's `IDeckLinkVideoFrameMetadataExtensions` interface. When you set a non-SDR EOTF via `set_eotf()` (with optional `set_static_metadata()` for explicit primaries), the library automatically wraps each output frame with the specified metadata.
 
 ### Metadata Includes:
 
@@ -1518,7 +1526,7 @@ with BlackmagicOutput() as output:
 
 **Low-level API:**
 
-For precise control over HDR Static Metadata with the low-level API, use `set_hdr_static_metadata()`:
+For precise control over HDR Static Metadata with the low-level API, use `set_static_metadata()` after `set_matrix()` and `set_eotf()`:
 
 ```python
 import decklink_io as dl
@@ -1546,7 +1554,9 @@ static_metadata.max_frame_average_light_level = 400.0 # 400 nits average (MaxFAL
 
 output = dl.DeckLinkOutput()
 output.initialize()
-output.set_hdr_static_metadata(dl.Gamut.Rec2020, dl.Eotf.PQ, static_metadata)
+output.set_matrix(dl.Matrix.Rec2020)
+output.set_eotf(dl.Eotf.PQ)
+output.set_static_metadata(static_metadata)
 ```
 
 ### Available HDR Metadata Fields:
@@ -1570,15 +1580,15 @@ All 14 SMPTE ST 2086 / CEA-861.3 HDR static metadata fields are supported:
 ### Important Notes:
 
 1. **Simplified API**: With `display_static_frame()`, HDR metadata and matrix are set in a single call
-2. **Low-level API call order**: When using the low-level API, `set_hdr_metadata()` must be called before `setup_output()`
+2. **Low-level API call order**: When using the low-level API, `set_matrix()` / `set_eotf()` / `set_static_metadata()` must all be called before `setup_output()`
 3. **Frame-level metadata**: Metadata is embedded in every video frame, not set globally
-4. **Matrix consistency**: When using the simplified API, the same `matrix` parameter is used for both metadata and R'G'B' →Y'CbCr conversion. With the low-level API, ensure consistency between `set_hdr_metadata()` and conversion functions.
+4. **Matrix consistency**: When using the simplified API, the same `matrix` parameter is used for both signalled-matrix metadata and R'G'B' → Y'CbCr conversion. With the low-level API, ensure consistency between `set_matrix()` and the conversion functions you call.
 5. **Transfer function**: The library only sets the metadata - you must apply the actual transfer function (PQ / HLG curve) to your R'G'B' data before conversion
 6. **All 14 metadata fields supported**: The library implements all SMPTE ST 2086 / CEA-861.3 HDR metadata fields including display primaries, white point, mastering display luminance, and content light levels
 7. **Matrix / Resolution restrictions**:
    - **Rec.601** is only supported for SD display modes (NTSC, PAL, etc.) and is the only matrix supported for SD
    - **Rec.709** and **Rec.2020** are only supported for HD and higher resolutions (720p, 1080p, 2K, 4K, 8K, etc.)
-8. **HLG static metadata is suppressed on transmit by the Blackmagic SDK**: When EOTF is HLG, the SDK transmits zero values for all HDR static metadata fields (display primaries, white point, mastering display luminance, MaxCLL, MaxFALL) over HDMI, even when populated explicitly via `set_hdr_static_metadata()`. The receive side reads non-zero values faithfully when present in an incoming HLG signal, so the suppression is transmit-side, not receive-side. SDI conveys HDR static metadata via SMPTE ST 2108 ANC packets (separate from VPID, which carries only EOTF and matrix); the S2108 path is used for PQ. For HLG on SDI, the static metadata is not present in the captured signal. This is consistent with the view that HLG is display-referred but stricter than CTA-861.3 permits. See HDMI Notes for details.
+8. **HLG static metadata is suppressed on transmit by the Blackmagic SDK**: When EOTF is HLG, the SDK transmits zero values for all HDR static metadata fields (display primaries, white point, mastering display luminance, MaxCLL, MaxFALL) over HDMI, even when populated explicitly via `set_static_metadata()`. The receive side reads non-zero values faithfully when present in an incoming HLG signal, so the suppression is transmit-side, not receive-side. SDI conveys HDR static metadata via SMPTE ST 2108 ANC packets (separate from VPID, which carries only EOTF and matrix); the S2108 path is used for PQ. For HLG on SDI, the static metadata is not present in the captured signal. This is consistent with the view that HLG is display-referred but stricter than CTA-861.3 permits. See HDMI Notes for details.
 
 ## HDMI Notes
 
@@ -1630,7 +1640,7 @@ Empirical observation on an LG OLED: with HDMI Black Level set to Auto, the disp
 
 The Blackmagic SDK reports HDR static metadata faithfully from HLG sources over HDMI. When an HLG source transmits a populated HDR Static Metadata InfoFrame — Rec.2020 primaries, D65 white point, mastering display luminance — those values arrive on the capture side intact. MaxCLL and MaxFALL may legitimately be zero for HLG content even when the other fields are populated, since HLG is display-referred. If you need mastering display information from an HLG source, the receive side will not strip it.
 
-However, when this library — or anything else built on the Blackmagic SDK — transmits HLG over HDMI, the SDK suppresses HDR static metadata. Even populating an `HdrStaticMetadata` struct explicitly via `set_hdr_static_metadata()` produces zero values on the wire, as confirmed by Blackmagic-to-Blackmagic loopback. If you capture HLG and the source is a Blackmagic-SDK-based transmitter, you will see all-zero static metadata. The behaviour is consistent with the view that HLG is display-referred and does not require mastering display information at the receiver, but it is stricter than CTA-861.3 permits.
+However, when this library — or anything else built on the Blackmagic SDK — transmits HLG over HDMI, the SDK suppresses HDR static metadata. Even populating an `HdrStaticMetadata` struct explicitly via `set_static_metadata()` produces zero values on the wire, as confirmed by Blackmagic-to-Blackmagic loopback. If you capture HLG and the source is a Blackmagic-SDK-based transmitter, you will see all-zero static metadata. The behaviour is consistent with the view that HLG is display-referred and does not require mastering display information at the receiver, but it is stricter than CTA-861.3 permits.
 
 SDI uses a different mechanism: HDR static metadata is conveyed via SMPTE ST 2108 ANC packets, separate from VPID (which carries only colorimetric descriptors like EOTF and matrix). The S2108 path is used for PQ. For HLG on SDI, the static metadata is not present in the captured signal — only EOTF and matrix come through.
 
@@ -1663,7 +1673,7 @@ SDI uses a different mechanism: HDR static metadata is conveyed via SMPTE ST 210
 
 **HDR output not displaying correctly**
 - **Simplified API**: Specify both `matrix` and `hdr_metadata` in `display_static_frame()` - they're automatically set correctly
-- **Low-level API**: Call `set_hdr_metadata()` BEFORE `setup_output()` - metadata is embedded in each frame
+- **Low-level API**: Call `set_matrix()` / `set_eotf()` / `set_static_metadata()` BEFORE `setup_output()` — metadata is embedded in each frame
 - Ensure matrix consistency: same value in both metadata and R'G'B' →Y'CbCr conversion
 
 ### Testing Your Installation

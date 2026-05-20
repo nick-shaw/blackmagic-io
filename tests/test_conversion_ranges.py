@@ -9,7 +9,7 @@ import numpy as np
 import pytest
 
 try:
-    from blackmagic_io import rgb_uint16_to_yuv10, rgb_float_to_yuv10, Gamut
+    from blackmagic_io import rgb_uint16_to_yuv10, rgb_float_to_yuv10, Matrix
     CONVERSIONS_AVAILABLE = True
 except ImportError:
     CONVERSIONS_AVAILABLE = False
@@ -76,7 +76,7 @@ class TestRGBtoYUVConversions:
         width, height = 12, 2
         rgb = np.zeros((height, width, 3), dtype=np.uint16)
 
-        yuv_buffer = rgb_uint16_to_yuv10(rgb, width, height, Gamut.Rec709)
+        yuv_buffer = rgb_uint16_to_yuv10(rgb, width, height, Matrix.Rec709)
 
         y, cb, cr = unpack_v210_pixel(yuv_buffer, 0, width)
 
@@ -89,7 +89,7 @@ class TestRGBtoYUVConversions:
         width, height = 12, 2
         rgb = np.full((height, width, 3), 65535, dtype=np.uint16)
 
-        yuv_buffer = rgb_uint16_to_yuv10(rgb, width, height, Gamut.Rec709)
+        yuv_buffer = rgb_uint16_to_yuv10(rgb, width, height, Matrix.Rec709)
 
         y, cb, cr = unpack_v210_pixel(yuv_buffer, 0, width)
 
@@ -102,7 +102,7 @@ class TestRGBtoYUVConversions:
         width, height = 12, 2
         rgb = np.full((height, width, 3), 32768, dtype=np.uint16)
 
-        yuv_buffer = rgb_uint16_to_yuv10(rgb, width, height, Gamut.Rec709)
+        yuv_buffer = rgb_uint16_to_yuv10(rgb, width, height, Matrix.Rec709)
 
         y, cb, cr = unpack_v210_pixel(yuv_buffer, 0, width)
 
@@ -115,7 +115,7 @@ class TestRGBtoYUVConversions:
         width, height = 12, 2
         rgb = np.zeros((height, width, 3), dtype=np.float32)
 
-        yuv_buffer = rgb_float_to_yuv10(rgb, width, height, Gamut.Rec709)
+        yuv_buffer = rgb_float_to_yuv10(rgb, width, height, Matrix.Rec709)
 
         y, cb, cr = unpack_v210_pixel(yuv_buffer, 0, width)
 
@@ -128,7 +128,7 @@ class TestRGBtoYUVConversions:
         width, height = 12, 2
         rgb = np.ones((height, width, 3), dtype=np.float32)
 
-        yuv_buffer = rgb_float_to_yuv10(rgb, width, height, Gamut.Rec709)
+        yuv_buffer = rgb_float_to_yuv10(rgb, width, height, Matrix.Rec709)
 
         y, cb, cr = unpack_v210_pixel(yuv_buffer, 0, width)
 
@@ -141,7 +141,7 @@ class TestRGBtoYUVConversions:
         width, height = 12, 2
         rgb = np.full((height, width, 3), 0.5, dtype=np.float32)
 
-        yuv_buffer = rgb_float_to_yuv10(rgb, width, height, Gamut.Rec709)
+        yuv_buffer = rgb_float_to_yuv10(rgb, width, height, Matrix.Rec709)
 
         y, cb, cr = unpack_v210_pixel(yuv_buffer, 0, width)
 
@@ -155,7 +155,7 @@ class TestRGBtoYUVConversions:
         rgb = np.zeros((height, width, 3), dtype=np.uint16)
         rgb[:, :, 0] = 65535
 
-        yuv_buffer = rgb_uint16_to_yuv10(rgb, width, height, Gamut.Rec709)
+        yuv_buffer = rgb_uint16_to_yuv10(rgb, width, height, Matrix.Rec709)
 
         y, cb, cr = unpack_v210_pixel(yuv_buffer, 0, width)
 
@@ -175,7 +175,7 @@ class TestRGBtoYUVConversions:
         width, height = 12, 2
         rgb = np.full((height, width, 3), 65535, dtype=np.uint16)
 
-        yuv_buffer = rgb_uint16_to_yuv10(rgb, width, height, Gamut.Rec709,
+        yuv_buffer = rgb_uint16_to_yuv10(rgb, width, height, Matrix.Rec709,
                                          input_narrow_range=False, output_narrow_range=False)
 
         y, cb, cr = unpack_v210_pixel(yuv_buffer, 0, width)
@@ -189,7 +189,7 @@ class TestRGBtoYUVConversions:
         width, height = 12, 2
         rgb = np.zeros((height, width, 3), dtype=np.uint16)
 
-        yuv_buffer = rgb_uint16_to_yuv10(rgb, width, height, Gamut.Rec709,
+        yuv_buffer = rgb_uint16_to_yuv10(rgb, width, height, Matrix.Rec709,
                                          input_narrow_range=False, output_narrow_range=False)
 
         y, cb, cr = unpack_v210_pixel(yuv_buffer, 0, width)
@@ -204,7 +204,7 @@ class TestRGBtoYUVConversions:
         # White in narrow range: 940 @ 10-bit = 60160 @ 16-bit
         rgb = np.full((height, width, 3), 60160, dtype=np.uint16)
 
-        yuv_buffer = rgb_uint16_to_yuv10(rgb, width, height, Gamut.Rec709,
+        yuv_buffer = rgb_uint16_to_yuv10(rgb, width, height, Matrix.Rec709,
                                          input_narrow_range=True, output_narrow_range=True)
 
         y, cb, cr = unpack_v210_pixel(yuv_buffer, 0, width)
@@ -219,7 +219,7 @@ class TestRGBtoYUVConversions:
         # White in narrow range: 940 @ 10-bit = 60160 @ 16-bit
         rgb = np.full((height, width, 3), 60160, dtype=np.uint16)
 
-        yuv_buffer = rgb_uint16_to_yuv10(rgb, width, height, Gamut.Rec709,
+        yuv_buffer = rgb_uint16_to_yuv10(rgb, width, height, Matrix.Rec709,
                                          input_narrow_range=True, output_narrow_range=False)
 
         y, cb, cr = unpack_v210_pixel(yuv_buffer, 0, width)
@@ -233,7 +233,7 @@ class TestRGBtoYUVConversions:
         width, height = 12, 2
         rgb = np.ones((height, width, 3), dtype=np.float32)
 
-        yuv_buffer = rgb_float_to_yuv10(rgb, width, height, Gamut.Rec709, output_narrow_range=False)
+        yuv_buffer = rgb_float_to_yuv10(rgb, width, height, Matrix.Rec709, output_narrow_range=False)
 
         y, cb, cr = unpack_v210_pixel(yuv_buffer, 0, width)
 
@@ -246,7 +246,7 @@ class TestRGBtoYUVConversions:
         width, height = 12, 2
         rgb = np.zeros((height, width, 3), dtype=np.float32)
 
-        yuv_buffer = rgb_float_to_yuv10(rgb, width, height, Gamut.Rec709, output_narrow_range=False)
+        yuv_buffer = rgb_float_to_yuv10(rgb, width, height, Matrix.Rec709, output_narrow_range=False)
 
         y, cb, cr = unpack_v210_pixel(yuv_buffer, 0, width)
 
@@ -534,9 +534,9 @@ class TestYUV8RoundTrip:
 
     def _round_trip(self, rgb_uint8, width, height, matrix=None,
                     output_narrow_range=True):
-        from blackmagic_io import (rgb_uint8_to_yuv8, yuv8_to_rgb_float, Gamut)
+        from blackmagic_io import (rgb_uint8_to_yuv8, yuv8_to_rgb_float, Matrix)
         if matrix is None:
-            matrix = Gamut.Rec709
+            matrix = Matrix.Rec709
         yuv = rgb_uint8_to_yuv8(rgb_uint8, width, height, matrix=matrix,
                                 input_narrow_range=False,
                                 output_narrow_range=output_narrow_range)
@@ -545,10 +545,10 @@ class TestYUV8RoundTrip:
 
     def test_mid_gray_narrow_rec709(self):
         """Mid-gray round-trips with chroma at midpoint and Y in band."""
-        from blackmagic_io import Gamut
+        from blackmagic_io import Matrix
         width, height = 16, 4
         rgb = self._const_rgb_uint8(width, height, (128, 128, 128))
-        recovered = self._round_trip(rgb, width, height, matrix=Gamut.Rec709)
+        recovered = self._round_trip(rgb, width, height, matrix=Matrix.Rec709)
 
         expected = 128 / 255.0
         assert np.allclose(recovered, expected, atol=self.TOL), \
@@ -556,10 +556,10 @@ class TestYUV8RoundTrip:
 
     def test_pure_red_narrow_rec709(self):
         """Pure red round-trips to ~ (1, 0, 0). Bug produced ~ (1.79, -0.07, -0.20)."""
-        from blackmagic_io import Gamut
+        from blackmagic_io import Matrix
         width, height = 16, 4
         rgb = self._const_rgb_uint8(width, height, (255, 0, 0))
-        recovered = self._round_trip(rgb, width, height, matrix=Gamut.Rec709)
+        recovered = self._round_trip(rgb, width, height, matrix=Matrix.Rec709)
 
         # Sample the centre pixel (avoids any potential edge effects).
         r = recovered[height // 2, width // 2, 0]
@@ -571,10 +571,10 @@ class TestYUV8RoundTrip:
 
     def test_pure_blue_narrow_rec709(self):
         """Pure blue round-trips to ~ (0, 0, 1)."""
-        from blackmagic_io import Gamut
+        from blackmagic_io import Matrix
         width, height = 16, 4
         rgb = self._const_rgb_uint8(width, height, (0, 0, 255))
-        recovered = self._round_trip(rgb, width, height, matrix=Gamut.Rec709)
+        recovered = self._round_trip(rgb, width, height, matrix=Matrix.Rec709)
 
         r = recovered[height // 2, width // 2, 0]
         g = recovered[height // 2, width // 2, 1]
@@ -585,10 +585,10 @@ class TestYUV8RoundTrip:
 
     def test_pure_green_narrow_rec709(self):
         """Pure green round-trips to ~ (0, 1, 0)."""
-        from blackmagic_io import Gamut
+        from blackmagic_io import Matrix
         width, height = 16, 4
         rgb = self._const_rgb_uint8(width, height, (0, 255, 0))
-        recovered = self._round_trip(rgb, width, height, matrix=Gamut.Rec709)
+        recovered = self._round_trip(rgb, width, height, matrix=Matrix.Rec709)
 
         r = recovered[height // 2, width // 2, 0]
         g = recovered[height // 2, width // 2, 1]
@@ -599,10 +599,10 @@ class TestYUV8RoundTrip:
 
     def test_pure_red_full_range_rec709(self):
         """Pure red round-trips correctly with full-range YUV too."""
-        from blackmagic_io import Gamut
+        from blackmagic_io import Matrix
         width, height = 16, 4
         rgb = self._const_rgb_uint8(width, height, (255, 0, 0))
-        recovered = self._round_trip(rgb, width, height, matrix=Gamut.Rec709,
+        recovered = self._round_trip(rgb, width, height, matrix=Matrix.Rec709,
                                      output_narrow_range=False)
 
         # Full range has 255 Y codes (vs 219), so tighter tolerance is fine,
@@ -616,10 +616,10 @@ class TestYUV8RoundTrip:
 
     def test_pure_red_narrow_rec601(self):
         """Bug applied to all matrices — verify Rec.601 round-trips too."""
-        from blackmagic_io import Gamut
+        from blackmagic_io import Matrix
         width, height = 16, 4
         rgb = self._const_rgb_uint8(width, height, (255, 0, 0))
-        recovered = self._round_trip(rgb, width, height, matrix=Gamut.Rec601)
+        recovered = self._round_trip(rgb, width, height, matrix=Matrix.Rec601)
 
         r = recovered[height // 2, width // 2, 0]
         g = recovered[height // 2, width // 2, 1]
@@ -630,10 +630,10 @@ class TestYUV8RoundTrip:
 
     def test_pure_red_narrow_rec2020(self):
         """Rec.2020 has different Kr/Kb but same encode/decode structure."""
-        from blackmagic_io import Gamut
+        from blackmagic_io import Matrix
         width, height = 16, 4
         rgb = self._const_rgb_uint8(width, height, (255, 0, 0))
-        recovered = self._round_trip(rgb, width, height, matrix=Gamut.Rec2020)
+        recovered = self._round_trip(rgb, width, height, matrix=Matrix.Rec2020)
 
         r = recovered[height // 2, width // 2, 0]
         g = recovered[height // 2, width // 2, 1]
@@ -675,9 +675,9 @@ class TestYUV10RoundTrip:
 
     def _round_trip(self, rgb_uint16, width, height, matrix=None,
                     output_narrow_range=True):
-        from blackmagic_io import (rgb_uint16_to_yuv10, yuv10_to_rgb_float, Gamut)
+        from blackmagic_io import (rgb_uint16_to_yuv10, yuv10_to_rgb_float, Matrix)
         if matrix is None:
-            matrix = Gamut.Rec709
+            matrix = Matrix.Rec709
         yuv = rgb_uint16_to_yuv10(rgb_uint16, width, height, matrix=matrix,
                                   input_narrow_range=False,
                                   output_narrow_range=output_narrow_range)
@@ -686,10 +686,10 @@ class TestYUV10RoundTrip:
 
     def test_mid_gray_narrow_rec709(self):
         """Mid-gray round-trips with chroma at midpoint and Y in band."""
-        from blackmagic_io import Gamut
+        from blackmagic_io import Matrix
         width, height = 48, 4
         rgb = self._const_rgb_uint16(width, height, (32768, 32768, 32768))
-        recovered = self._round_trip(rgb, width, height, matrix=Gamut.Rec709)
+        recovered = self._round_trip(rgb, width, height, matrix=Matrix.Rec709)
 
         expected = 32768 / 65535.0
         assert np.allclose(recovered, expected, atol=self.TOL), \
@@ -697,10 +697,10 @@ class TestYUV10RoundTrip:
 
     def test_pure_red_narrow_rec709(self):
         """Pure red round-trips to ~ (1, 0, 0)."""
-        from blackmagic_io import Gamut
+        from blackmagic_io import Matrix
         width, height = 48, 4
         rgb = self._const_rgb_uint16(width, height, (65535, 0, 0))
-        recovered = self._round_trip(rgb, width, height, matrix=Gamut.Rec709)
+        recovered = self._round_trip(rgb, width, height, matrix=Matrix.Rec709)
 
         r = recovered[height // 2, width // 2, 0]
         g = recovered[height // 2, width // 2, 1]
@@ -711,10 +711,10 @@ class TestYUV10RoundTrip:
 
     def test_pure_blue_narrow_rec709(self):
         """Pure blue round-trips to ~ (0, 0, 1)."""
-        from blackmagic_io import Gamut
+        from blackmagic_io import Matrix
         width, height = 48, 4
         rgb = self._const_rgb_uint16(width, height, (0, 0, 65535))
-        recovered = self._round_trip(rgb, width, height, matrix=Gamut.Rec709)
+        recovered = self._round_trip(rgb, width, height, matrix=Matrix.Rec709)
 
         r = recovered[height // 2, width // 2, 0]
         g = recovered[height // 2, width // 2, 1]
@@ -725,10 +725,10 @@ class TestYUV10RoundTrip:
 
     def test_pure_green_narrow_rec709(self):
         """Pure green round-trips to ~ (0, 1, 0)."""
-        from blackmagic_io import Gamut
+        from blackmagic_io import Matrix
         width, height = 48, 4
         rgb = self._const_rgb_uint16(width, height, (0, 65535, 0))
-        recovered = self._round_trip(rgb, width, height, matrix=Gamut.Rec709)
+        recovered = self._round_trip(rgb, width, height, matrix=Matrix.Rec709)
 
         r = recovered[height // 2, width // 2, 0]
         g = recovered[height // 2, width // 2, 1]
@@ -739,10 +739,10 @@ class TestYUV10RoundTrip:
 
     def test_pure_red_full_range_rec709(self):
         """Pure red round-trips correctly with full-range YUV too."""
-        from blackmagic_io import Gamut
+        from blackmagic_io import Matrix
         width, height = 48, 4
         rgb = self._const_rgb_uint16(width, height, (65535, 0, 0))
-        recovered = self._round_trip(rgb, width, height, matrix=Gamut.Rec709,
+        recovered = self._round_trip(rgb, width, height, matrix=Matrix.Rec709,
                                      output_narrow_range=False)
 
         r = recovered[height // 2, width // 2, 0]
@@ -754,10 +754,10 @@ class TestYUV10RoundTrip:
 
     def test_pure_red_narrow_rec601(self):
         """Rec.601 (different Kr/Kb) round-trips too."""
-        from blackmagic_io import Gamut
+        from blackmagic_io import Matrix
         width, height = 48, 4
         rgb = self._const_rgb_uint16(width, height, (65535, 0, 0))
-        recovered = self._round_trip(rgb, width, height, matrix=Gamut.Rec601)
+        recovered = self._round_trip(rgb, width, height, matrix=Matrix.Rec601)
 
         r = recovered[height // 2, width // 2, 0]
         g = recovered[height // 2, width // 2, 1]
@@ -768,10 +768,10 @@ class TestYUV10RoundTrip:
 
     def test_pure_red_narrow_rec2020(self):
         """Rec.2020 has different Kr/Kb but same encode/decode structure."""
-        from blackmagic_io import Gamut
+        from blackmagic_io import Matrix
         width, height = 48, 4
         rgb = self._const_rgb_uint16(width, height, (65535, 0, 0))
-        recovered = self._round_trip(rgb, width, height, matrix=Gamut.Rec2020)
+        recovered = self._round_trip(rgb, width, height, matrix=Matrix.Rec2020)
 
         r = recovered[height // 2, width // 2, 0]
         g = recovered[height // 2, width // 2, 1]
@@ -1117,13 +1117,13 @@ class TestYUV8Uint16RoundTrip:
         return frame
 
     def _round_trip(self, rgb_uint8, width, height, output_narrow_range):
-        from blackmagic_io import rgb_uint8_to_yuv8, yuv8_to_rgb_uint16, Gamut
+        from blackmagic_io import rgb_uint8_to_yuv8, yuv8_to_rgb_uint16, Matrix
         yuv = rgb_uint8_to_yuv8(rgb_uint8, width, height,
-                                matrix=Gamut.Rec709,
+                                matrix=Matrix.Rec709,
                                 input_narrow_range=False,
                                 output_narrow_range=True)
         return yuv8_to_rgb_uint16(yuv, width, height,
-                                  matrix=Gamut.Rec709,
+                                  matrix=Matrix.Rec709,
                                   input_narrow_range=True,
                                   output_narrow_range=output_narrow_range)
 
@@ -1175,13 +1175,13 @@ class TestYUV10Uint16RoundTrip:
         return frame
 
     def _round_trip(self, rgb_uint16, width, height, output_narrow_range):
-        from blackmagic_io import rgb_uint16_to_yuv10, yuv10_to_rgb_uint16, Gamut
+        from blackmagic_io import rgb_uint16_to_yuv10, yuv10_to_rgb_uint16, Matrix
         yuv = rgb_uint16_to_yuv10(rgb_uint16, width, height,
-                                  matrix=Gamut.Rec709,
+                                  matrix=Matrix.Rec709,
                                   input_narrow_range=False,
                                   output_narrow_range=True)
         return yuv10_to_rgb_uint16(yuv, width, height,
-                                   matrix=Gamut.Rec709,
+                                   matrix=Matrix.Rec709,
                                    input_narrow_range=True,
                                    output_narrow_range=output_narrow_range)
 

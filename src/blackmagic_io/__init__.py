@@ -68,6 +68,12 @@ try:
         unpack_rgb12 as _unpack_rgb12,
     )
 
+    def _unwrap_matrix(matrix):
+        """Accept either the wrapper Matrix enum or the raw _decklink.Matrix."""
+        if isinstance(matrix, Matrix):
+            return matrix.value
+        return matrix
+
     # Wrap conversion functions to ensure C-contiguous arrays
     def rgb_to_bgra(rgb_array, width, height):
         """Convert RGB numpy array to BGRA format.
@@ -85,7 +91,7 @@ try:
         rgb_array = np.ascontiguousarray(rgb_array)
         return _rgb_to_bgra(rgb_array, width, height)
 
-    def rgb_uint8_to_yuv8(rgb_array, width, height, matrix=Gamut.Rec709,
+    def rgb_uint8_to_yuv8(rgb_array, width, height, matrix=_Matrix.Rec709,
                           input_narrow_range=False, output_narrow_range=True):
         """Convert RGB uint8 numpy array to 8-bit YUV 2vuy format.
 
@@ -103,9 +109,9 @@ try:
             Flat uint8 array in 2vuy format
         """
         rgb_array = np.ascontiguousarray(rgb_array)
-        return _rgb_uint8_to_yuv8(rgb_array, width, height, matrix, input_narrow_range, output_narrow_range)
+        return _rgb_uint8_to_yuv8(rgb_array, width, height, _unwrap_matrix(matrix), input_narrow_range, output_narrow_range)
 
-    def rgb_uint16_to_yuv8(rgb_array, width, height, matrix=Gamut.Rec709, input_narrow_range=False, output_narrow_range=True):
+    def rgb_uint16_to_yuv8(rgb_array, width, height, matrix=_Matrix.Rec709, input_narrow_range=False, output_narrow_range=True):
         """Convert RGB uint16 numpy array to 8-bit YUV 2vuy format.
 
         Automatically converts input array to C-contiguous layout if needed.
@@ -125,9 +131,9 @@ try:
             Flat uint8 array in 2vuy format
         """
         rgb_array = np.ascontiguousarray(rgb_array)
-        return _rgb_uint16_to_yuv8(rgb_array, width, height, matrix, input_narrow_range, output_narrow_range)
+        return _rgb_uint16_to_yuv8(rgb_array, width, height, _unwrap_matrix(matrix), input_narrow_range, output_narrow_range)
 
-    def rgb_float_to_yuv8(rgb_array, width, height, matrix=Gamut.Rec709, output_narrow_range=True):
+    def rgb_float_to_yuv8(rgb_array, width, height, matrix=_Matrix.Rec709, output_narrow_range=True):
         """Convert RGB float numpy array to 8-bit YUV 2vuy format.
 
         Automatically converts input array to C-contiguous layout if needed.
@@ -147,9 +153,9 @@ try:
             Flat uint8 array in 2vuy format
         """
         rgb_array = np.ascontiguousarray(rgb_array)
-        return _rgb_float_to_yuv8(rgb_array, width, height, matrix, output_narrow_range)
+        return _rgb_float_to_yuv8(rgb_array, width, height, _unwrap_matrix(matrix), output_narrow_range)
 
-    def rgb_uint16_to_yuv10(rgb_array, width, height, matrix=Gamut.Rec709, input_narrow_range=False, output_narrow_range=True):
+    def rgb_uint16_to_yuv10(rgb_array, width, height, matrix=_Matrix.Rec709, input_narrow_range=False, output_narrow_range=True):
         """Convert RGB uint16 numpy array to 10-bit YUV v210 format.
 
         Automatically converts input array to C-contiguous layout if needed.
@@ -168,9 +174,9 @@ try:
             Flat uint8 array in v210 format
         """
         rgb_array = np.ascontiguousarray(rgb_array)
-        return _rgb_uint16_to_yuv10(rgb_array, width, height, matrix, input_narrow_range, output_narrow_range)
+        return _rgb_uint16_to_yuv10(rgb_array, width, height, _unwrap_matrix(matrix), input_narrow_range, output_narrow_range)
 
-    def rgb_float_to_yuv10(rgb_array, width, height, matrix=Gamut.Rec709, output_narrow_range=True):
+    def rgb_float_to_yuv10(rgb_array, width, height, matrix=_Matrix.Rec709, output_narrow_range=True):
         """Convert RGB float numpy array to 10-bit YUV v210 format.
 
         Automatically converts input array to C-contiguous layout if needed.
@@ -191,7 +197,7 @@ try:
             Flat uint8 array in v210 format
         """
         rgb_array = np.ascontiguousarray(rgb_array)
-        return _rgb_float_to_yuv10(rgb_array, width, height, matrix, output_narrow_range)
+        return _rgb_float_to_yuv10(rgb_array, width, height, _unwrap_matrix(matrix), output_narrow_range)
 
     def rgb_uint16_to_rgb10(rgb_array, width, height, input_narrow_range=True, output_narrow_range=True):
         """Convert RGB uint16 numpy array to 10-bit RGB r210 format.
@@ -272,7 +278,7 @@ try:
         return _rgb_float_to_rgb12(rgb_array, width, height, output_narrow_range)
 
     # Unpacking functions (format -> RGB)
-    def yuv10_to_rgb_uint16(yuv_array, width, height, matrix=Gamut.Rec709, input_narrow_range=True, output_narrow_range=False, row_bytes=None):
+    def yuv10_to_rgb_uint16(yuv_array, width, height, matrix=_Matrix.Rec709, input_narrow_range=True, output_narrow_range=False, row_bytes=None):
         """Convert 10-bit YUV (v210) to RGB uint16.
 
         Args:
@@ -290,10 +296,10 @@ try:
             HxWx3 RGB array (uint16)
         """
         yuv_array = np.ascontiguousarray(yuv_array)
-        return _yuv10_to_rgb_uint16(yuv_array, width, height, matrix, input_narrow_range, output_narrow_range,
+        return _yuv10_to_rgb_uint16(yuv_array, width, height, _unwrap_matrix(matrix), input_narrow_range, output_narrow_range,
                                     -1 if row_bytes is None else row_bytes)
 
-    def yuv10_to_rgb_float(yuv_array, width, height, matrix=Gamut.Rec709, input_narrow_range=True, row_bytes=None):
+    def yuv10_to_rgb_float(yuv_array, width, height, matrix=_Matrix.Rec709, input_narrow_range=True, row_bytes=None):
         """Convert 10-bit YUV (v210) to RGB float.
 
         Args:
@@ -310,10 +316,10 @@ try:
             HxWx3 RGB array (float, 0.0-1.0 full range)
         """
         yuv_array = np.ascontiguousarray(yuv_array)
-        return _yuv10_to_rgb_float(yuv_array, width, height, matrix, input_narrow_range,
+        return _yuv10_to_rgb_float(yuv_array, width, height, _unwrap_matrix(matrix), input_narrow_range,
                                    -1 if row_bytes is None else row_bytes)
 
-    def yuv8_to_rgb_uint16(yuv_array, width, height, matrix=Gamut.Rec709, input_narrow_range=True, output_narrow_range=False, row_bytes=None):
+    def yuv8_to_rgb_uint16(yuv_array, width, height, matrix=_Matrix.Rec709, input_narrow_range=True, output_narrow_range=False, row_bytes=None):
         """Convert 8-bit YUV (2vuy) to RGB uint16.
 
         Args:
@@ -330,10 +336,10 @@ try:
             HxWx3 RGB array (uint16)
         """
         yuv_array = np.ascontiguousarray(yuv_array)
-        return _yuv8_to_rgb_uint16(yuv_array, width, height, matrix, input_narrow_range, output_narrow_range,
+        return _yuv8_to_rgb_uint16(yuv_array, width, height, _unwrap_matrix(matrix), input_narrow_range, output_narrow_range,
                                    -1 if row_bytes is None else row_bytes)
 
-    def yuv8_to_rgb_float(yuv_array, width, height, matrix=Gamut.Rec709, input_narrow_range=True, row_bytes=None):
+    def yuv8_to_rgb_float(yuv_array, width, height, matrix=_Matrix.Rec709, input_narrow_range=True, row_bytes=None):
         """Convert 8-bit YUV (2vuy) to RGB float.
 
         Args:
@@ -349,7 +355,7 @@ try:
             HxWx3 RGB array (float, 0.0-1.0 full range)
         """
         yuv_array = np.ascontiguousarray(yuv_array)
-        return _yuv8_to_rgb_float(yuv_array, width, height, matrix, input_narrow_range,
+        return _yuv8_to_rgb_float(yuv_array, width, height, _unwrap_matrix(matrix), input_narrow_range,
                                   -1 if row_bytes is None else row_bytes)
 
     def rgb10_to_uint16(rgb_array, width, height, input_narrow_range=True, output_narrow_range=False, row_bytes=None):

@@ -16,8 +16,8 @@ DeckLinkOutput::DeckLinkOutput()
     , m_outputEnabled(false)
     , m_frameDuration(0)
     , m_timeScale(0)
-    , m_useHdrMetadata(false)
-    , m_hdrColorimetry(Gamut::Rec709)
+    , m_signalMetadata(false)
+    , m_matrix(Matrix::Rec709)
     , m_hdrEotf(Eotf::SDR)
 {
 }
@@ -198,7 +198,7 @@ bool DeckLinkOutput::displayFrame()
 
     IDeckLinkVideoFrame* frame = mutableFrame;
 
-    if (m_useHdrMetadata) {
+    if (m_signalMetadata) {
         frame = createHdrFrame(mutableFrame);
         mutableFrame->Release();
     }
@@ -243,77 +243,45 @@ void DeckLinkOutput::cleanup()
     }
 }
 
-void DeckLinkOutput::setHdrMetadata(Gamut colorimetry, Eotf eotf)
+void DeckLinkOutput::setMatrix(Matrix matrix)
 {
-    m_useHdrMetadata = true;
-    m_hdrColorimetry = colorimetry;
-    m_hdrEotf = eotf;
+    m_signalMetadata = true;
+    m_matrix = matrix;
 
-    if (eotf == Eotf::PQ) {
-        if (colorimetry == Gamut::Rec2020) {
-            m_hdrStaticMetadata.displayPrimariesRedX = 0.708;
-            m_hdrStaticMetadata.displayPrimariesRedY = 0.292;
-            m_hdrStaticMetadata.displayPrimariesGreenX = 0.170;
-            m_hdrStaticMetadata.displayPrimariesGreenY = 0.797;
-            m_hdrStaticMetadata.displayPrimariesBlueX = 0.131;
-            m_hdrStaticMetadata.displayPrimariesBlueY = 0.046;
-        } else {
-            m_hdrStaticMetadata.displayPrimariesRedX = 0.64;
-            m_hdrStaticMetadata.displayPrimariesRedY = 0.33;
-            m_hdrStaticMetadata.displayPrimariesGreenX = 0.30;
-            m_hdrStaticMetadata.displayPrimariesGreenY = 0.60;
-            m_hdrStaticMetadata.displayPrimariesBlueX = 0.15;
-            m_hdrStaticMetadata.displayPrimariesBlueY = 0.06;
-        }
-
-        m_hdrStaticMetadata.whitePointX = 0.3127;
-        m_hdrStaticMetadata.whitePointY = 0.3290;
-
-        m_hdrStaticMetadata.maxMasteringLuminance = 1000.0;
-        m_hdrStaticMetadata.minMasteringLuminance = 0.0001;
-        m_hdrStaticMetadata.maxContentLightLevel = 1000.0;
-        m_hdrStaticMetadata.maxFrameAverageLightLevel = 50.0;
+    if (matrix == Matrix::Rec2020) {
+        m_hdrStaticMetadata.displayPrimariesRedX = 0.708;
+        m_hdrStaticMetadata.displayPrimariesRedY = 0.292;
+        m_hdrStaticMetadata.displayPrimariesGreenX = 0.170;
+        m_hdrStaticMetadata.displayPrimariesGreenY = 0.797;
+        m_hdrStaticMetadata.displayPrimariesBlueX = 0.131;
+        m_hdrStaticMetadata.displayPrimariesBlueY = 0.046;
     } else {
-        m_hdrStaticMetadata.displayPrimariesRedX = 0.0;
-        m_hdrStaticMetadata.displayPrimariesRedY = 0.0;
-        m_hdrStaticMetadata.displayPrimariesGreenX = 0.0;
-        m_hdrStaticMetadata.displayPrimariesGreenY = 0.0;
-        m_hdrStaticMetadata.displayPrimariesBlueX = 0.0;
-        m_hdrStaticMetadata.displayPrimariesBlueY = 0.0;
-        m_hdrStaticMetadata.whitePointX = 0.0;
-        m_hdrStaticMetadata.whitePointY = 0.0;
-        m_hdrStaticMetadata.maxMasteringLuminance = 0.0;
-        m_hdrStaticMetadata.minMasteringLuminance = 0.0;
-        m_hdrStaticMetadata.maxContentLightLevel = 0.0;
-        m_hdrStaticMetadata.maxFrameAverageLightLevel = 0.0;
+        m_hdrStaticMetadata.displayPrimariesRedX = 0.64;
+        m_hdrStaticMetadata.displayPrimariesRedY = 0.33;
+        m_hdrStaticMetadata.displayPrimariesGreenX = 0.30;
+        m_hdrStaticMetadata.displayPrimariesGreenY = 0.60;
+        m_hdrStaticMetadata.displayPrimariesBlueX = 0.15;
+        m_hdrStaticMetadata.displayPrimariesBlueY = 0.06;
     }
+
+    m_hdrStaticMetadata.whitePointX = 0.3127;
+    m_hdrStaticMetadata.whitePointY = 0.3290;
+    m_hdrStaticMetadata.maxMasteringLuminance = 1000.0;
+    m_hdrStaticMetadata.minMasteringLuminance = 0.0001;
+    m_hdrStaticMetadata.maxContentLightLevel = 1000.0;
+    m_hdrStaticMetadata.maxFrameAverageLightLevel = 50.0;
 }
 
-void DeckLinkOutput::setHdrStaticMetadata(Gamut colorimetry, Eotf eotf, const HdrStaticMetadata& staticMetadata)
+void DeckLinkOutput::setEotf(Eotf eotf)
 {
-    m_useHdrMetadata = true;
-    m_hdrColorimetry = colorimetry;
+    m_signalMetadata = true;
     m_hdrEotf = eotf;
-    m_hdrStaticMetadata = staticMetadata;
 }
 
-void DeckLinkOutput::clearHdrMetadata()
+void DeckLinkOutput::setStaticMetadata(const HdrStaticMetadata& staticMetadata)
 {
-    m_useHdrMetadata = false;
-    m_hdrColorimetry = Gamut::Rec709;
-    m_hdrEotf = Eotf::SDR;
-    m_hdrStaticMetadata.displayPrimariesRedX = 0.0;
-    m_hdrStaticMetadata.displayPrimariesRedY = 0.0;
-    m_hdrStaticMetadata.displayPrimariesGreenX = 0.0;
-    m_hdrStaticMetadata.displayPrimariesGreenY = 0.0;
-    m_hdrStaticMetadata.displayPrimariesBlueX = 0.0;
-    m_hdrStaticMetadata.displayPrimariesBlueY = 0.0;
-    m_hdrStaticMetadata.whitePointX = 0.0;
-    m_hdrStaticMetadata.whitePointY = 0.0;
-    m_hdrStaticMetadata.maxMasteringLuminance = 0.0;
-    m_hdrStaticMetadata.minMasteringLuminance = 0.0;
-    m_hdrStaticMetadata.maxContentLightLevel = 0.0;
-    m_hdrStaticMetadata.maxFrameAverageLightLevel = 0.0;
+    m_signalMetadata = true;
+    m_hdrStaticMetadata = staticMetadata;
 }
 
 IDeckLinkVideoFrame* DeckLinkOutput::createHdrFrame(IDeckLinkMutableVideoFrame* frame)
@@ -330,7 +298,7 @@ IDeckLinkVideoFrame* DeckLinkOutput::createHdrFrame(IDeckLinkMutableVideoFrame* 
     };
 
     HdrMetadata metadata = HdrMetadata::custom(
-        m_hdrColorimetry,
+        m_matrix,
         m_hdrEotf,
         primaries,
         m_hdrStaticMetadata.maxMasteringLuminance,

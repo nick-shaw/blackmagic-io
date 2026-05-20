@@ -49,13 +49,13 @@ def _build_frame_data(pixel_format, rgb_pattern, width, height):
     if pixel_format == decklink_io.PixelFormat.YUV8:
         rgb_uint8 = np.round(rgb_pattern * 255).astype(np.uint8)
         return decklink_io.rgb_uint8_to_yuv8(
-            rgb_uint8, width, height, matrix=decklink_io.Gamut.Rec709,
+            rgb_uint8, width, height, matrix=decklink_io.Matrix.Rec709,
         )
     if pixel_format == decklink_io.PixelFormat.YUV10:
         rgb_uint16 = np.round(rgb_pattern * 65535).astype(np.uint16)
         return decklink_io.rgb_uint16_to_yuv10(
             rgb_uint16, width, height,
-            matrix=decklink_io.Gamut.Rec709,
+            matrix=decklink_io.Matrix.Rec709,
             input_narrow_range=False,
             output_narrow_range=True,
         )
@@ -77,7 +77,7 @@ def _captured_to_rgb_float(captured_frame):
         return decklink_io.yuv8_to_rgb_float(
             np.array(captured_frame.data, dtype=np.uint8),
             captured_frame.width, captured_frame.height,
-            matrix=captured_frame.colorspace,
+            matrix=captured_frame.matrix,
             input_narrow_range=True,
             row_bytes=captured_frame.row_bytes,
         )
@@ -85,7 +85,7 @@ def _captured_to_rgb_float(captured_frame):
         return decklink_io.yuv10_to_rgb_float(
             np.array(captured_frame.data, dtype=np.uint8),
             captured_frame.width, captured_frame.height,
-            matrix=captured_frame.colorspace,
+            matrix=captured_frame.matrix,
             input_narrow_range=True,
             row_bytes=captured_frame.row_bytes,
         )
@@ -140,8 +140,8 @@ def _assert_hdr_metadata(captured_frame):
     assert captured_frame.eotf == decklink_io.Eotf.PQ, (
         f"EOTF mismatch: expected PQ, got {captured_frame.eotf}"
     )
-    assert captured_frame.colorspace == decklink_io.Gamut.Rec2020, (
-        f"Colorspace mismatch: expected Rec2020, got {captured_frame.colorspace}"
+    assert captured_frame.matrix == decklink_io.Matrix.Rec2020, (
+        f"Matrix mismatch: expected Rec2020, got {captured_frame.matrix}"
     )
 
     assert captured_frame.has_display_primaries, "Display primaries missing from captured signal"
@@ -177,9 +177,9 @@ def test_pixel_format_loopback(decklink_devices, pixel_format, format_name, veri
     width, height = settings.width, settings.height
 
     if verify_hdr:
-        output_device.set_hdr_static_metadata(
-            decklink_io.Gamut.Rec2020, decklink_io.Eotf.PQ, _make_hdr_metadata(),
-        )
+        output_device.set_matrix(decklink_io.Matrix.Rec2020)
+        output_device.set_eotf(decklink_io.Eotf.PQ)
+        output_device.set_static_metadata(_make_hdr_metadata())
 
     assert output_device.setup_output(settings), f"Failed to set up output for {format_name}"
 

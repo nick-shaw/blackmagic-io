@@ -1,6 +1,6 @@
 """HDR static metadata loopback test, parametrised over HDMI and SDI.
 
-Iterates EOTF + colorimetry combinations through both transports, configures
+Iterates EOTF + matrix combinations through both transports, configures
 the output's HDR static metadata, captures a frame on the corresponding input,
 and verifies the metadata round-trip.
 
@@ -55,25 +55,25 @@ TRANSPORTS = [
 ]
 
 
-# (case_name, gamut, eotf, static_metadata_kwargs_or_None, expect_full_mastering)
+# (case_name, matrix, eotf, static_metadata_kwargs_or_None, expect_full_mastering)
 TEST_CASES = [
     (
         "SDR Rec.709 (no HDR metadata)",
-        decklink_io.Gamut.Rec709,
+        decklink_io.Matrix.Rec709,
         decklink_io.Eotf.SDR,
         None,
         False,
     ),
     (
         "SDR Rec.2020 (matrix signalling without HDR EOTF)",
-        decklink_io.Gamut.Rec2020,
+        decklink_io.Matrix.Rec2020,
         decklink_io.Eotf.SDR,
         None,
         False,
     ),
     (
         "PQ Rec.2020 + full mastering display",
-        decklink_io.Gamut.Rec2020,
+        decklink_io.Matrix.Rec2020,
         decklink_io.Eotf.PQ,
         dict(
             primaries=PRIMARIES_REC2020,
@@ -87,7 +87,7 @@ TEST_CASES = [
     ),
     (
         "PQ Rec.709 + full mastering display",
-        decklink_io.Gamut.Rec709,
+        decklink_io.Matrix.Rec709,
         decklink_io.Eotf.PQ,
         dict(
             primaries=PRIMARIES_REC709,
@@ -101,7 +101,7 @@ TEST_CASES = [
     ),
     (
         "HLG Rec.2020",
-        decklink_io.Gamut.Rec2020,
+        decklink_io.Matrix.Rec2020,
         decklink_io.Eotf.HLG,
         None,
         False,
@@ -126,16 +126,11 @@ def _make_static_metadata(primaries, white, max_lum, min_lum, max_cll, max_fall)
     return md
 
 
-def _configure_output_metadata(output_device, gamut, eotf, static_metadata_kwargs):
-    if eotf == decklink_io.Eotf.SDR and gamut == decklink_io.Gamut.Rec709:
-        output_device.clear_hdr_metadata()
-        return
-    if static_metadata_kwargs is None:
-        output_device.set_hdr_metadata(gamut, eotf)
-        return
-    output_device.set_hdr_static_metadata(
-        gamut, eotf, _make_static_metadata(**static_metadata_kwargs),
-    )
+def _configure_output_metadata(output_device, matrix, eotf, static_metadata_kwargs):
+    output_device.set_matrix(matrix)
+    output_device.set_eotf(eotf)
+    if static_metadata_kwargs is not None:
+        output_device.set_static_metadata(_make_static_metadata(**static_metadata_kwargs))
 
 
 def _push_frame(output_device, width, height):
@@ -208,17 +203,17 @@ def decklink_devices(request):
 
 
 @pytest.mark.parametrize(
-    "case_name, gamut, eotf, static_metadata_kwargs, expect_full_mastering",
+    "case_name, matrix, eotf, static_metadata_kwargs, expect_full_mastering",
     TEST_CASES,
     ids=[c[0] for c in TEST_CASES],
 )
 def test_hdr_metadata_roundtrip(
-    decklink_devices, case_name, gamut, eotf, static_metadata_kwargs, expect_full_mastering,
+    decklink_devices, case_name, matrix, eotf, static_metadata_kwargs, expect_full_mastering,
 ):
-    """Round-trip HDR static metadata through one transport (HDMI or SDI) for one EOTF + colorimetry combination."""
+    """Round-trip HDR static metadata through one transport (HDMI or SDI) for one EOTF + matrix combination."""
     output_device, input_device, _transport = decklink_devices
 
-    _configure_output_metadata(output_device, gamut, eotf, static_metadata_kwargs)
+    _configure_output_metadata(output_device, matrix, eotf, static_metadata_kwargs)
 
     settings = output_device.get_video_settings(DISPLAY_MODE)
     settings.format = PIXEL_FORMAT
@@ -233,8 +228,8 @@ def test_hdr_metadata_roundtrip(
             frame = _capture_frame(input_device)
 
             assert frame.eotf == eotf, f"EOTF: expected {eotf}, got {frame.eotf}"
-            assert frame.colorspace == gamut, (
-                f"Colorspace: expected {gamut}, got {frame.colorspace}"
+            assert frame.matrix == matrix, (
+                f"Matrix: expected {matrix}, got {frame.matrix}"
             )
 
             if expect_full_mastering:

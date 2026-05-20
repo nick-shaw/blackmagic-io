@@ -95,7 +95,7 @@ DeckLinkInput::DeckLinkInput()
 {
     m_lastFrame.valid = false;
     m_lastFrame.hasMetadata = false;
-    m_lastFrame.colorspace = Gamut::Rec709;
+    m_lastFrame.matrix = Matrix::Rec709;
     m_lastFrame.eotf = Eotf::SDR;
     m_lastFrame.hasDisplayPrimaries = false;
     m_lastFrame.hasWhitePoint = false;
@@ -278,7 +278,7 @@ void DeckLinkInput::onFrameArrived(IDeckLinkVideoInputFrame* videoFrame)
     tempFrame.mode = m_currentSettings.mode;
 
     tempFrame.hasMetadata = false;
-    tempFrame.colorspace = Gamut::Rec709;
+    tempFrame.matrix = Matrix::Rec709;
     tempFrame.eotf = Eotf::SDR;
     tempFrame.hasDisplayPrimaries = false;
     tempFrame.hasWhitePoint = false;
@@ -296,13 +296,13 @@ void DeckLinkInput::onFrameArrived(IDeckLinkVideoInputFrame* videoFrame)
             tempFrame.hasMetadata = true;
             switch (colorspace) {
                 case bmdColorspaceRec601:
-                    tempFrame.colorspace = Gamut::Rec601;
+                    tempFrame.matrix = Matrix::Rec601;
                     break;
                 case bmdColorspaceRec709:
-                    tempFrame.colorspace = Gamut::Rec709;
+                    tempFrame.matrix = Matrix::Rec709;
                     break;
                 case bmdColorspaceRec2020:
-                    tempFrame.colorspace = Gamut::Rec2020;
+                    tempFrame.matrix = Matrix::Rec2020;
                     break;
             }
         }

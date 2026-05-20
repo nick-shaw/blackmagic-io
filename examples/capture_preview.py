@@ -65,7 +65,7 @@ def capture_high_quality_frame(input_device, narrow_range=False):
         'height': frame_with_metadata['height'],
         'format': frame_with_metadata['format'],
         'mode': frame_with_metadata['mode'],
-        'colorspace': frame_with_metadata['colorspace'],
+        'matrix': frame_with_metadata['matrix'],
         'eotf': frame_with_metadata['eotf'],
         'input_narrow_range': frame_with_metadata['input_narrow_range'],
         'output_range': range_str
@@ -82,7 +82,7 @@ def capture_high_quality_frame(input_device, narrow_range=False):
     print(f"       {json_filename}")
     print(f"  Shape: {rgb_uint16.shape}, dtype: {rgb_uint16.dtype}")
     print(f"  Format: {frame_with_metadata['format']}")
-    print(f"  Colorspace: {frame_with_metadata['colorspace']}")
+    print(f"  Matrix: {frame_with_metadata['matrix']}")
     print(f"  EOTF: {frame_with_metadata['eotf']}")
 
     input_device.stop_capture()
@@ -141,19 +141,19 @@ def simple_preview(device_index=0, scale=1.0, input_connection=None):
                         'mode': frame_data['mode'],
                         'format': frame_data['format'],
                         'eotf': frame_data['eotf'],
-                        'colorspace': frame_data['colorspace']
+                        'matrix': frame_data['matrix']
                     }
                     print(f"  Mode: {metadata['mode']}, "
                           f"Format: {metadata['format']}, "
                           f"EOTF: {metadata['eotf']}, "
-                          f"Matrix: {metadata['colorspace']}")
+                          f"Matrix: {metadata['matrix']}")
                     prev_metadata = metadata.copy()
                 else:
                     current_metadata = {
                         'mode': frame_data['mode'],
                         'format': frame_data['format'],
                         'eotf': frame_data['eotf'],
-                        'colorspace': frame_data['colorspace']
+                        'matrix': frame_data['matrix']
                     }
 
                     if current_metadata != prev_metadata:
@@ -164,8 +164,8 @@ def simple_preview(device_index=0, scale=1.0, input_connection=None):
                             print(f"  Format: {prev_metadata['format']} -> {current_metadata['format']}")
                         if current_metadata['eotf'] != prev_metadata['eotf']:
                             print(f"  EOTF: {prev_metadata['eotf']} -> {current_metadata['eotf']}")
-                        if current_metadata['colorspace'] != prev_metadata['colorspace']:
-                            print(f"  Colorspace: {prev_metadata['colorspace']} -> {current_metadata['colorspace']}")
+                        if current_metadata['matrix'] != prev_metadata['matrix']:
+                            print(f"  Matrix: {prev_metadata['matrix']} -> {current_metadata['matrix']}")
 
                         metadata = current_metadata
                         prev_metadata = current_metadata.copy()
@@ -214,7 +214,7 @@ def simple_preview(device_index=0, scale=1.0, input_connection=None):
                                cv2.FONT_HERSHEY_SIMPLEX, 0.6, (0, 255, 0), 2)
                     y_offset += 30
 
-                    matrix_text = f"Matrix: {metadata['colorspace']}"
+                    matrix_text = f"Matrix: {metadata['matrix']}"
                     cv2.putText(bgr_frame, matrix_text, (10, y_offset),
                                cv2.FONT_HERSHEY_SIMPLEX, 0.6, (0, 255, 0), 2)
 

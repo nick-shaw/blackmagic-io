@@ -46,7 +46,18 @@ def _adjust_range_uint8(rgb: np.ndarray,
 
 
 class Matrix(Enum):
-    """R'G'B' to Y'CbCr conversion matrix"""
+    """Y'CbCr matrix identifying the coefficient set used for R'G'B' ↔ Y'CbCr
+    conversion and signalled on the wire (VPID for SDI, AVI InfoFrame for HDMI).
+    Not HDR-specific — every Y'CbCr signal has a matrix."""
+    Rec601 = _decklink.Matrix.Rec601
+    Rec709 = _decklink.Matrix.Rec709
+    Rec2020 = _decklink.Matrix.Rec2020
+
+
+class Gamut(Enum):
+    """HDR static-metadata colorimetry-bundle identifier (display primaries,
+    white point). Conveyed via the HDR Static Metadata InfoFrame; only
+    meaningful for PQ output on tested hardware."""
     Rec601 = _decklink.Gamut.Rec601
     Rec709 = _decklink.Gamut.Rec709
     Rec2020 = _decklink.Gamut.Rec2020
@@ -353,22 +364,20 @@ class BlackmagicOutput:
         self._current_input_narrow_range = input_narrow_range
         self._current_output_narrow_range = output_narrow_range
 
-        gamut = matrix.value
+        self._device.set_matrix(matrix.value)
 
         if hdr_metadata is not None:
             eotf = hdr_metadata.get('eotf')
             if eotf is None:
                 raise ValueError("hdr_metadata must contain 'eotf' key")
 
-            static_metadata = hdr_metadata.get('static_metadata')
+            self._device.set_eotf(eotf.value)
 
+            static_metadata = hdr_metadata.get('static_metadata')
             if static_metadata is not None:
-                self._device.set_hdr_static_metadata(gamut, eotf.value, static_metadata)
-            else:
-                self._device.set_hdr_metadata(gamut, eotf.value)
+                self._device.set_static_metadata(static_metadata)
         else:
-            self._device.clear_hdr_metadata()
-            self._device.set_hdr_metadata(gamut, Eotf.SDR.value)
+            self._device.set_eotf(Eotf.SDR.value)
 
         if (not self._current_settings or
             self._current_settings.mode != display_mode.value or
@@ -912,7 +921,7 @@ class BlackmagicInput:
         """Capture a frame and convert to R'G'B' uint8 array (faster than float).
 
         Automatically detects pixel format and converts to R'G'B' uint8.
-        Uses colorspace metadata from the captured frame for Y'CbCr conversion.
+        Uses matrix metadata from the captured frame for Y'CbCr conversion.
 
         Args:
             timeout_ms: Capture timeout in milliseconds (default: 5000)
@@ -945,7 +954,7 @@ class BlackmagicInput:
         """Capture a frame and convert to R'G'B' uint8 with metadata (fast preview with metadata).
 
         Automatically detects pixel format and converts to R'G'B' uint8.
-        Uses colorspace metadata from the captured frame for Y'CbCr conversion.
+        Uses matrix metadata from the captured frame for Y'CbCr conversion.
 
         Args:
             timeout_ms: Capture timeout in milliseconds (default: 5000)
@@ -961,7 +970,7 @@ class BlackmagicInput:
                 - 'height': int
                 - 'format': PixelFormat name
                 - 'mode': DisplayMode name
-                - 'colorspace': Matrix name (Rec.601/709/2020)
+                - 'matrix': Matrix name (Rec.601/709/2020)
                 - 'eotf': Eotf name (SDR/PQ/HLG)
                 - 'input_narrow_range': bool (what was used for conversion)
                 - 'timecode': dict with timecode (if present):
@@ -992,7 +1001,7 @@ class BlackmagicInput:
             return None
 
         pixel_format = PixelFormat(captured_frame.format)
-        colorspace = Matrix(captured_frame.colorspace)
+        matrix = Matrix(captured_frame.matrix)
         eotf = Eotf(captured_frame.eotf)
 
         display_mode = None
@@ -1007,7 +1016,7 @@ class BlackmagicInput:
             'height': captured_frame.height,
             'format': pixel_format.name,
             'mode': display_mode.name if display_mode else 'Unknown',
-            'colorspace': colorspace.name,
+            'matrix': matrix.name,
             'eotf': eotf.name,
             'input_narrow_range': input_narrow_range,
             'output_narrow_range': output_narrow_range
@@ -1118,7 +1127,7 @@ class BlackmagicInput:
             Dictionary with:
                 - 'rgb': R'G'B' array (H×W×3), dtype uint16
                 - 'width', 'height': int
-                - 'format', 'mode', 'colorspace', 'eotf': name strings
+                - 'format', 'mode', 'matrix', 'eotf': name strings
                 - 'input_narrow_range', 'output_narrow_range': bool
                 - 'timecode': dict if present
                 - 'hdr_metadata': dict if present
@@ -1139,7 +1148,7 @@ class BlackmagicInput:
             return None
 
         pixel_format = PixelFormat(captured_frame.format)
-        colorspace = Matrix(captured_frame.colorspace)
+        matrix = Matrix(captured_frame.matrix)
         eotf = Eotf(captured_frame.eotf)
 
         display_mode = None
@@ -1154,7 +1163,7 @@ class BlackmagicInput:
             'height': captured_frame.height,
             'format': pixel_format.name,
             'mode': display_mode.name if display_mode else 'Unknown',
-            'colorspace': colorspace.name,
+            'matrix': matrix.name,
             'eotf': eotf.name,
             'input_narrow_range': input_narrow_range,
             'output_narrow_range': output_narrow_range
@@ -1218,7 +1227,7 @@ class BlackmagicInput:
         """Capture a frame and convert to R'G'B' float array.
 
         Automatically detects pixel format and converts to R'G'B' float (0.0-1.0).
-        Uses colorspace metadata from the captured frame for Y'CbCr conversion.
+        Uses matrix metadata from the captured frame for Y'CbCr conversion.
 
         Args:
             timeout_ms: Capture timeout in milliseconds (default: 5000)
@@ -1257,7 +1266,7 @@ class BlackmagicInput:
                 - 'height': int
                 - 'format': PixelFormat
                 - 'mode': DisplayMode
-                - 'colorspace': Matrix (Rec.601/709/2020)
+                - 'matrix': Matrix (Rec.601/709/2020)
                 - 'eotf': Eotf (SDR/PQ/HLG)
                 - 'input_narrow_range': bool (what was used for conversion)
                 - 'timecode': dict with timecode (if present):
@@ -1286,7 +1295,7 @@ class BlackmagicInput:
             return None
 
         pixel_format = PixelFormat(captured_frame.format)
-        colorspace = Matrix(captured_frame.colorspace)
+        matrix = Matrix(captured_frame.matrix)
         eotf = Eotf(captured_frame.eotf)
 
         display_mode = None
@@ -1301,7 +1310,7 @@ class BlackmagicInput:
             'height': captured_frame.height,
             'format': pixel_format.name,
             'mode': display_mode.name if display_mode else 'Unknown',
-            'colorspace': colorspace.name,
+            'matrix': matrix.name,
             'eotf': eotf.name,
             'input_narrow_range': input_narrow_range
         }
@@ -1463,7 +1472,7 @@ class BlackmagicInput:
             if pixel_format == _decklink.PixelFormat.YUV8:
                 rgb_uint16 = _decklink.yuv8_to_rgb_uint16(
                     frame_data, width, height,
-                    matrix=captured_frame.colorspace,
+                    matrix=captured_frame.matrix,
                     input_narrow_range=input_narrow_range,
                     output_narrow_range=output_narrow_range,
                     row_bytes=captured_frame.row_bytes
@@ -1473,7 +1482,7 @@ class BlackmagicInput:
             elif pixel_format == _decklink.PixelFormat.YUV10:
                 rgb_uint16 = _decklink.yuv10_to_rgb_uint16(
                     frame_data, width, height,
-                    matrix=captured_frame.colorspace,
+                    matrix=captured_frame.matrix,
                     input_narrow_range=input_narrow_range,
                     output_narrow_range=output_narrow_range,
                     row_bytes=captured_frame.row_bytes
@@ -1560,7 +1569,7 @@ class BlackmagicInput:
             if pixel_format == _decklink.PixelFormat.YUV8:
                 return _decklink.yuv8_to_rgb_float(
                     frame_data, width, height,
-                    matrix=captured_frame.colorspace,
+                    matrix=captured_frame.matrix,
                     input_narrow_range=input_narrow_range,
                     row_bytes=captured_frame.row_bytes
                 )
@@ -1568,7 +1577,7 @@ class BlackmagicInput:
             elif pixel_format == _decklink.PixelFormat.YUV10:
                 return _decklink.yuv10_to_rgb_float(
                     frame_data, width, height,
-                    matrix=captured_frame.colorspace,
+                    matrix=captured_frame.matrix,
                     input_narrow_range=input_narrow_range,
                     row_bytes=captured_frame.row_bytes
                 )

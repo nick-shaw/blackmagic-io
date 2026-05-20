@@ -50,7 +50,7 @@ py::array_t<uint8_t> rgb_to_bgra(py::array_t<uint8_t> rgb_array, int width, int 
     return result;
 }
 
-py::array_t<uint8_t> rgb_uint16_to_yuv10(py::array_t<uint16_t> rgb_array, int width, int height, DeckLinkOutput::Gamut matrix = DeckLinkOutput::Gamut::Rec709, bool input_narrow_range = false, bool output_narrow_range = true) {
+py::array_t<uint8_t> rgb_uint16_to_yuv10(py::array_t<uint16_t> rgb_array, int width, int height, DeckLinkOutput::Matrix matrix = DeckLinkOutput::Matrix::Rec709, bool input_narrow_range = false, bool output_narrow_range = true) {
     auto buf = rgb_array.request();
 
     if (buf.ndim != 3 || buf.shape[2] != 3) {
@@ -76,9 +76,9 @@ py::array_t<uint8_t> rgb_uint16_to_yuv10(py::array_t<uint16_t> rgb_array, int wi
     // Matrix coefficients: Y = Kr*R + Kg*G + Kb*B
     double Kr, Kb;
     switch (matrix) {
-        case DeckLinkOutput::Gamut::Rec601:  Kr = 0.299;  Kb = 0.114;  break;
-        case DeckLinkOutput::Gamut::Rec2020: Kr = 0.2627; Kb = 0.0593; break;
-        case DeckLinkOutput::Gamut::Rec709:
+        case DeckLinkOutput::Matrix::Rec601:  Kr = 0.299;  Kb = 0.114;  break;
+        case DeckLinkOutput::Matrix::Rec2020: Kr = 0.2627; Kb = 0.0593; break;
+        case DeckLinkOutput::Matrix::Rec709:
         default:                             Kr = 0.2126; Kb = 0.0722; break;
     }
     double Kg = 1.0 - Kr - Kb;
@@ -161,7 +161,7 @@ py::array_t<uint8_t> rgb_uint16_to_yuv10(py::array_t<uint16_t> rgb_array, int wi
     return result;
 }
 
-py::array_t<uint8_t> rgb_float_to_yuv10(py::array_t<float> rgb_array, int width, int height, DeckLinkOutput::Gamut matrix = DeckLinkOutput::Gamut::Rec709, bool output_narrow_range = true) {
+py::array_t<uint8_t> rgb_float_to_yuv10(py::array_t<float> rgb_array, int width, int height, DeckLinkOutput::Matrix matrix = DeckLinkOutput::Matrix::Rec709, bool output_narrow_range = true) {
     auto buf = rgb_array.request();
 
     if (buf.ndim != 3 || buf.shape[2] != 3) {
@@ -187,9 +187,9 @@ py::array_t<uint8_t> rgb_float_to_yuv10(py::array_t<float> rgb_array, int width,
     // Matrix coefficients: Y = Kr*R + Kg*G + Kb*B
     double Kr, Kb;
     switch (matrix) {
-        case DeckLinkOutput::Gamut::Rec601:  Kr = 0.299;  Kb = 0.114;  break;
-        case DeckLinkOutput::Gamut::Rec2020: Kr = 0.2627; Kb = 0.0593; break;
-        case DeckLinkOutput::Gamut::Rec709:
+        case DeckLinkOutput::Matrix::Rec601:  Kr = 0.299;  Kb = 0.114;  break;
+        case DeckLinkOutput::Matrix::Rec2020: Kr = 0.2627; Kb = 0.0593; break;
+        case DeckLinkOutput::Matrix::Rec709:
         default:                             Kr = 0.2126; Kb = 0.0722; break;
     }
     double Kg = 1.0 - Kr - Kb;
@@ -551,7 +551,7 @@ py::array_t<uint8_t> rgb_float_to_rgb12(py::array_t<float> rgb_array, int width,
     return result;
 }
 
-py::array_t<uint16_t> yuv10_to_rgb_uint16(py::array_t<uint8_t> yuv_array, int width, int height, DeckLinkOutput::Gamut matrix = DeckLinkOutput::Gamut::Rec709, bool input_narrow_range = true, bool output_narrow_range = false, int row_bytes = -1) {
+py::array_t<uint16_t> yuv10_to_rgb_uint16(py::array_t<uint8_t> yuv_array, int width, int height, DeckLinkOutput::Matrix matrix = DeckLinkOutput::Matrix::Rec709, bool input_narrow_range = true, bool output_narrow_range = false, int row_bytes = -1) {
     auto buf = yuv_array.request();
 
     if (buf.ndim != 1) {
@@ -577,9 +577,9 @@ py::array_t<uint16_t> yuv10_to_rgb_uint16(py::array_t<uint8_t> yuv_array, int wi
     // Matrix coefficients: Y = Kr*R + Kg*G + Kb*B
     double Kr, Kb;
     switch (matrix) {
-        case DeckLinkOutput::Gamut::Rec601:  Kr = 0.299;  Kb = 0.114;  break;
-        case DeckLinkOutput::Gamut::Rec2020: Kr = 0.2627; Kb = 0.0593; break;
-        case DeckLinkOutput::Gamut::Rec709:
+        case DeckLinkOutput::Matrix::Rec601:  Kr = 0.299;  Kb = 0.114;  break;
+        case DeckLinkOutput::Matrix::Rec2020: Kr = 0.2627; Kb = 0.0593; break;
+        case DeckLinkOutput::Matrix::Rec709:
         default:                             Kr = 0.2126; Kb = 0.0722; break;
     }
     double Kg = 1.0 - Kr - Kb;
@@ -673,7 +673,7 @@ py::array_t<uint16_t> yuv10_to_rgb_uint16(py::array_t<uint8_t> yuv_array, int wi
     return result;
 }
 
-py::array_t<float> yuv10_to_rgb_float(py::array_t<uint8_t> yuv_array, int width, int height, DeckLinkOutput::Gamut matrix = DeckLinkOutput::Gamut::Rec709, bool input_narrow_range = true, int row_bytes = -1) {
+py::array_t<float> yuv10_to_rgb_float(py::array_t<uint8_t> yuv_array, int width, int height, DeckLinkOutput::Matrix matrix = DeckLinkOutput::Matrix::Rec709, bool input_narrow_range = true, int row_bytes = -1) {
     auto buf = yuv_array.request();
 
     if (buf.ndim != 1) {
@@ -699,9 +699,9 @@ py::array_t<float> yuv10_to_rgb_float(py::array_t<uint8_t> yuv_array, int width,
     // Matrix coefficients: Y = Kr*R + Kg*G + Kb*B
     double Kr, Kb;
     switch (matrix) {
-        case DeckLinkOutput::Gamut::Rec601:  Kr = 0.299;  Kb = 0.114;  break;
-        case DeckLinkOutput::Gamut::Rec2020: Kr = 0.2627; Kb = 0.0593; break;
-        case DeckLinkOutput::Gamut::Rec709:
+        case DeckLinkOutput::Matrix::Rec601:  Kr = 0.299;  Kb = 0.114;  break;
+        case DeckLinkOutput::Matrix::Rec2020: Kr = 0.2627; Kb = 0.0593; break;
+        case DeckLinkOutput::Matrix::Rec709:
         default:                             Kr = 0.2126; Kb = 0.0722; break;
     }
     double Kg = 1.0 - Kr - Kb;
@@ -876,7 +876,7 @@ py::dict unpack_v210(py::array_t<uint8_t> yuv_array, int width, int height, int 
 
 // YUV8 (2vuy) to RGB conversion functions
 py::array_t<uint16_t> yuv8_to_rgb_uint16(py::array_t<uint8_t> yuv_array, int width, int height,
-                                          DeckLinkOutput::Gamut matrix = DeckLinkOutput::Gamut::Rec709,
+                                          DeckLinkOutput::Matrix matrix = DeckLinkOutput::Matrix::Rec709,
                                           bool input_narrow_range = true, bool output_narrow_range = false, int row_bytes = -1) {
     auto buf = yuv_array.request();
 
@@ -903,9 +903,9 @@ py::array_t<uint16_t> yuv8_to_rgb_uint16(py::array_t<uint8_t> yuv_array, int wid
     // Matrix coefficients: Y = Kr*R + Kg*G + Kb*B
     double Kr, Kb;
     switch (matrix) {
-        case DeckLinkOutput::Gamut::Rec601:  Kr = 0.299;  Kb = 0.114;  break;
-        case DeckLinkOutput::Gamut::Rec2020: Kr = 0.2627; Kb = 0.0593; break;
-        case DeckLinkOutput::Gamut::Rec709:
+        case DeckLinkOutput::Matrix::Rec601:  Kr = 0.299;  Kb = 0.114;  break;
+        case DeckLinkOutput::Matrix::Rec2020: Kr = 0.2627; Kb = 0.0593; break;
+        case DeckLinkOutput::Matrix::Rec709:
         default:                             Kr = 0.2126; Kb = 0.0722; break;
     }
     double Kg = 1.0 - Kr - Kb;
@@ -969,7 +969,7 @@ py::array_t<uint16_t> yuv8_to_rgb_uint16(py::array_t<uint8_t> yuv_array, int wid
 }
 
 py::array_t<float> yuv8_to_rgb_float(py::array_t<uint8_t> yuv_array, int width, int height,
-                                       DeckLinkOutput::Gamut matrix = DeckLinkOutput::Gamut::Rec709,
+                                       DeckLinkOutput::Matrix matrix = DeckLinkOutput::Matrix::Rec709,
                                        bool input_narrow_range = true, int row_bytes = -1) {
     auto buf = yuv_array.request();
 
@@ -996,9 +996,9 @@ py::array_t<float> yuv8_to_rgb_float(py::array_t<uint8_t> yuv_array, int width, 
     // Matrix coefficients: Y = Kr*R + Kg*G + Kb*B
     double Kr, Kb;
     switch (matrix) {
-        case DeckLinkOutput::Gamut::Rec601:  Kr = 0.299;  Kb = 0.114;  break;
-        case DeckLinkOutput::Gamut::Rec2020: Kr = 0.2627; Kb = 0.0593; break;
-        case DeckLinkOutput::Gamut::Rec709:
+        case DeckLinkOutput::Matrix::Rec601:  Kr = 0.299;  Kb = 0.114;  break;
+        case DeckLinkOutput::Matrix::Rec2020: Kr = 0.2627; Kb = 0.0593; break;
+        case DeckLinkOutput::Matrix::Rec709:
         default:                             Kr = 0.2126; Kb = 0.0722; break;
     }
     double Kg = 1.0 - Kr - Kb;
@@ -1054,7 +1054,7 @@ py::array_t<float> yuv8_to_rgb_float(py::array_t<uint8_t> yuv_array, int width, 
 
 // RGB to YUV8 (2vuy) conversion functions
 py::array_t<uint8_t> rgb_uint8_to_yuv8(py::array_t<uint8_t> rgb_array, int width, int height,
-                                        DeckLinkOutput::Gamut matrix = DeckLinkOutput::Gamut::Rec709,
+                                        DeckLinkOutput::Matrix matrix = DeckLinkOutput::Matrix::Rec709,
                                         bool input_narrow_range = false, bool output_narrow_range = true) {
     auto buf = rgb_array.request();
 
@@ -1081,9 +1081,9 @@ py::array_t<uint8_t> rgb_uint8_to_yuv8(py::array_t<uint8_t> rgb_array, int width
     // Matrix coefficients: Y = Kr*R + Kg*G + Kb*B
     double Kr, Kb;
     switch (matrix) {
-        case DeckLinkOutput::Gamut::Rec601:  Kr = 0.299;  Kb = 0.114;  break;
-        case DeckLinkOutput::Gamut::Rec2020: Kr = 0.2627; Kb = 0.0593; break;
-        case DeckLinkOutput::Gamut::Rec709:
+        case DeckLinkOutput::Matrix::Rec601:  Kr = 0.299;  Kb = 0.114;  break;
+        case DeckLinkOutput::Matrix::Rec2020: Kr = 0.2627; Kb = 0.0593; break;
+        case DeckLinkOutput::Matrix::Rec709:
         default:                             Kr = 0.2126; Kb = 0.0722; break;
     }
     double Kg = 1.0 - Kr - Kb;
@@ -1164,7 +1164,7 @@ py::array_t<uint8_t> rgb_uint8_to_yuv8(py::array_t<uint8_t> rgb_array, int width
 }
 
 py::array_t<uint8_t> rgb_uint16_to_yuv8(py::array_t<uint16_t> rgb_array, int width, int height,
-                                         DeckLinkOutput::Gamut matrix = DeckLinkOutput::Gamut::Rec709,
+                                         DeckLinkOutput::Matrix matrix = DeckLinkOutput::Matrix::Rec709,
                                          bool input_narrow_range = false, bool output_narrow_range = true) {
     auto buf = rgb_array.request();
 
@@ -1191,9 +1191,9 @@ py::array_t<uint8_t> rgb_uint16_to_yuv8(py::array_t<uint16_t> rgb_array, int wid
     // Matrix coefficients: Y = Kr*R + Kg*G + Kb*B
     double Kr, Kb;
     switch (matrix) {
-        case DeckLinkOutput::Gamut::Rec601:  Kr = 0.299;  Kb = 0.114;  break;
-        case DeckLinkOutput::Gamut::Rec2020: Kr = 0.2627; Kb = 0.0593; break;
-        case DeckLinkOutput::Gamut::Rec709:
+        case DeckLinkOutput::Matrix::Rec601:  Kr = 0.299;  Kb = 0.114;  break;
+        case DeckLinkOutput::Matrix::Rec2020: Kr = 0.2627; Kb = 0.0593; break;
+        case DeckLinkOutput::Matrix::Rec709:
         default:                             Kr = 0.2126; Kb = 0.0722; break;
     }
     double Kg = 1.0 - Kr - Kb;
@@ -1275,7 +1275,7 @@ py::array_t<uint8_t> rgb_uint16_to_yuv8(py::array_t<uint16_t> rgb_array, int wid
 }
 
 py::array_t<uint8_t> rgb_float_to_yuv8(py::array_t<float> rgb_array, int width, int height,
-                                        DeckLinkOutput::Gamut matrix = DeckLinkOutput::Gamut::Rec709,
+                                        DeckLinkOutput::Matrix matrix = DeckLinkOutput::Matrix::Rec709,
                                         bool output_narrow_range = true) {
     auto buf = rgb_array.request();
 
@@ -1302,9 +1302,9 @@ py::array_t<uint8_t> rgb_float_to_yuv8(py::array_t<float> rgb_array, int width, 
     // Matrix coefficients: Y = Kr*R + Kg*G + Kb*B
     double Kr, Kb;
     switch (matrix) {
-        case DeckLinkOutput::Gamut::Rec601:  Kr = 0.299;  Kb = 0.114;  break;
-        case DeckLinkOutput::Gamut::Rec2020: Kr = 0.2627; Kb = 0.0593; break;
-        case DeckLinkOutput::Gamut::Rec709:
+        case DeckLinkOutput::Matrix::Rec601:  Kr = 0.299;  Kb = 0.114;  break;
+        case DeckLinkOutput::Matrix::Rec2020: Kr = 0.2627; Kb = 0.0593; break;
+        case DeckLinkOutput::Matrix::Rec709:
         default:                             Kr = 0.2126; Kb = 0.0722; break;
     }
     double Kg = 1.0 - Kr - Kb;
@@ -2042,13 +2042,15 @@ PYBIND11_MODULE(decklink_io, m) {
         .value("Mode2560x1600p50", DeckLinkOutput::DisplayMode::Mode2560x1600p50)
         .value("Mode2560x1600p60", DeckLinkOutput::DisplayMode::Mode2560x1600p60);
 
-    auto gamut_enum = py::enum_<DeckLinkOutput::Gamut>(m, "Gamut")
+    py::enum_<DeckLinkOutput::Matrix>(m, "Matrix")
+        .value("Rec601", DeckLinkOutput::Matrix::Rec601)
+        .value("Rec709", DeckLinkOutput::Matrix::Rec709)
+        .value("Rec2020", DeckLinkOutput::Matrix::Rec2020);
+
+    py::enum_<DeckLinkOutput::Gamut>(m, "Gamut")
         .value("Rec601", DeckLinkOutput::Gamut::Rec601)
         .value("Rec709", DeckLinkOutput::Gamut::Rec709)
         .value("Rec2020", DeckLinkOutput::Gamut::Rec2020);
-
-    // Create Matrix as an alias to Gamut for clearer naming in RGB->YCbCr conversion
-    m.attr("Matrix") = gamut_enum;
 
     py::enum_<DeckLinkOutput::Eotf>(m, "Eotf")
         .value("SDR", DeckLinkOutput::Eotf::SDR)
@@ -2088,7 +2090,7 @@ PYBIND11_MODULE(decklink_io, m) {
         .def_readwrite("width", &DeckLinkOutput::VideoSettings::width)
         .def_readwrite("height", &DeckLinkOutput::VideoSettings::height)
         .def_readwrite("framerate", &DeckLinkOutput::VideoSettings::framerate)
-        .def_readwrite("colorimetry", &DeckLinkOutput::VideoSettings::colorimetry)
+        .def_readwrite("matrix", &DeckLinkOutput::VideoSettings::matrix)
         .def_readwrite("eotf", &DeckLinkOutput::VideoSettings::eotf);
 
     // OutputInfo struct
@@ -2138,25 +2140,28 @@ PYBIND11_MODULE(decklink_io, m) {
         .def("is_pixel_format_supported", &DeckLinkOutput::isPixelFormatSupported,
              "Check if pixel format is supported for given display mode",
              py::arg("mode"), py::arg("format"))
-        .def("set_hdr_metadata", &DeckLinkOutput::setHdrMetadata,
-             "Set HDR metadata with default values. Stores the values; the next "
-             "display_frame() call attaches them to the emitted frame. HDMI note: "
+        .def("set_matrix", &DeckLinkOutput::setMatrix,
+             "Set the Y'CbCr matrix (Rec.601/709/2020) used for YUV encoding and "
+             "signalled on the wire (VPID for SDI, AVI InfoFrame for HDMI). Also "
+             "default-fills HDR Static Metadata primaries / white point / mastering "
+             "luminance from the matrix name; only meaningful for PQ output (the "
+             "SDK zeroes the InfoFrame for HLG and SDR). Call set_static_metadata "
+             "afterwards to override the defaults.",
+             py::arg("matrix"))
+        .def("set_eotf", &DeckLinkOutput::setEotf,
+             "Set the EOTF. Setting to non-SDR triggers HDR Static Metadata "
+             "InfoFrame transmission on the next emitted frame. HDMI note: "
              "BMD's HDMI driver caches the HDR Static Metadata InfoFrame, so a "
              "subsequent display_frame() call is required for HDMI consumers to "
              "see updated values mid-stream. SDI carries metadata per-frame and "
              "updates on the next frame without any extra step.",
-             py::arg("colorimetry"), py::arg("eotf"))
-        .def("set_hdr_static_metadata", &DeckLinkOutput::setHdrStaticMetadata,
+             py::arg("eotf"))
+        .def("set_static_metadata", &DeckLinkOutput::setStaticMetadata,
              "Set HDR Static Metadata (per SMPTE ST 2086 / CEA-861.3 Type 1) with "
              "explicit display primaries, white point, mastering display luminance, "
-             "and content light level fields. Stores the values; the next "
-             "display_frame() call attaches them to the emitted frame. HDMI note: "
-             "BMD's HDMI driver caches the HDR Static Metadata InfoFrame, so a "
-             "subsequent display_frame() call is required for HDMI consumers to "
-             "see updated values mid-stream. SDI carries metadata per-frame and "
-             "updates on the next frame without any extra step.",
-             py::arg("colorimetry"), py::arg("eotf"), py::arg("static_metadata"))
-        .def("clear_hdr_metadata", &DeckLinkOutput::clearHdrMetadata, "Clear HDR metadata and reset to SDR")
+             "and content light level fields. Overrides the defaults set by "
+             "set_matrix. Only meaningful for PQ output.",
+             py::arg("static_metadata"))
         .def("get_current_output_info", &DeckLinkOutput::getCurrentOutputInfo, "Get current output configuration info")
         .def("get_supported_display_modes", &DeckLinkOutput::getSupportedDisplayModes, "Get list of supported display modes");
 
@@ -2172,14 +2177,14 @@ PYBIND11_MODULE(decklink_io, m) {
     m.def("rgb_uint16_to_yuv10", &rgb_uint16_to_yuv10,
           "Convert R'G'B' uint16 numpy array to 10-bit Y'CbCr v210 format",
           py::arg("rgb_array"), py::arg("width"), py::arg("height"),
-          py::arg("matrix") = DeckLinkOutput::Gamut::Rec709,
+          py::arg("matrix") = DeckLinkOutput::Matrix::Rec709,
           py::arg("input_narrow_range") = false,
           py::arg("output_narrow_range") = true);
 
     m.def("rgb_float_to_yuv10", &rgb_float_to_yuv10,
           "Convert R'G'B' float numpy array to 10-bit Y'CbCr v210 format",
           py::arg("rgb_array"), py::arg("width"), py::arg("height"),
-          py::arg("matrix") = DeckLinkOutput::Gamut::Rec709,
+          py::arg("matrix") = DeckLinkOutput::Matrix::Rec709,
           py::arg("output_narrow_range") = true);
 
     m.def("rgb_uint16_to_rgb10", &rgb_uint16_to_rgb10,
@@ -2206,7 +2211,7 @@ PYBIND11_MODULE(decklink_io, m) {
     m.def("yuv10_to_rgb_uint16", &yuv10_to_rgb_uint16,
           "Convert 10-bit Y'CbCr v210 format to R'G'B' uint16 numpy array",
           py::arg("yuv_array"), py::arg("width"), py::arg("height"),
-          py::arg("matrix") = DeckLinkOutput::Gamut::Rec709,
+          py::arg("matrix") = DeckLinkOutput::Matrix::Rec709,
           py::arg("input_narrow_range") = true,
           py::arg("output_narrow_range") = false,
           py::arg("row_bytes") = -1);
@@ -2214,7 +2219,7 @@ PYBIND11_MODULE(decklink_io, m) {
     m.def("yuv10_to_rgb_float", &yuv10_to_rgb_float,
           "Convert 10-bit Y'CbCr v210 format to R'G'B' float numpy array",
           py::arg("yuv_array"), py::arg("width"), py::arg("height"),
-          py::arg("matrix") = DeckLinkOutput::Gamut::Rec709,
+          py::arg("matrix") = DeckLinkOutput::Matrix::Rec709,
           py::arg("input_narrow_range") = true,
           py::arg("row_bytes") = -1);
 
@@ -2226,7 +2231,7 @@ PYBIND11_MODULE(decklink_io, m) {
     m.def("yuv8_to_rgb_uint16", &yuv8_to_rgb_uint16,
           "Convert 8-bit Y'CbCr 2vuy format to R'G'B' uint16 numpy array",
           py::arg("yuv_array"), py::arg("width"), py::arg("height"),
-          py::arg("matrix") = DeckLinkOutput::Gamut::Rec709,
+          py::arg("matrix") = DeckLinkOutput::Matrix::Rec709,
           py::arg("input_narrow_range") = true,
           py::arg("output_narrow_range") = false,
           py::arg("row_bytes") = -1);
@@ -2234,28 +2239,28 @@ PYBIND11_MODULE(decklink_io, m) {
     m.def("yuv8_to_rgb_float", &yuv8_to_rgb_float,
           "Convert 8-bit Y'CbCr 2vuy format to R'G'B' float numpy array",
           py::arg("yuv_array"), py::arg("width"), py::arg("height"),
-          py::arg("matrix") = DeckLinkOutput::Gamut::Rec709,
+          py::arg("matrix") = DeckLinkOutput::Matrix::Rec709,
           py::arg("input_narrow_range") = true,
           py::arg("row_bytes") = -1);
 
     m.def("rgb_uint8_to_yuv8", &rgb_uint8_to_yuv8,
           "Convert R'G'B' uint8 numpy array to 8-bit Y'CbCr 2vuy format",
           py::arg("rgb_array"), py::arg("width"), py::arg("height"),
-          py::arg("matrix") = DeckLinkOutput::Gamut::Rec709,
+          py::arg("matrix") = DeckLinkOutput::Matrix::Rec709,
           py::arg("input_narrow_range") = false,
           py::arg("output_narrow_range") = true);
 
     m.def("rgb_uint16_to_yuv8", &rgb_uint16_to_yuv8,
           "Convert R'G'B' uint16 numpy array to 8-bit Y'CbCr 2vuy format",
           py::arg("rgb_array"), py::arg("width"), py::arg("height"),
-          py::arg("matrix") = DeckLinkOutput::Gamut::Rec709,
+          py::arg("matrix") = DeckLinkOutput::Matrix::Rec709,
           py::arg("input_narrow_range") = false,
           py::arg("output_narrow_range") = true);
 
     m.def("rgb_float_to_yuv8", &rgb_float_to_yuv8,
           "Convert R'G'B' float numpy array to 8-bit Y'CbCr 2vuy format",
           py::arg("rgb_array"), py::arg("width"), py::arg("height"),
-          py::arg("matrix") = DeckLinkOutput::Gamut::Rec709,
+          py::arg("matrix") = DeckLinkOutput::Matrix::Rec709,
           py::arg("output_narrow_range") = true);
 
     m.def("unpack_2vuy", &unpack_2vuy,
@@ -2314,7 +2319,7 @@ PYBIND11_MODULE(decklink_io, m) {
         .def_readonly("row_bytes", &DeckLinkInput::CapturedFrame::rowBytes)
         .def_readonly("format", &DeckLinkInput::CapturedFrame::format)
         .def_readonly("mode", &DeckLinkInput::CapturedFrame::mode)
-        .def_readonly("colorspace", &DeckLinkInput::CapturedFrame::colorspace)
+        .def_readonly("matrix", &DeckLinkInput::CapturedFrame::matrix)
         .def_readonly("eotf", &DeckLinkInput::CapturedFrame::eotf)
         .def_readonly("has_metadata", &DeckLinkInput::CapturedFrame::hasMetadata)
         .def_readonly("valid", &DeckLinkInput::CapturedFrame::valid)

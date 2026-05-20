@@ -209,7 +209,7 @@ def test_capture_as_uint16_with_metadata():
             assert result is not None, "capture_frame_as_uint16_with_metadata returned None"
             assert isinstance(result, dict)
 
-            for key in ("rgb", "width", "height", "format", "mode", "colorspace",
+            for key in ("rgb", "width", "height", "format", "mode", "matrix",
                         "eotf", "input_narrow_range", "output_narrow_range"):
                 assert key in result, f"Missing key {key!r}"
 

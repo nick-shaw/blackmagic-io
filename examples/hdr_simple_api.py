@@ -3,7 +3,8 @@
 Example: HDR Output with Simplified API
 
 Demonstrates the simplified display_static_frame() API with matrix and hdr_metadata
-parameters, eliminating the need to call set_hdr_metadata() separately.
+parameters, eliminating the need to call the low-level set_matrix() / set_eotf() /
+set_static_metadata() setters separately.
 """
 
 import sys
