@@ -101,9 +101,11 @@ def main():
     wheel_file = wheel_files[0]
     print(f"Found wheel: {wheel_file.name}")
 
-    # Install the wheel
+    # Install the wheel. Use double quotes around the path: on Windows cmd.exe
+    # single quotes are literal characters, not shell grouping, so single-quoting
+    # the path makes pip see it as part of the filename and fail to find it.
     if not run_command(
-        f"{sys.executable} -m pip install '{wheel_file}' --force-reinstall",
+        f'{sys.executable} -m pip install "{wheel_file}" --force-reinstall',
         "Installing wheel"
     ):
         print("\n[FAIL] Build test failed at wheel installation")
