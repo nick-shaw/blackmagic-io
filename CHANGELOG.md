@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.18.0b1] - 2026-05-21
+
 ### Changed (breaking)
 - **Split the C++ `Gamut` enum into `Matrix` + `Gamut`.** The SDK conflates two distinct concepts under "colorimetry" / `BMDColorspace`: the Y'CbCr matrix (Rec.601/709/2020 coefficient set, signalled on the wire via VPID for SDI and the AVI InfoFrame for HDMI — needed by every Y'CbCr signal, SDR or HDR) and the HDR static-metadata colorimetry bundle (display primaries + white point, conveyed via the HDR Static Metadata InfoFrame — only meaningful for PQ output on tested hardware). The previous `Gamut` enum was used for both. Now: `Matrix` for the Y'CbCr matrix (used by the eight YUV↔RGB conversion functions and the captured-frame attribute), and `Gamut` reserved for HDR static-metadata signalling. Both enums carry the same `Rec601/Rec709/Rec2020` values; in Python they become distinct types (`isinstance(x, Gamut)` and `isinstance(x, Matrix)` are no longer interchangeable).
 - **Renamed captured-frame `colorspace` → `matrix`** on the `CapturedFrame` C++ attribute and in the dict returned by every `capture_frame_*_with_metadata()` variant. The field has always been the Y'CbCr matrix, not the gamut — the rename matches the conceptual model.
