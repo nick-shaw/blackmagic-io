@@ -48,10 +48,12 @@ LUMINANCE_TOLERANCE = 1.0
 MIN_LUMINANCE_TOLERANCE = 0.001
 
 
-# (transport_name, input_connection)
+# (transport_name, input_connection) — per-param marks let users filter via
+# `pytest -m "hardware and sdi"` etc. so SDI-only and HDMI-only cards don't
+# emit failures for the unavailable transport.
 TRANSPORTS = [
-    ("HDMI", decklink_io.InputConnection.HDMI),
-    ("SDI",  decklink_io.InputConnection.SDI),
+    pytest.param(("HDMI", decklink_io.InputConnection.HDMI), marks=pytest.mark.hdmi, id="HDMI"),
+    pytest.param(("SDI",  decklink_io.InputConnection.SDI),  marks=pytest.mark.sdi,  id="SDI"),
 ]
 
 
@@ -182,11 +184,7 @@ def _assert_full_mastering(frame, kwargs):
     assert abs(frame.max_frame_average_light_level - kwargs["max_fall"]) <= LUMINANCE_TOLERANCE
 
 
-@pytest.fixture(
-    scope="module",
-    params=TRANSPORTS,
-    ids=[t[0] for t in TRANSPORTS],
-)
+@pytest.fixture(scope="module", params=TRANSPORTS)
 def decklink_devices(request):
     transport_name, input_connection = request.param
     output_device = decklink_io.DeckLinkOutput()

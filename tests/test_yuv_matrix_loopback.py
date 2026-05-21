@@ -31,7 +31,7 @@ from blackmagic_io import (
 )
 
 
-pytestmark = pytest.mark.hardware
+pytestmark = [pytest.mark.hardware, pytest.mark.sdi]
 
 
 OUTPUT_DEVICE_INDEX = 0

@@ -1732,9 +1732,12 @@ Use this tool to verify that matrix and EOTF metadata are being set correctly by
 The test suite lives in `tests/` and is run with pytest:
 
 ```bash
-pytest tests/                    # everything (skips hardware tests if no DeckLink)
-pytest tests/ -m "not hardware"  # non-hardware tests only (math, byte layouts, etc.)
-pytest tests/ -m "hardware"      # hardware loopback tests only
+pytest tests/                          # everything (skips hardware tests if no DeckLink)
+pytest tests/ -m "not hardware"        # non-hardware tests only (math, byte layouts, etc.)
+pytest tests/ -m "hardware"            # hardware loopback tests only
+pytest tests/ -m "hardware and sdi"    # SDI-only hardware tests (for SDI-only or SDI-loopback cards)
+pytest tests/ -m "hardware and hdmi"   # HDMI-only hardware tests
+pytest tests/ -m "hardware and not hdmi"  # all hardware tests except HDMI ones
 ```
 
 The non-hardware tests run anywhere — they exercise the C++ conversion functions, byte ordering, range helpers, and similar pure-software paths. CI runs these on every push across macOS, Linux, and Windows.
@@ -1742,10 +1745,10 @@ The non-hardware tests run anywhere — they exercise the C++ conversion functio
 The hardware loopback tests require:
 
 - A DeckLink device (any model) with Blackmagic Desktop Video installed.
-- An **SDI BNC cable** looped from `SDI OUT` → `SDI IN`.
-- An **HDMI cable** looped from `HDMI OUT` → `HDMI IN`.
+- An **SDI BNC cable** looped from `SDI OUT` → `SDI IN`, for the SDI-marked tests.
+- An **HDMI cable** looped from `HDMI OUT` → `HDMI IN`, for the HDMI-marked tests.
 
-Both cables are needed to run the full hardware suite. Individual test files declare which transport they use in their module docstring — `test_loopback.py` and `test_capture_as_uint16.py` exercise SDI; `test_hdmi_bgra_loopback.py`, `test_hdmi_bgra_ycbcr_source.py`, and `test_hdmi_full_range_round_trip.py` exercise HDMI; `test_hdr_metadata_loopback.py` parametrises over both. Without the required cable a hardware test will time out waiting for a capture, so it's worth confirming both cables are in place before invoking the full suite.
+Each hardware test file is marked with `sdi` or `hdmi` so the suite can be filtered to match the cards/cables available — useful for cards that don't have both transports, or for partial-loopback rigs. `test_hdr_metadata_loopback.py` parametrises over both transports, with per-parametrise marks, so the HDMI half and SDI half can be selected independently via the same `-m` filter. Without the required cable a hardware test will time out waiting for a capture, so it's worth confirming the right cables are in place — or filtering with `-m` — before invoking the full suite.
 
 ## Contributing
 

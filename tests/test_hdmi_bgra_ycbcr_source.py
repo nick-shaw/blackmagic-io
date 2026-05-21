@@ -31,7 +31,7 @@ import numpy as np
 import pytest
 from blackmagic_io import BlackmagicInput, PixelFormat, create_test_pattern
 
-pytestmark = pytest.mark.hardware
+pytestmark = [pytest.mark.hardware, pytest.mark.hdmi]
 
 OUTPUT_DEVICE_INDEX = 0
 INPUT_DEVICE_INDEX = 0

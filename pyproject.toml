@@ -47,6 +47,8 @@ Issues = "https://github.com/nick-shaw/blackmagic-io/issues"
 [tool.pytest.ini_options]
 markers = [
     "hardware: test requires a DeckLink device (skipped in CI; run manually with hardware connected)",
+    "sdi: hardware test requires an SDI input connection on the DeckLink device",
+    "hdmi: hardware test requires an HDMI input connection on the DeckLink device",
 ]
 
 [tool.scikit-build]
