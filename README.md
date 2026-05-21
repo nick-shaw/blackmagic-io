@@ -8,6 +8,17 @@ Written by Nick Shaw, www.antlerpost.com, with a lot of help from [Claude Code](
 
 **⚠️ Note:** The library has only had minimal testing at this time, and is under ongoing development. Please report any issues you encounter. I am particularly interested in feedback from Linux and Windows users.
 
+## ⚠️ Breaking changes in 0.18.0b1
+
+If upgrading from 0.17.x:
+
+- Captured-frame metadata dict key `'colorspace'` is now `'matrix'`. Affects every variant of `capture_frame_*_with_metadata()`.
+- `captured_frame.colorspace` attribute on the low-level `CapturedFrame` struct is now `captured_frame.matrix`.
+- The `Gamut` enum has been split into `Matrix` (Y'CbCr matrix selection for YUV↔RGB conversion) and `Gamut` (HDR static-metadata signalling). YUV↔RGB conversion functions now take `Matrix`.
+- Low-level setters `setHdrMetadata` / `setHdrStaticMetadata` / `clearHdrMetadata` replaced by per-field `setMatrix` / `setEotf` / `setStaticMetadata` on `DeckLinkOutput`. The high-level `display_static_frame(matrix=..., hdr_metadata=...)` API is unchanged.
+
+See [CHANGELOG.md](CHANGELOG.md) for the full rationale and rename mapping.
+
 ## Features
 
 ### Output
