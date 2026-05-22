@@ -56,8 +56,8 @@ def example_static_frame():
             print("Failed to initialize device")
 
 def example_solid_colors():
-    """Example: Display different solid colors"""
-    print("Example 2: Solid Color Output")
+    """Example: Display different solid colours"""
+    print("Example 2: Solid Colour Output")
 
     colors = [
         (1.0, 0.0, 0.0),  # Red
@@ -75,19 +75,19 @@ def example_solid_colors():
             print("Failed to initialize device")
             return
         
-        print("Cycling through colors. Press Ctrl+C to stop...")
+        print("Cycling through colours. Press Ctrl+C to stop...")
         try:
             for i, color in enumerate(colors):
                 color_name = ["Red", "Green", "Blue", "Yellow", "Magenta", "Cyan", "White", "Black"][i]
                 print(f"Displaying {color_name}: {color}")
                 
                 if output.display_solid_color(color, DisplayMode.HD1080p25):
-                    time.sleep(2)  # Display each color for 2 seconds
+                    time.sleep(2)  # Display each colour for 2 seconds
                 else:
                     print(f"Failed to display {color_name}")
                     break
         except KeyboardInterrupt:
-            print("\nStopping color cycle...")
+            print("\nStopping colour cycle...")
 
 def example_test_patterns():
     """Example: Display various test patterns"""

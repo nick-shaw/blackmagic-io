@@ -99,7 +99,7 @@ def test_test_patterns():
             print(f"    Warning: Pattern appears to be empty")
 
 def test_initialization_without_hardware():
-    """Test initialization behavior when no hardware is present"""
+    """Test initialization behaviour when no hardware is present"""
     print("\nTesting initialization without hardware...")
 
     # Use low-level API for setup testing without displaying

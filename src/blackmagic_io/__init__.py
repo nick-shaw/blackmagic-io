@@ -101,7 +101,7 @@ try:
             rgb_array: HxWx3 RGB array (uint8)
             width: Image width
             height: Image height
-            matrix: Color matrix (Rec601, Rec709, or Rec2020)
+            matrix: Y'CbCr matrix (Rec601, Rec709, or Rec2020)
             input_narrow_range: If True, input is narrow range (16-235); if False, full range (0-255)
             output_narrow_range: If True, output is narrow range (Y: 16-235, CbCr: 16-240; clamped to [0, 255], so super-blacks/super-whites are preserved); if False, full range
 
@@ -120,7 +120,7 @@ try:
             rgb_array: HxWx3 RGB array (uint16)
             width: Image width
             height: Image height
-            matrix: Color matrix (Rec601, Rec709, or Rec2020)
+            matrix: Y'CbCr matrix (Rec601, Rec709, or Rec2020)
             input_narrow_range: If True, input is narrow range (64-940 @10-bit, i.e., 4096-60160 @16-bit).
                               If False, input is full range (0-65535). Default: False
             output_narrow_range: If True, output Y'CbCr is narrow range (Y: 16-235, CbCr: 16-240;
@@ -144,7 +144,7 @@ try:
             rgb_array: HxWx3 RGB array (float, 0.0-1.0 full range)
             width: Image width
             height: Image height
-            matrix: Color matrix (Rec601, Rec709, or Rec2020)
+            matrix: Y'CbCr matrix (Rec601, Rec709, or Rec2020)
             output_narrow_range: If True, output Y'CbCr is narrow range (Y: 16-235, CbCr: 16-240;
                                clamped to [0, 255], so super-blacks/super-whites are preserved).
                                If False, output is full range (0-255). Default: True
@@ -164,7 +164,7 @@ try:
             rgb_array: HxWx3 RGB array (uint16)
             width: Image width
             height: Image height
-            matrix: Color matrix (Rec601, Rec709, or Rec2020)
+            matrix: Y'CbCr matrix (Rec601, Rec709, or Rec2020)
             input_narrow_range: If True, input is narrow range (64-940 @10-bit, i.e., 4096-60160 @16-bit).
                               If False, input is full range (0-65535). Default: False
             output_narrow_range: If True, output Y'CbCr is narrow range (Y: 64-940, CbCr: 64-960).
@@ -189,7 +189,7 @@ try:
             rgb_array: HxWx3 RGB array (float, 0.0-1.0 full range)
             width: Image width
             height: Image height
-            matrix: Color matrix (Rec601, Rec709, or Rec2020)
+            matrix: Y'CbCr matrix (Rec601, Rec709, or Rec2020)
             output_narrow_range: If True, output Y'CbCr is narrow range (Y: 64-940, CbCr: 64-960).
                                If False, output is full range (0-1023). Default: True
 
@@ -285,7 +285,7 @@ try:
             yuv_array: Flat uint8 array in v210 format
             width: Image width
             height: Image height
-            matrix: Color matrix (Rec601, Rec709, or Rec2020)
+            matrix: Y'CbCr matrix (Rec601, Rec709, or Rec2020)
             input_narrow_range: If True, input is narrow range (Y: 64-940, UV: 64-960). Default: True
             output_narrow_range: If True, output is narrow range (4096-60160 @16-bit). Default: False
             row_bytes: Bytes per row in the source buffer. Pass ``captured_frame.row_bytes`` for
@@ -306,7 +306,7 @@ try:
             yuv_array: Flat uint8 array in v210 format
             width: Image width
             height: Image height
-            matrix: Color matrix (Rec601, Rec709, or Rec2020)
+            matrix: Y'CbCr matrix (Rec601, Rec709, or Rec2020)
             input_narrow_range: If True, input is narrow range (Y: 64-940, UV: 64-960). Default: True
             row_bytes: Bytes per row in the source buffer. Pass ``captured_frame.row_bytes`` for
                 captured frames whose stride may include padding. If None, defaults to
@@ -326,7 +326,7 @@ try:
             yuv_array: Flat uint8 array in 2vuy format
             width: Image width
             height: Image height
-            matrix: Color matrix (Rec601, Rec709, or Rec2020)
+            matrix: Y'CbCr matrix (Rec601, Rec709, or Rec2020)
             input_narrow_range: If True, input is narrow range (Y: 16-235, UV: 16-240). Default: True
             output_narrow_range: If True, output is narrow range (4096-60160 @16-bit). Default: False
             row_bytes: Bytes per row in the source buffer. Pass ``captured_frame.row_bytes`` for
@@ -346,7 +346,7 @@ try:
             yuv_array: Flat uint8 array in 2vuy format
             width: Image width
             height: Image height
-            matrix: Color matrix (Rec601, Rec709, or Rec2020)
+            matrix: Y'CbCr matrix (Rec601, Rec709, or Rec2020)
             input_narrow_range: If True, input is narrow range (Y: 16-235, UV: 16-240). Default: True
             row_bytes: Bytes per row in the source buffer. Pass ``captured_frame.row_bytes`` for
                 captured frames whose stride may include padding. If None, defaults to ``width * 2``.

@@ -30,7 +30,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - New public `BlackmagicInput.start_capture(pixel_format=None)` wrapper method. Lets callers change pixel format mid-session without reaching into the private `_input` attribute. Tracks the requested format on the wrapper for the conversion paths.
 - Automatic right-shift handling in `capture_frame_as_uint8()` / `capture_frame_as_rgb()` (and their `*_with_metadata` variants) when the user initialised capture with `pixel_format=PixelFormat.BGRA` and the SDK delivers 10-bit R'G'B' (typical for 8-bit R'G'B' HDMI sources on tested hardware). The library right-shifts each channel by 2 to recover the exact 8-bit values before any range or float conversion, avoiding the ~0.3% precision loss of decoding LSB-padded 8-bit content as native 10-bit.
 - `tests/test_bgra_layout.py` — non-hardware unit tests for `rgb_to_bgra` byte ordering and for the new private `_adjust_range_uint8` helper (narrow/full range conversion at 8-bit precision, including clipping of out-of-range inputs and round-trip preservation).
-- `tests/test_hdmi_bgra_loopback.py` — HDMI loopback test verifying BGRA output round-trips through `BlackmagicInput.capture_frame_as_uint8()` byte-exact for 75% colour bars (default full-range output) and for `output_narrow_range=True`. A second case sends a 0-255 grayscale ramp and verifies all 256 distinct values are preserved through the HDMI wire, catching any silent full-narrow-full scaling.
+- `tests/test_hdmi_bgra_loopback.py` — HDMI loopback test verifying BGRA output round-trips through `BlackmagicInput.capture_frame_as_uint8()` byte-exact for 75% colour bars (default full-range output) and for `output_narrow_range=True`. A second case sends a 0-255 greyscale ramp and verifies all 256 distinct values are preserved through the HDMI wire, catching any silent full-narrow-full scaling.
 - `tests/test_hdmi_bgra_ycbcr_source.py` — HDMI loopback test for the BGRA-from-Y'CbCr-source path. Output narrow-range YUV10 with explicit Rec.709 and Rec.2020 matrix metadata, capture as BGRA, verify the SDK's hardware matrix + range conversion produces 8-bit full-range R'G'B' matching the source within ±3 (4:2:2 chroma subsampling + matrix rounding tolerance).
 - `--input` / `-i` and `--device` / `-d` CLI flags on `examples/capture_preview.py` for choosing between SDI and HDMI input and selecting a specific DeckLink device. Replaces the previous positional-argument interface.
 - `BlackmagicInput.capture_frame_as_uint16()` and `capture_frame_as_uint16_with_metadata()` — higher-precision counterparts to the uint8 methods. 10-bit (RGB10 / YUV10) and 12-bit (RGB12) sources keep their native precision in the uint16 result; 8-bit sources (BGRA, or RGB10-delivered-as-BGRA) are LSB-padded via `<< 8` so 0xff maps to 0xff00. Mirrors the existing `capture_frame_as_*` naming convention. Internally, `_convert_frame_to_uint8` has been refactored into a shared `_convert_frame_to_int(bit_depth)` helper used by both uint8 and uint16 public methods.
@@ -234,7 +234,7 @@ No fields, behaviour, or signatures change beyond the names.
   - New `patch` parameter: tuple (center_x, center_y, width, height) with normalized coordinates (0.0-1.0)
   - New `background_color` parameter: R'G'B' tuple for background when using patches
   - Useful for testing, calibration, and creating custom test patterns
-  - Background color defaults to black (0 or 64 depending on `input_narrow_range`)
+  - Background colour defaults to black (0 or 64 depending on `input_narrow_range`)
 - Comprehensive test suite for range conversions (24 tests covering all range combinations)
 - RGB12 documentation sections in README (previously missing)
 
@@ -253,7 +253,7 @@ No fields, behaviour, or signatures change beyond the names.
 - Removed manual range conversion code from high-level API that prevented full range YUV10 output
 
 ### Notes
-- Default behavior maintained for backward compatibility:
+- Default behaviour maintained for backward compatibility:
   - `input_narrow_range=False` (full range 16-bit input)
   - `output_narrow_range=True` for YUV10 and RGB10 (narrow range output)
   - `output_narrow_range=False` for RGB12 (full range output)

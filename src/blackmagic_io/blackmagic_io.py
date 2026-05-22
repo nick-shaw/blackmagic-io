@@ -411,7 +411,7 @@ class BlackmagicOutput:
                           patch: Optional[Tuple[float, float, float, float]] = None,
                           background_color: Optional[Tuple] = None) -> bool:
         """
-        Display a solid color frame continuously.
+        Display a solid colour frame continuously.
 
         Args:
             color: R'G'B' tuple (r, g, b) with values:
@@ -440,7 +440,7 @@ class BlackmagicOutput:
             patch: Optional tuple (center_x, center_y, width, height) with normalized coordinates (0.0-1.0).
                   - center_x, center_y: Center position of the patch (0.5, 0.5 = center of screen)
                   - width, height: Patch dimensions (1.0, 1.0 = full screen)
-                  If None, displays full screen solid color. Default: None
+                  If None, displays full screen solid colour. Default: None
             background_color: R'G'B' tuple for background when using patch parameter.
                             Uses same format as color parameter (integer 0-1023 or float 0.0-1.0).
                             If None, defaults to black. Default: None

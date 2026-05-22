@@ -47,7 +47,6 @@
     "fromarray",
     "frombuffer",
     "fullrange",
-    "grayscale",
     "HDMI",
     "HFRTC",
     "HLG",

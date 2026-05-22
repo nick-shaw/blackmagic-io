@@ -44,11 +44,11 @@ def _build_bgra_frame(settings):
 
 
 def _build_bgra_ramp_frame(settings):
-    """Build a horizontal grayscale ramp covering all 256 8-bit values.
+    """Build a horizontal greyscale ramp covering all 256 8-bit values.
 
     Column x maps to value floor(x * 256 / width), so each value 0-255 occupies
     a known contiguous block of columns. R, G and B all carry the same value at
-    each column (grayscale). Repeated unchanged across every row.
+    each column (greyscale). Repeated unchanged across every row.
 
     The ramp exposes any wire-level full→narrow→full scaling: a hidden
     256→220→256 round-trip at 8-bit collapses ~36 source values into pairs

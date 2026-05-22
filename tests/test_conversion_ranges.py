@@ -1,7 +1,7 @@
 """
 Test R'G'B' to Y'CbCr conversion with different range parameters.
 
-These tests verify color conversion accuracy for known reference values
+These tests verify colour conversion accuracy for known reference values
 and serve as regression tests during refactoring.
 """
 
@@ -260,7 +260,7 @@ class TestRGBtoRGB10Conversions:
     """Test RGB to RGB10 conversions with different range parameters."""
 
     def test_uint16_to_rgb10_narrow_to_narrow(self):
-        """Test narrow range uint16 to narrow range RGB10 (default behavior - bit shift)."""
+        """Test narrow range uint16 to narrow range RGB10 (default behaviour - bit shift)."""
         width, height = 12, 2
         # Narrow range white: 940 @ 10-bit = 60160 @ 16-bit
         rgb = np.full((height, width, 3), 60160, dtype=np.uint16)
@@ -394,7 +394,7 @@ class TestRGBtoRGB12Conversions:
         return r, g, b
 
     def test_uint16_to_rgb12_default(self):
-        """Test default behavior: full to full."""
+        """Test default behaviour: full to full."""
         width, height = 16, 2
         # Full range white: 65535 @ 16-bit
         rgb = np.full((height, width, 3), 65535, dtype=np.uint16)
@@ -516,7 +516,7 @@ class TestYUV8RoundTrip:
     Cb/Cr were normalised to [-1, 1] while the matrix coefficients
     expected [-0.5, 0.5], doubling all chroma in the recovered RGB.
 
-    Uses constant-color frames so 4:2:2 chroma subsampling is lossless;
+    Uses constant-colour frames so 4:2:2 chroma subsampling is lossless;
     the only round-trip error is 8-bit quantisation.
     """
 
@@ -651,7 +651,7 @@ class TestYUV10RoundTrip:
     non-hardware coverage of the YUV10 decoder, which previously was
     only exercised by the hardware loopback test.
 
-    Uses constant-color frames so 4:2:2 chroma subsampling is lossless;
+    Uses constant-colour frames so 4:2:2 chroma subsampling is lossless;
     the only round-trip error is 10-bit quantisation.
     """
 

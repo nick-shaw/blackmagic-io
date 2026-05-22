@@ -23,7 +23,7 @@ See [CHANGELOG.md](CHANGELOG.md) for the full rationale and rename mapping.
 
 ### Output
 - **Static Frame Output**: Display static images from NumPy arrays
-- **Solid Color Output**: Display solid colors for testing and calibration
+- **Solid Colour Output**: Display solid colours for testing and calibration
 - **Dynamic Updates**: Update currently displayed frame
 - **Multiple Resolutions**: Support for all display modes supported by your DeckLink device (SD, HD, 2K, 4K, 8K, and PC modes)
 - **8 and 10-bit Y'CbCr 4:2:2 output** (`PixelFormat.YUV8`, `PixelFormat.YUV10`; 10-bit is the default for uint16/float input)
@@ -308,7 +308,7 @@ Display a static frame continuously.
 - Returns: True if successful
 
 **`display_solid_color(color, display_mode, pixel_format=PixelFormat.YUV10, matrix=None, hdr_metadata=None, input_narrow_range=False, output_narrow_range=True, patch=None, background_color=None) -> bool`**
-Display a solid color continuously.
+Display a solid colour continuously.
 - `color`: R'G'B' tuple (r, g, b) with values:
   - Integer values (0-1023): Interpreted as 10-bit values
   - Float values (0.0-1.0): Interpreted as normalized full range values
@@ -321,7 +321,7 @@ Display a solid color continuously.
 - `patch`: Optional tuple (center_x, center_y, width, height) with normalized coordinates (0.0-1.0):
   - center_x, center_y: Center position of the patch (0.5, 0.5 = center of screen)
   - width, height: Patch dimensions (1.0, 1.0 = full screen)
-  - If None, displays full screen solid color. Default: None
+  - If None, displays full screen solid colour. Default: None
 - `background_color`: R'G'B' tuple for background when using patch parameter. Uses same format as `color` parameter (respecting `input_narrow_range`). If None, defaults to black. Default: None
 - Returns: True if successful
 
@@ -1003,7 +1003,7 @@ with BlackmagicOutput() as output:
   - Output range configurable via `output_narrow_range` parameter
   - Defaults: `input_narrow_range=False, output_narrow_range=False`
 
-### Range Signaling Limitations
+### Range Signalling Limitations
 
 **Important:** While this library supports both narrow and full range output encoding via the `output_narrow_range` parameter, the Blackmagic DeckLink SDK (v14.1) does not provide APIs to control the full range flag in the VPID, as per SMPTE ST 425-1 (byte 4, bit 7):
 
@@ -1013,7 +1013,7 @@ with BlackmagicOutput() as output:
 
 - **RGB12**: The convention is that 12-bit R'G'B' is full range, as described in the Blackmagic SDK, so using `output_narrow_range=True` may cause downstream devices to misinterpret the signal.
 
-The `output_narrow_range` parameter controls the **actual encoded values** in the output stream, not metadata signaling. Use it when you know the downstream device will correctly interpret the range, or when the receiving device allows manual range configuration.
+The `output_narrow_range` parameter controls the **actual encoded values** in the output stream, not metadata signalling. Use it when you know the downstream device will correctly interpret the range, or when the receiving device allows manual range configuration.
 
 #### SDI Protected Code Values (SDI only)
 
@@ -1074,12 +1074,12 @@ with BlackmagicInput() as input_device:
 
 ## Examples
 
-### Example 1: Color Bars Test Pattern
+### Example 1: Colour Bars Test Pattern
 
 ```python
 from blackmagic_io import BlackmagicOutput, DisplayMode, create_test_pattern
 
-# Create color bars test pattern
+# Create colour bars test pattern
 frame = create_test_pattern(1920, 1080, 'bars')
 
 with BlackmagicOutput() as output:
@@ -1400,7 +1400,7 @@ output.stop_output()
 output.cleanup()
 ```
 
-### Example 9: Color Patches for Testing and Calibration
+### Example 9: Colour Patches for Testing and Calibration
 
 The `display_solid_color()` method supports displaying color patches smaller than full screen, useful for testing, calibration, and creating custom test patterns.
 
@@ -1409,11 +1409,11 @@ import time
 from blackmagic_io import BlackmagicOutput, DisplayMode
 
 with BlackmagicOutput() as output:
-    # Full screen white (default behavior)
+    # Full screen white (default behaviour)
     output.display_solid_color((1.0, 1.0, 1.0), DisplayMode.HD1080p25)
     time.sleep(2)
 
-    # Centered 50% white patch on black background
+    # Centred 50% white patch on black background
     output.display_solid_color(
         (1.0, 1.0, 1.0),
         DisplayMode.HD1080p25,
@@ -1421,7 +1421,7 @@ with BlackmagicOutput() as output:
     )
     time.sleep(2)
 
-    # Small centered white patch (10% size) on gray background
+    # Small centred white patch (10% size) on gray background
     output.display_solid_color(
         (1.0, 1.0, 1.0),
         DisplayMode.HD1080p25,
@@ -1455,9 +1455,9 @@ with BlackmagicOutput() as output:
 - All values are normalized (0.0-1.0) for resolution independence
 - `center_x, center_y`: Position of patch center (0.0 = left/top, 1.0 = right/bottom)
 - `width, height`: Patch dimensions as fraction of screen (1.0 = full width/height)
-- Example: `(0.5, 0.5, 0.25, 0.25)` = centered patch, 25% of screen size
+- Example: `(0.5, 0.5, 0.25, 0.25)` = centred patch, 25% of screen size
 
-**Background color:**
+**Background colour:**
 - Uses same format as foreground `color` (integers 0-1023 or floats 0.0-1.0)
 - Defaults to black if not specified
 - For integer colors with `input_narrow_range=True`, black defaults to 64 instead of 0
@@ -1691,7 +1691,7 @@ The `pixel_reader` tool captures and analyses video input from a DeckLink device
 See `tools/README.md` for more detail.
 
 The tool displays:
-- **Pixel format** and **color space** (R'G'B' 4:4:4, Y'CbCr 4:2:2, etc.)
+- **Pixel format** and **colour space** (R'G'B' 4:4:4, Y'CbCr 4:2:2, etc.)
 - **Resolution** and **frame rate**
 - **Metadata**: EOTF (SDR / PQ / HLG), matrix (Rec.601 / Rec.709 / Rec.2020)
 - **Pixel values** at selected coordinates in native format (code values)
