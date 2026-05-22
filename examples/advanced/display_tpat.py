@@ -2,7 +2,13 @@
 """
 A python utility for rendering a Test Pattern Descriptor file to Blackmagic Decklink output.
 
-Usage: python display_tpat.py <tpat_file> <display_mode> [-p <pixel_format>] [-r <range>] [-m <matrix>] [-e <eotf>]
+Usage: python display_tpat.py <tpat_file> <display_mode> [-p {yuv10,rgb10,rgb12,bgra}] [-r <range>] [-m <matrix>] [-e <eotf>]
+
+The `bgra` pixel format is intended for fast preview-quality work: the
+16-bit promoted image is downshifted to uint8 before output. The `-r`
+flag has no effect on the BGRA wire output (the SDK's hardware
+conversion produces narrow Y'CbCr 4:2:2 on SDI and full R'G'B' 4:4:4 on
+HDMI regardless). For controlled output range, use yuv10 / rgb10 / rgb12.
 """
 
 import argparse
@@ -37,6 +43,7 @@ PIXEL_FORMATS = {
     'yuv10': PixelFormat.YUV10,
     'rgb10': PixelFormat.RGB10,
     'rgb12': PixelFormat.RGB12,
+    'bgra': PixelFormat.BGRA,
 }
 
 MATRICES = {
@@ -54,7 +61,7 @@ EOTFS = {
 def main():
     """Main function for the tpat_bmd utility."""
     displaymode_options = list(DISPLAY_MODES.keys())
-    pixelformat_options = ['yuv10', 'rgb10', 'rgb12']
+    pixelformat_options = ['yuv10', 'rgb10', 'rgb12', 'bgra']
     range_options = ['full', 'narrow']
     matrix_options = ['rec709', 'rec2020']
     eotf_options = ['sdr', 'hlg', 'pq']
@@ -116,6 +123,11 @@ def main():
             input_narrow_range = tpat_narrow if tpat_narrow is not None else True
             output_narrow_range = input_narrow_range
 
+        pixel_format = PIXEL_FORMATS.get(
+            str(args.p).lower(),
+            PixelFormat.YUV10
+        )
+
         # Promote N-bit integer codes to uint16 in the canonical representation
         # for the declared input range. Narrow uses `<< (16 - bits)` (narrow at
         # N-bit IS narrow at 16-bit scaled by 2^(16-bits), exact). Full uses
@@ -133,14 +145,17 @@ def main():
         elif bits < 32:
             image = image.astype(np.uint16)
 
+        if pixel_format == PixelFormat.BGRA:
+            # BGRA wants uint8. The preceding promotion bit-replicates (full) or
+            # left-shifts (narrow) 8→16, so `>> 8` recovers the original 8-bit
+            # values precisely for 8-bit TPAT sources. For 10/12/16-bit sources
+            # `>> 8` produces the canonical reduction (v >> 2, v >> 4, v >> 8
+            # respectively) — no precision loss beyond the bit-depth downsample.
+            image = (image >> 8).astype(np.uint8)
+
         with BlackmagicOutput() as output:
 
             display_mode = DISPLAY_MODES[args.display_mode]
-
-            pixel_format = PIXEL_FORMATS.get(
-                str(args.p).lower(),
-                PixelFormat.YUV10
-            )
 
             if args.m is not None:
                 matrix_str = str(args.m).lower()
@@ -161,6 +176,9 @@ def main():
             eotf_value = EOTFS.get(eotf_str, bmo.Eotf.SDR)
             eotf = {'eotf': eotf_value}
 
+            output_narrow_range_arg = (
+                None if pixel_format == PixelFormat.BGRA else output_narrow_range
+            )
             output.display_static_frame(
                 image,
                 display_mode,
@@ -168,7 +186,7 @@ def main():
                 matrix=matrix,
                 hdr_metadata=eotf,
                 input_narrow_range=input_narrow_range,
-                output_narrow_range=output_narrow_range
+                output_narrow_range=output_narrow_range_arg,
             )
 
             print("Displaying:", name)
