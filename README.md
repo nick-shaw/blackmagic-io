@@ -16,6 +16,8 @@ If upgrading from 0.17.x:
 - `captured_frame.colorspace` attribute on the low-level `CapturedFrame` struct is now `captured_frame.matrix`.
 - The `Gamut` enum has been split into `Matrix` (Y'CbCr matrix selection for YUV↔RGB conversion) and `Gamut` (HDR static-metadata signalling). YUV↔RGB conversion functions now take `Matrix`.
 - Low-level setters `setHdrMetadata` / `setHdrStaticMetadata` / `clearHdrMetadata` replaced by per-field `setMatrix` / `setEotf` / `setStaticMetadata` on `DeckLinkOutput`. The high-level `display_static_frame(matrix=..., hdr_metadata=...)` API is unchanged.
+- `display_static_frame()` and `display_solid_color()` now use `output_narrow_range: Optional[bool] = None` (previously `bool = True`). `None` resolves to the per-format default — True for YUV8 / YUV10 / RGB10, **False for RGB12** — matching the canonical low-level wrappers and the documented per-format defaults. RGB12 callers who omitted `output_narrow_range` previously got narrow (256-3760); they now get full (0-4095). Pass `output_narrow_range=True` explicitly to preserve the old behaviour.
+- `display_static_frame()` and `display_solid_color()` now honour `input_narrow_range` on the BGRA pixel-format path (previously silently ignored). Narrow-range input is expanded to full-range R'G'B' before packing. Passing `output_narrow_range` to a BGRA call now emits a `UserWarning` and is ignored — see HDMI Notes for the rationale.
 
 See [CHANGELOG.md](CHANGELOG.md) for the full rationale and rename mapping.
 
@@ -291,10 +293,10 @@ Check if a pixel format is supported for a given display mode.
 - `pixel_format`: Pixel format to check
 - Returns: True if the mode / format combination is supported
 
-**`display_static_frame(frame_data, display_mode, pixel_format=PixelFormat.YUV10, matrix=None, hdr_metadata=None, input_narrow_range=False, output_narrow_range=True) -> bool`**
+**`display_static_frame(frame_data, display_mode, pixel_format=PixelFormat.YUV10, matrix=None, hdr_metadata=None, input_narrow_range=False, output_narrow_range=None) -> bool`**
 Display a static frame continuously.
 - `frame_data`: NumPy array with image data. Accepted shape and dtype depend on `pixel_format`:
-  - `BGRA` (fast preview): shape (height, width, 3) R'G'B' or (height, width, 4) BGRA; dtype `uint8` only. 8-bit R'G'B' is output as R'G'B' 4:4:4 over HDMI or as 8-bit Y'CbCr 4:2:2 over SDI. For higher-precision output, use one of `YUV10` / `RGB10` / `RGB12` below.
+  - `BGRA` (fast preview): shape (height, width, 3) R'G'B' or (height, width, 4) BGRA; dtype `uint8` only. `input_narrow_range` controls how the library interprets the input bytes — narrow 16-235 input is expanded to full 0-255 via `_adjust_range_uint8` before BGRA packing, mirroring the capture-side range handling. `output_narrow_range` is ignored on the BGRA path (a `UserWarning` is issued if explicitly passed): the SDK's hardware conversion produces narrow-range Y'CbCr 4:2:2 on the SDI wire and full-range R'G'B' 4:4:4 on the HDMI wire regardless of buffer contents. For controlled output range — including narrow-range R'G'B' on HDMI — use `YUV10` / `RGB10` / `RGB12` instead.
   - `YUV8`: shape (height, width, 3) R'G'B'; dtype `uint8`, `uint16`, `float32`, or `float64`.
   - `YUV10` / `RGB10` / `RGB12`: shape (height, width, 3) R'G'B'; dtype `uint16`, `float32`, or `float64`.
 - `display_mode`: Video resolution and frame rate
@@ -304,10 +306,10 @@ Display a static frame continuously.
   - `'eotf'`: Eotf enum (SDR, PQ, or HLG)
   - `'static_metadata'`: Optional HdrStaticMetadata object with explicit display primaries, white point, mastering luminance, and content light level fields
 - `input_narrow_range`: Whether to interpret integer `frame_data` as narrow range (float is always interpreted as full range). Default: False
-- `output_narrow_range`: Whether to output a narrow range signal. Default: True
+- `output_narrow_range`: Whether to output a narrow range signal. Default: `None` — each format applies its own default (True for YUV8 / YUV10 / RGB10, False for RGB12). Ignored for BGRA (a warning is issued if explicitly passed); see the `BGRA` bullet above and the [PixelFormat](#blackmagicoutput---static-display) section for per-format details.
 - Returns: True if successful
 
-**`display_solid_color(color, display_mode, pixel_format=PixelFormat.YUV10, matrix=None, hdr_metadata=None, input_narrow_range=False, output_narrow_range=True, patch=None, background_color=None) -> bool`**
+**`display_solid_color(color, display_mode, pixel_format=PixelFormat.YUV10, matrix=None, hdr_metadata=None, input_narrow_range=False, output_narrow_range=None, patch=None, background_color=None) -> bool`**
 Display a solid colour continuously.
 - `color`: R'G'B' tuple (r, g, b) with values:
   - Integer values (0-1023): Interpreted as 10-bit values
@@ -317,7 +319,7 @@ Display a solid colour continuously.
 - `matrix`: R'G'B' to Y'CbCr conversion matrix (Rec601, Rec709 or Rec2020). Only applies when pixel_format is YUV8 or YUV10. If not specified, auto-detects based on resolution: SD modes (NTSC, PAL) use Rec.601, HD and higher use Rec.709
 - `hdr_metadata`: Optional HDR metadata dict with 'eotf' (and optional 'static_metadata') keys
 - `input_narrow_range`: Whether to interpret integer `color` values as narrow range (float is always interpreted as full range). Default: False
-- `output_narrow_range`: Whether to output a narrow range signal. Default: True
+- `output_narrow_range`: Whether to output a narrow range signal. Default: `None` — each format applies its own default (True for YUV8 / YUV10 / RGB10, False for RGB12). Ignored for BGRA (a warning is issued if explicitly passed).
 - `patch`: Optional tuple (center_x, center_y, width, height) with normalized coordinates (0.0-1.0):
   - center_x, center_y: Center position of the patch (0.5, 0.5 = center of screen)
   - width, height: Patch dimensions (1.0, 1.0 = full screen)
@@ -982,7 +984,8 @@ with BlackmagicOutput() as output:
 
 **`PixelFormat`**
 - `BGRA`: 8-bit BGRA (automatically used for uint8 data)
-  - **Note**: Over SDI, BGRA data is output as narrow range 8-bit Y'CbCr 4:2:2, not R'G'B'. The BGRA name refers to the input buffer format, not the SDI wire format.
+  - uint8 input: Configurable interpretation via `input_narrow_range` parameter (narrow input is expanded to full-range BGRA before packing; sub-blacks and super-whites are clipped at the 0-255 boundary)
+  - `output_narrow_range` is ignored (a `UserWarning` is issued if explicitly passed). The SDK's hardware conversion produces transport-asymmetric output: narrow Y'CbCr 4:2:2 on the SDI wire and full R'G'B' 4:4:4 on the HDMI wire, regardless of buffer contents. For controlled output range, use `YUV10` / `RGB10` / `RGB12`. See [BGRA output is transport-asymmetric on the wire](#bgra-output-is-transport-asymmetric-on-the-wire) under HDMI Notes for details.
 - `YUV8`: 8-bit Y'CbCr 4:2:2 (2vuy) - direct 8-bit Y'CbCr output
   - uint8 input: Configurable interpretation via `input_narrow_range` parameter
   - uint16 input: Configurable interpretation via `input_narrow_range` parameter
@@ -1619,6 +1622,24 @@ When capturing with `pixel_format=PixelFormat.BGRA`, the SDK on tested hardware 
 ### Y'CbCr → BGRA hardware conversion honours signalled matrix metadata
 
 When capturing as BGRA from a Y'CbCr source, the SDK's hardware Y'CbCr → R'G'B' conversion uses the matrix coefficients (Rec.601, Rec.709, or Rec.2020) signalled in the source's frame metadata. Verified via SDI and HDMI loopback with Rec.709 and Rec.2020 sources. Applications working with BGRA captures don't need to apply their own matrix conversion.
+
+### BGRA output is transport-asymmetric on the wire
+
+Symmetric with the capture-side behaviour above. On output, the SDK fans a single BGRA buffer out to SDI and HDMI with *different* range characteristics on the two transports:
+
+- **SDI**: the SDK hardware-converts the BGRA buffer to **narrow-range Y'CbCr 4:2:2** for the wire, treating the buffer as full-range R'G'B' for the matrix math. The SDI wire is always narrow Y'CbCr when output via BGRA, regardless of buffer contents.
+- **HDMI**: the SDK transmits the BGRA buffer as **R'G'B' 4:4:4** on the wire. Buffer values pass through to the wire (verified by the 256-value ramp test in `tests/test_hdmi_bgra_loopback.py`).
+
+Because the same buffer produces different wire ranges on the two transports, there is no single BGRA buffer composition that is correct for both SDI and HDMI for arbitrary range combinations. The library therefore:
+
+- **Honours `input_narrow_range`**: narrow-range input bytes are expanded to full-range R'G'B' via `_adjust_range_uint8` before BGRA packing, mirroring the capture-side range handling.
+- **Ignores `output_narrow_range`**: a `UserWarning` is issued if the parameter is explicitly passed. There is no buffer-level interpretation that produces correct wire output on both transports.
+
+Sub-blacks (codes 0-15) and super-whites (codes 236-255) in narrow-range input are clipped at the narrow → full expansion stage (BGRA's 0-255 range cannot represent them); this matches the symmetric capture-side caveat above.
+
+For controlled output range — including narrow-range R'G'B' on HDMI — use `PixelFormat.YUV10` / `PixelFormat.RGB10` / `PixelFormat.RGB12` instead. These are higher-precision formats with transport-uniform range control.
+
+If you specifically need narrow-range R'G'B' on HDMI via BGRA (a niche workflow), the workaround is to lie about the input range: pass narrow-range bytes (already 16-235) with `input_narrow_range=False`. The library treats them as already-full and packs them unchanged; HDMI then transmits them as narrow R'G'B'. SDI receives doubly-narrowed Y'CbCr in that case — the cost of the lie.
 
 ### RGB range signalling on transmit (AVI InfoFrame Q)
 
