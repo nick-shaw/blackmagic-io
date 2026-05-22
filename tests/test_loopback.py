@@ -23,10 +23,10 @@ CAPTURE_TIMEOUT_MS = 10000
 
 # (pixel_format, format_name)
 PIXEL_FORMATS = [
-    (decklink_io.PixelFormat.YUV8,  "8-bit YUV (2vuy)"),
-    (decklink_io.PixelFormat.YUV10, "10-bit YUV (v210)"),
-    (decklink_io.PixelFormat.RGB10, "10-bit RGB (R10l)"),
-    (decklink_io.PixelFormat.RGB12, "12-bit RGB (R12L)"),
+    (decklink_io.PixelFormat.YUV8,  "8-bit Y'CbCr (2vuy)"),
+    (decklink_io.PixelFormat.YUV10, "10-bit Y'CbCr (v210)"),
+    (decklink_io.PixelFormat.RGB10, "10-bit R'G'B' (R10l)"),
+    (decklink_io.PixelFormat.RGB12, "12-bit R'G'B' (R12L)"),
 ]
 
 

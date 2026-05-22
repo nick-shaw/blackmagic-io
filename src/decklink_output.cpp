@@ -448,19 +448,19 @@ DeckLinkOutput::OutputInfo DeckLinkOutput::getCurrentOutputInfo()
     BMDPixelFormat bmdFormat = static_cast<BMDPixelFormat>(m_currentSettings.format);
     switch (bmdFormat) {
         case bmdFormat8BitYUV:
-            info.pixelFormatName = "8-bit YUV (2vuy)";
+            info.pixelFormatName = "8-bit Y'CbCr (2vuy)";
             break;
         case bmdFormat8BitBGRA:
             info.pixelFormatName = "8-bit BGRA";
             break;
         case bmdFormat10BitYUV:
-            info.pixelFormatName = "10-bit YUV (v210)";
+            info.pixelFormatName = "10-bit Y'CbCr (v210)";
             break;
         case bmdFormat10BitRGBXLE:
-            info.pixelFormatName = "10-bit RGB LE (R10l)";
+            info.pixelFormatName = "10-bit R'G'B' LE (R10l)";
             break;
         case bmdFormat12BitRGBLE:
-            info.pixelFormatName = "12-bit RGB LE (R12L)";
+            info.pixelFormatName = "12-bit R'G'B' LE (R12L)";
             break;
         default:
             info.pixelFormatName = "Unknown format";

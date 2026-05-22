@@ -42,7 +42,7 @@ See [CHANGELOG.md](CHANGELOG.md) for the full rationale and rename mapping.
 
 ### General
 - **Device Enumeration**: List connected DeckLink devices with their names and capabilities
-- **Cross-Platform**: Works on Windows, macOS, and Linux (mainly tested on macOS; basic Windows testing has confirmed library output and pixel_reader build with hardware; Linux untested with hardware)
+- **Cross-Platform**: Works on Windows, macOS, and Linux. Full hardware coverage on macOS; Windows hardware-tested for SDI loopback (HDMI and HDR-metadata paths awaiting suitable Windows test hardware); Linux build verified via CI but hardware-untested.
 
 ## Requirements
 
@@ -79,7 +79,7 @@ The build system (CMake + scikit-build-core) automatically uses the correct plat
 pip install blackmagic-io
 ```
 
-This installs the latest beta. `pip` normally skips pre-releases, but falls back to them when no stable version is available — and every published version of this library is currently a beta (`0.17.0bN`). Once a stable `0.17.0` (or later) is published, `pip install blackmagic-io` will resolve to that stable version, and getting a future beta will require `pip install --pre blackmagic-io`. Pre-built wheels are available for Python 3.8–3.14 on macOS, Linux, and Windows; pip falls back to a source build on unsupported Pythons (which requires a C++ compiler — Xcode Command Line Tools on macOS, build-essential on Linux, or MSVC on Windows).
+This installs the latest beta. `pip` normally skips pre-releases, but falls back to them when no stable version is available — and every published version of this library is currently a beta (`0.18.0bN`). Once a stable `0.18.0` (or later) is published, `pip install blackmagic-io` will resolve to that stable version, and getting a future beta will require `pip install --pre blackmagic-io`. Pre-built wheels are available for Python 3.8–3.14 on macOS, Linux, and Windows; pip falls back to a source build on unsupported Pythons (which requires a C++ compiler — Xcode Command Line Tools on macOS, build-essential on Linux, or MSVC on Windows).
 
 To use the library at runtime you also need Blackmagic Desktop Video installed on your system (separate from this Python package) — the runtime DeckLink driver and framework are provided by Desktop Video, available from [blackmagicdesign.com/support](https://www.blackmagicdesign.com/support).
 
@@ -183,7 +183,6 @@ with BlackmagicInput() as input_device:
         print(f"Format: {frame_data['format']}")
         print(f"Matrix: {frame_data['matrix']}")
         print(f"EOTF: {frame_data['eotf']}")
-        print(f"Narrow range source: {frame_data['input_narrow_range']}")
 
         # Access timecode if present
         if 'timecode' in frame_data:
@@ -300,7 +299,7 @@ Display a static frame continuously.
   - `YUV10` / `RGB10` / `RGB12`: shape (height, width, 3) R'G'B'; dtype `uint16`, `float32`, or `float64`.
 - `display_mode`: Video resolution and frame rate
 - `pixel_format`: Pixel format (default: YUV10, automatically uses BGRA for uint8 data)
-- `matrix`: Optional R'G'B' to Y'CbCr conversion matrix (`Matrix.Rec601`, `Matrix.Rec709` or `Matrix.Rec2020`). Only used with YUV10 format. If not specified, auto-detects based on resolution: SD modes (NTSC, PAL) use Rec.601, HD and higher use Rec.709
+- `matrix`: Optional R'G'B' to Y'CbCr conversion matrix (`Matrix.Rec601`, `Matrix.Rec709` or `Matrix.Rec2020`). Only used with Y'CbCr output formats (YUV8 / YUV10). If not specified, auto-detects based on resolution: SD modes (NTSC, PAL) use Rec.601, HD and higher use Rec.709
 - `hdr_metadata`: Optional HDR metadata dict with keys:
   - `'eotf'`: Eotf enum (SDR, PQ, or HLG)
   - `'static_metadata'`: Optional HdrStaticMetadata object with explicit display primaries, white point, mastering luminance, and content light level fields
@@ -315,7 +314,7 @@ Display a solid color continuously.
   - Float values (0.0-1.0): Interpreted as normalized full range values
 - `display_mode`: Video resolution and frame rate
 - `pixel_format`: Pixel format (default: YUV10)
-- `matrix`: R'G'B' to Y'CbCr conversion matrix (Rec601, Rec709 or Rec2020). Only applies when pixel_format is YUV10. If not specified, auto-detects based on resolution: SD modes (NTSC, PAL) use Rec.601, HD and higher use Rec.709
+- `matrix`: R'G'B' to Y'CbCr conversion matrix (Rec601, Rec709 or Rec2020). Only applies when pixel_format is YUV8 or YUV10. If not specified, auto-detects based on resolution: SD modes (NTSC, PAL) use Rec.601, HD and higher use Rec.709
 - `hdr_metadata`: Optional HDR metadata dict with 'eotf' (and optional 'static_metadata') keys
 - `input_narrow_range`: Whether to interpret integer `color` values as narrow range (float is always interpreted as full range). Default: False
 - `output_narrow_range`: Whether to output a narrow range signal. Default: True
@@ -533,7 +532,7 @@ Check if a pixel format is supported for a given display mode.
 Get video settings object for a display mode.
 
 **`set_matrix(matrix: Matrix)`**
-Set the Y'CbCr matrix (Rec.601/709/2020) used for YUV encoding and signalled on the wire (VPID for SDI, AVI InfoFrame for HDMI). Not HDR-specific — every Y'CbCr signal needs a matrix. Also default-fills HDR Static Metadata primaries / white point / mastering luminance from the matrix name (only meaningful for PQ output; the SDK zeroes the InfoFrame for HLG and SDR). Call `set_static_metadata()` afterwards to override the defaults. Must be called before `setup_output()`.
+Set the Y'CbCr matrix (Rec.601/709/2020) used for Y'CbCr encoding and signalled on the wire (VPID for SDI, AVI InfoFrame for HDMI). Not HDR-specific — every Y'CbCr signal needs a matrix. Also default-fills HDR Static Metadata primaries / white point / mastering luminance from the matrix name (only meaningful for PQ output; the SDK zeroes the InfoFrame for HLG and SDR). Call `set_static_metadata()` afterwards to override the defaults. Must be called before `setup_output()`.
 
 **`set_eotf(eotf: Eotf)`**
 Set the EOTF (`SDR`, `PQ`, or `HLG`). Setting to non-`SDR` triggers HDR Static Metadata InfoFrame transmission on the next emitted frame; setting back to `SDR` suppresses it. Must be called before `setup_output()`.
@@ -755,11 +754,11 @@ Cleanup and release resources.
 **`rgb_to_bgra(rgb_array, width, height) -> np.ndarray`**
 Convert RGB to BGRA format.
 - `rgb_array`: NumPy array (H×W×3), dtype uint8
-- 8-bit data is always treated as full range, but 8-bit Y'CbCr output will always be narrow range
+- This function is a pure byte-reorder + alpha-padding (R'G'B' → BGRA layout). It does no range conversion; the input bytes are passed through to the output bytes unchanged. Range handling for the BGRA path is done at the wrapper layer (`display_static_frame(output_narrow_range=...)` for output; `capture_frame_as_uint8(output_narrow_range=...)` for capture).
 - Returns: BGRA array (H×W×4), dtype uint8
 
 **`rgb_uint8_to_yuv8(rgb_array, width, height, matrix=Matrix.Rec709, input_narrow_range=False, output_narrow_range=True) -> np.ndarray`**
-Convert R'G'B' uint8 to 8-bit Y'CbCr 2vuy format.
+Convert R'G'B' uint8 to 8-bit Y'CbCr (2vuy) format.
 - `rgb_array`: NumPy array (H×W×3), dtype uint8 (0-255 range)
 - `matrix`: R'G'B' to Y'CbCr conversion matrix (Matrix.Rec601, Matrix.Rec709 or Matrix.Rec2020). Default: Matrix.Rec709
 - `input_narrow_range`: Whether to interpret the `rgb_array` as narrow range (16-235). Default: False
@@ -767,7 +766,7 @@ Convert R'G'B' uint8 to 8-bit Y'CbCr 2vuy format.
 - Returns: Packed 2vuy array
 
 **`rgb_uint16_to_yuv8(rgb_array, width, height, matrix=Matrix.Rec709, input_narrow_range=False, output_narrow_range=True) -> np.ndarray`**
-Convert R'G'B' uint16 to 8-bit Y'CbCr 2vuy format.
+Convert R'G'B' uint16 to 8-bit Y'CbCr (2vuy) format.
 - `rgb_array`: NumPy array (H×W×3), dtype uint16 (0-65535 range)
 - `matrix`: R'G'B' to Y'CbCr conversion matrix (Matrix.Rec601, Matrix.Rec709 or Matrix.Rec2020). Default: Matrix.Rec709
 - `input_narrow_range`: Whether to interpret the `rgb_array` as narrow range. Default: False
@@ -775,14 +774,14 @@ Convert R'G'B' uint16 to 8-bit Y'CbCr 2vuy format.
 - Returns: Packed 2vuy array
 
 **`rgb_float_to_yuv8(rgb_array, width, height, matrix=Matrix.Rec709, output_narrow_range=True) -> np.ndarray`**
-Convert R'G'B' float to 8-bit Y'CbCr 2vuy format.
+Convert R'G'B' float to 8-bit Y'CbCr (2vuy) format.
 - `rgb_array`: NumPy array (H×W×3), dtype float32 (0.0-1.0 range)
 - `matrix`: R'G'B' to Y'CbCr conversion matrix (Matrix.Rec601, Matrix.Rec709 or Matrix.Rec2020). Default: Matrix.Rec709
 - `output_narrow_range`: Whether to encode the Y'CbCr as narrow range (Y: 16-235, CbCr: 16-240; clamped to [0, 255], so super-blacks/super-whites are preserved). Default: True
 - Returns: Packed 2vuy array
 
 **`rgb_uint16_to_yuv10(rgb_array, width, height, matrix=Matrix.Rec709, input_narrow_range=False, output_narrow_range=True) -> np.ndarray`**
-Convert R'G'B' uint16 to 10-bit Y'CbCr v210 format.
+Convert R'G'B' uint16 to 10-bit Y'CbCr (v210) format.
 - `rgb_array`: NumPy array (H×W×3), dtype uint16 (0-65535 range)
 - `matrix`: R'G'B' to Y'CbCr conversion matrix (Matrix.Rec601, Matrix.Rec709 or Matrix.Rec2020). Default: Matrix.Rec709
 - `input_narrow_range`: Whether to interpret the `rgb_array` as narrow range. Default: False
@@ -790,7 +789,7 @@ Convert R'G'B' uint16 to 10-bit Y'CbCr v210 format.
 - Returns: Packed v210 array
 
 **`rgb_float_to_yuv10(rgb_array, width, height, matrix=Matrix.Rec709, output_narrow_range=True) -> np.ndarray`**
-Convert R'G'B' float to 10-bit Y'CbCr v210 format.
+Convert R'G'B' float to 10-bit Y'CbCr (v210) format.
 - `rgb_array`: NumPy array (H×W×3), dtype float32 (0.0-1.0 range)
 - `matrix`: R'G'B' to Y'CbCr conversion matrix (Matrix.Rec601, Matrix.Rec709 or Matrix.Rec2020). Default: Matrix.Rec709
 - `output_narrow_range`: Whether to encode the Y'CbCr as narrow range. Default: True
@@ -823,7 +822,7 @@ Convert R'G'B' float to 12-bit R'G'B' (bmdFormat12BitRGBLE) format.
 - Returns: Packed 12-bit R'G'B' array
 
 **`yuv10_to_rgb_uint16(yuv_array, width, height, matrix=Matrix.Rec709, input_narrow_range=True, output_narrow_range=False, row_bytes=None) -> np.ndarray`**
-Convert 10-bit Y'CbCr v210 format to R'G'B' uint16.
+Convert 10-bit Y'CbCr (v210) format to R'G'B' uint16.
 - `yuv_array`: NumPy array containing packed v210 data
 - `width`: Frame width in pixels
 - `height`: Frame height in pixels
@@ -834,7 +833,7 @@ Convert 10-bit Y'CbCr v210 format to R'G'B' uint16.
 - Returns: NumPy array (H×W×3), dtype uint16 (0-65535 range)
 
 **`yuv10_to_rgb_float(yuv_array, width, height, matrix=Matrix.Rec709, input_narrow_range=True, row_bytes=None) -> np.ndarray`**
-Convert 10-bit Y'CbCr v210 format to R'G'B' float.
+Convert 10-bit Y'CbCr (v210) format to R'G'B' float.
 - `yuv_array`: NumPy array containing packed v210 data
 - `width`: Frame width in pixels
 - `height`: Frame height in pixels
@@ -844,7 +843,7 @@ Convert 10-bit Y'CbCr v210 format to R'G'B' float.
 - Returns: NumPy array (H×W×3), dtype float32 (0.0-1.0 range)
 
 **`yuv8_to_rgb_uint16(yuv_array, width, height, matrix=Matrix.Rec709, input_narrow_range=True, output_narrow_range=False, row_bytes=None) -> np.ndarray`**
-Convert 8-bit Y'CbCr 4:2:2 (2vuy) format to R'G'B' uint16.
+Convert 8-bit Y'CbCr (2vuy) format to R'G'B' uint16.
 - `yuv_array`: NumPy array containing packed 2vuy data
 - `width`: Frame width in pixels
 - `height`: Frame height in pixels
@@ -855,7 +854,7 @@ Convert 8-bit Y'CbCr 4:2:2 (2vuy) format to R'G'B' uint16.
 - Returns: NumPy array (H×W×3), dtype uint16 (0-65535 range)
 
 **`yuv8_to_rgb_float(yuv_array, width, height, matrix=Matrix.Rec709, input_narrow_range=True, row_bytes=None) -> np.ndarray`**
-Convert 8-bit Y'CbCr 4:2:2 (2vuy) format to R'G'B' float.
+Convert 8-bit Y'CbCr (2vuy) format to R'G'B' float.
 - `yuv_array`: NumPy array containing packed 2vuy data
 - `width`: Frame width in pixels
 - `height`: Frame height in pixels
@@ -903,7 +902,7 @@ Convert 12-bit R'G'B' (bmdFormat12BitRGBLE) format to R'G'B' float.
 - Returns: NumPy array (H×W×3), dtype float32 (0.0-1.0 range)
 
 **`unpack_v210(v210_array, width, height, row_bytes=None) -> dict`**
-Unpack 10-bit Y'CbCr v210 format to Y', Cb, Cr component arrays.
+Unpack 10-bit Y'CbCr (v210) format to Y', Cb, Cr component arrays.
 - `v210_array`: NumPy array containing packed v210 data
 - `width`: Frame width in pixels
 - `height`: Frame height in pixels
@@ -911,7 +910,7 @@ Unpack 10-bit Y'CbCr v210 format to Y', Cb, Cr component arrays.
 - Returns: Dictionary with `'y'`, `'cb'`, `'cr'` keys, each containing an H×W NumPy array, dtype uint16 (0-1023 range, 10-bit values)
 
 **`unpack_2vuy(yuv_array, width, height, row_bytes=None) -> dict`**
-Unpack 8-bit Y'CbCr 4:2:2 (2vuy) format to Y', Cb, Cr component arrays.
+Unpack 8-bit Y'CbCr (2vuy) format to Y', Cb, Cr component arrays.
 - `yuv_array`: NumPy array containing packed 2vuy data
 - `width`: Frame width in pixels
 - `height`: Frame height in pixels
@@ -978,8 +977,7 @@ with BlackmagicOutput() as output:
     test_formats = [PixelFormat.YUV10, PixelFormat.RGB10, PixelFormat.RGB12]
     for fmt in test_formats:
         supported = output.is_pixel_format_supported(DisplayMode.HD1080p25, fmt)
-        status = "✓" if supported else "✗"
-        print(f"{status} {fmt.name}")
+        print(f"{fmt.name}: {'supported' if supported else 'not supported'}")
 ```
 
 **`PixelFormat`**
@@ -1466,45 +1464,26 @@ with BlackmagicOutput() as output:
 
 ## HDR Metadata
 
-HDR metadata is embedded into each video frame using the DeckLink SDK's `IDeckLinkVideoFrameMetadataExtensions` interface. When you set a non-SDR EOTF via `set_eotf()` (with optional `set_static_metadata()` for explicit primaries), the library automatically wraps each output frame with the specified metadata.
+The library exposes per-field signal-metadata setters: `set_matrix()` (Y'CbCr matrix), `set_eotf()` (EOTF identifier), `set_static_metadata()` (display primaries, white point, mastering display luminance, MaxCLL, MaxFALL). Once any has been called, the library wraps every emitted frame via the DeckLink SDK's `IDeckLinkVideoFrameMetadataExtensions` interface. The matrix tag and EOTF identifier reach the wire for any EOTF (in VPID on SDI, the AVI InfoFrame on HDMI); the HDR Static Metadata InfoFrame fields are transmitted only for PQ — HLG is SDK-suppressed (see HDMI Notes), SDR has no HDR InfoFrame.
 
 ### Metadata Includes:
 
-- **Display Primaries**: Automatically set to match the matrix parameter (unless explicitly specified via `HdrStaticMetadata`)
-  - Matrix.Rec709 → Rec.709 primaries (x,y): R(0.64, 0.33), G(0.30, 0.60), B(0.15, 0.06)
-  - Matrix.Rec2020 → Rec.2020 primaries (x,y): R(0.708, 0.292), G(0.170, 0.797), B(0.131, 0.046)
-- **White Point**: D65 (0.3127, 0.3290) for all matrices (unless explicitly specified)
-- **EOTF**: Electro-Optical Transfer Function (SDR / Rec.709, PQ / SMPTE ST 2084, or HLG)
-- **Mastering Display Info**: Default values for max / min luminance
-- **Content Light Levels**: Max content light level and max frame average
+- **Display Primaries**: Independent of the Y'CbCr matrix. When not provided explicitly via `set_static_metadata()` (low-level) or the `'static_metadata'` key of `hdr_metadata` (high-level), `set_matrix()` default-fills primaries from the matrix name as a convenience — see "Default HDR Metadata Values" below.
+- **White Point**: D65 (0.3127, 0.3290) default-fill (unless explicitly specified).
+- **EOTF**: Electro-Optical Transfer Function (`Eotf.SDR`, `Eotf.PQ`, or `Eotf.HLG`).
+- **Mastering Display Info**: Default-filled max / min luminance; override via `set_static_metadata()`.
+- **Content Light Levels**: MaxCLL and MaxFALL; default-filled, override via `set_static_metadata()`.
 
-### Default HDR Metadata Values (PQ only):
+### Default HDR Metadata Values (PQ only — SDK suppresses for SDR and HLG):
 
-**When using Matrix.Rec709:**
-```
-Display Primaries: Rec.709 (ITU-R BT.709)
-  Red:   (0.64, 0.33)
-  Green: (0.30, 0.60)
-  Blue:  (0.15, 0.06)
-White Point: D65 (0.3127, 0.3290)
-```
+`set_matrix()` populates the HDR Static Metadata struct from the matrix name as a convenience for callers who don't supply explicit static metadata. **This is a default-fill, not a conceptual coupling between matrix and primaries.** For real HDR delivery the mastering display's primaries are typically different from the Y'CbCr matrix (P3-D65 primaries inside a Rec.2020 container is the common case — no mastering display has actual BT.2020 primaries). Override the defaults via `set_static_metadata()` or the `'static_metadata'` key in the `hdr_metadata` dict.
 
-**When using Matrix.Rec2020:**
-```
-Display Primaries: Rec.2020 (ITU-R BT.2020)
-  Red:   (0.708, 0.292)
-  Green: (0.170, 0.797)
-  Blue:  (0.131, 0.046)
-White Point: D65 (0.3127, 0.3290)
-```
+The default-fill rule:
 
-**Luminance values:**
-```python
-Max Mastering Luminance: 1000 nits
-Min Mastering Luminance: 0.0001 nits
-Max Content Light Level: 1000 nits
-Max Frame Average Light Level: 50 nits
-```
+- `Matrix.Rec2020` → BT.2020 primaries: R(0.708, 0.292), G(0.170, 0.797), B(0.131, 0.046)
+- `Matrix.Rec601` or `Matrix.Rec709` → BT.709 primaries: R(0.64, 0.33), G(0.30, 0.60), B(0.15, 0.06)
+
+In all cases: white point D65 (0.3127, 0.3290), max mastering luminance 1000 nits, min 0.0001 nits, MaxCLL 1000 nits, MaxFALL 50 nits.
 
 ### Customizing HDR Metadata Values:
 
@@ -1703,11 +1682,7 @@ This will show available devices and let you test various output modes.
 
 The `pixel_reader` tool captures and analyses video input from a DeckLink device, displaying pixel values and metadata. This is useful for verifying output from the library by looping a DeckLink output back to its own input.
 
-**Build:**
-```bash
-cd tools
-make
-```
+**Build:** `pixel_reader` is built automatically as part of `pip install -e .` (or any wheel install) via the main `CMakeLists.txt`. The executable lands at `tools/pixel_reader` (or `tools/pixel_reader.exe` on Windows), ready to run alongside the Python module.
 
 **Usage:**
 ```bash

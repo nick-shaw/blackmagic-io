@@ -2141,7 +2141,7 @@ PYBIND11_MODULE(decklink_io, m) {
              "Check if pixel format is supported for given display mode",
              py::arg("mode"), py::arg("format"))
         .def("set_matrix", &DeckLinkOutput::setMatrix,
-             "Set the Y'CbCr matrix (Rec.601/709/2020) used for YUV encoding and "
+             "Set the Y'CbCr matrix (Rec.601/709/2020) used for encoding and "
              "signalled on the wire (VPID for SDI, AVI InfoFrame for HDMI). Also "
              "default-fills HDR Static Metadata primaries / white point / mastering "
              "luminance from the matrix name; only meaningful for PQ output (the "

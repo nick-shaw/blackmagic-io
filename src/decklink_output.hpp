@@ -60,7 +60,7 @@ public:
     bool isPixelFormatSupported(DisplayMode mode, PixelFormat format);
 
     // Per-field signal-metadata setters. The matrix names the Y'CbCr coefficient
-    // set (Rec.601/709/2020) used for YUV encoding and signalled on the wire
+    // set (Rec.601/709/2020) used for encoding and signalled on the wire
     // (VPID for SDI, AVI InfoFrame for HDMI). The EOTF identifies the transfer
     // function; setting it to non-SDR triggers HDR Static Metadata InfoFrame
     // transmission on the next emitted frame. setStaticMetadata overrides the

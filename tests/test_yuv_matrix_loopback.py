@@ -79,8 +79,8 @@ def test_yuv_matrix_loopback(
     output_device, label, display_mode, pixel_format, matrix,
     expected_matrix, mean_tol, max_tol,
 ):
-    """Float RGB → YUV (matrix) → SDI → YUV → float RGB round-trips, and the
-    captured frame is tagged with the matching Matrix enum."""
+    """Float RGB → Y'CbCr (matrix) → SDI → Y'CbCr → float RGB round-trips, and
+    the captured frame is tagged with the matching Matrix enum."""
     if not output_device.is_pixel_format_supported(display_mode, pixel_format):
         pytest.skip(f"{display_mode.name} + {pixel_format.name} not supported by this device")
 

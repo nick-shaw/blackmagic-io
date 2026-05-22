@@ -1,5 +1,5 @@
 """
-Test RGB to YUV conversion with different range parameters.
+Test R'G'B' to Y'CbCr conversion with different range parameters.
 
 These tests verify color conversion accuracy for known reference values
 and serve as regression tests during refactoring.
@@ -69,7 +69,7 @@ def unpack_v210_pixel(v210_buffer, pixel_index, width):
 
 @pytest.mark.skipif(not CONVERSIONS_AVAILABLE, reason="Conversion functions not available")
 class TestRGBtoYUVConversions:
-    """Test RGB to YUV conversions with known reference values."""
+    """Test R'G'B' to Y'CbCr conversions with known reference values."""
 
     def test_uint16_black_narrow_range_rec709(self):
         """Test black (0,0,0) converts to Y=64, Cb=512, Cr=512 in narrow range."""
@@ -171,7 +171,7 @@ class TestRGBtoYUVConversions:
 
 
     def test_uint16_white_full_range_yuv_rec709(self):
-        """Test white converts to Y=1023, Cb=512, Cr=512 in full range YUV."""
+        """Test white converts to Y=1023, Cb=512, Cr=512 in full range Y'CbCr."""
         width, height = 12, 2
         rgb = np.full((height, width, 3), 65535, dtype=np.uint16)
 
@@ -185,7 +185,7 @@ class TestRGBtoYUVConversions:
         assert cr == 512, f"Expected Cr=512 for white, got {cr}"
 
     def test_uint16_black_full_range_yuv_rec709(self):
-        """Test black converts to Y=0, Cb=512, Cr=512 in full range YUV."""
+        """Test black converts to Y=0, Cb=512, Cr=512 in full range Y'CbCr."""
         width, height = 12, 2
         rgb = np.zeros((height, width, 3), dtype=np.uint16)
 
@@ -199,7 +199,7 @@ class TestRGBtoYUVConversions:
         assert cr == 512, f"Expected Cr=512 for black, got {cr}"
 
     def test_uint16_narrow_input_to_narrow_output(self):
-        """Test narrow range RGB input (64-940 @10-bit) to narrow range YUV."""
+        """Test narrow range RGB input (64-940 @10-bit) to narrow range Y'CbCr."""
         width, height = 12, 2
         # White in narrow range: 940 @ 10-bit = 60160 @ 16-bit
         rgb = np.full((height, width, 3), 60160, dtype=np.uint16)
@@ -214,7 +214,7 @@ class TestRGBtoYUVConversions:
         assert cr == 512, f"Expected Cr=512 for narrow white, got {cr}"
 
     def test_uint16_narrow_input_to_full_output(self):
-        """Test narrow range RGB input to full range YUV output."""
+        """Test narrow range RGB input to full range Y'CbCr output."""
         width, height = 12, 2
         # White in narrow range: 940 @ 10-bit = 60160 @ 16-bit
         rgb = np.full((height, width, 3), 60160, dtype=np.uint16)
@@ -229,7 +229,7 @@ class TestRGBtoYUVConversions:
         assert cr == 512, f"Expected Cr=512, got {cr}"
 
     def test_float_white_full_range_yuv_rec709(self):
-        """Test float white converts to full range YUV (Y=1023, Cb=512, Cr=512)."""
+        """Test float white converts to full range Y'CbCr (Y=1023, Cb=512, Cr=512)."""
         width, height = 12, 2
         rgb = np.ones((height, width, 3), dtype=np.float32)
 
@@ -242,7 +242,7 @@ class TestRGBtoYUVConversions:
         assert cr == 512, f"Expected Cr=512 for white, got {cr}"
 
     def test_float_black_full_range_yuv_rec709(self):
-        """Test float black converts to full range YUV (Y=0, Cb=512, Cr=512)."""
+        """Test float black converts to full range Y'CbCr (Y=0, Cb=512, Cr=512)."""
         width, height = 12, 2
         rgb = np.zeros((height, width, 3), dtype=np.float32)
 
@@ -510,7 +510,7 @@ class TestRGBtoRGB12Conversions:
 
 @pytest.mark.skipif(not CONVERSIONS_AVAILABLE, reason="Conversion functions not available")
 class TestYUV8RoundTrip:
-    """Round-trip RGB through 8-bit YUV (2vuy) encode + decode.
+    """Round-trip RGB through 8-bit Y'CbCr (2vuy) encode + decode.
 
     Regression test for a chroma-scaling bug in the YUV8 decoder where
     Cb/Cr were normalised to [-1, 1] while the matrix coefficients
@@ -598,7 +598,7 @@ class TestYUV8RoundTrip:
         assert abs(b - 0.0) < self.TOL, f"Green B={b} (expected 0.0)"
 
     def test_pure_red_full_range_rec709(self):
-        """Pure red round-trips correctly with full-range YUV too."""
+        """Pure red round-trips correctly with full-range Y'CbCr too."""
         from blackmagic_io import Matrix
         width, height = 16, 4
         rgb = self._const_rgb_uint8(width, height, (255, 0, 0))
@@ -645,7 +645,7 @@ class TestYUV8RoundTrip:
 
 @pytest.mark.skipif(not CONVERSIONS_AVAILABLE, reason="Conversion functions not available")
 class TestYUV10RoundTrip:
-    """Round-trip RGB through 10-bit YUV (v210) encode + decode.
+    """Round-trip RGB through 10-bit Y'CbCr (v210) encode + decode.
 
     Mirrors TestYUV8RoundTrip at 10-bit precision. Provides direct
     non-hardware coverage of the YUV10 decoder, which previously was
@@ -738,7 +738,7 @@ class TestYUV10RoundTrip:
         assert abs(b - 0.0) < self.TOL, f"Green B={b} (expected 0.0)"
 
     def test_pure_red_full_range_rec709(self):
-        """Pure red round-trips correctly with full-range YUV too."""
+        """Pure red round-trips correctly with full-range Y'CbCr too."""
         from blackmagic_io import Matrix
         width, height = 48, 4
         rgb = self._const_rgb_uint16(width, height, (65535, 0, 0))

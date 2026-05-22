@@ -59,7 +59,7 @@ def output_device():
     ids=[c[0] for c in CASES],
 )
 def test_float_rgb_to_yuv_loopback(output_device, label, pixel_format, mean_tol, max_tol):
-    """Float RGB → YUV (encode) → SDI → YUV → float RGB (decode) round-trips."""
+    """Float RGB → Y'CbCr (encode) → SDI → Y'CbCr → float RGB (decode) round-trips."""
     settings = output_device._device.get_video_settings(DISPLAY_MODE.value)
     width, height = settings.width, settings.height
 

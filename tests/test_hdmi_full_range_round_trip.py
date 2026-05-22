@@ -156,7 +156,7 @@ def test_hdmi_rgb12_full_white():
 def test_hdmi_yuv10_narrow_output_sanity():
     """Sanity check: HDMI YUV10 narrow output round-trips bit-exact.
 
-    Narrow YUV values (Y in 64-940) sit well within any reasonable wire
+    Narrow Y'CbCr values (Y in 64-940) sit well within any reasonable wire
     code range, so clamping isn't a confound. Failure here means something
     more fundamental is wrong with the HDMI loopback, not the extent
     behaviour the other two tests are investigating.
