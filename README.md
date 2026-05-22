@@ -294,7 +294,7 @@ Check if a pixel format is supported for a given display mode.
 **`display_static_frame(frame_data, display_mode, pixel_format=PixelFormat.YUV10, matrix=None, hdr_metadata=None, input_narrow_range=False, output_narrow_range=True) -> bool`**
 Display a static frame continuously.
 - `frame_data`: NumPy array with image data. Accepted shape and dtype depend on `pixel_format`:
-  - `BGRA` (fast preview): shape (height, width, 3) R'G'B' or (height, width, 4) BGRA; dtype `uint8` only. For float or higher bit depth, use one of the formats below — BGRA is converted to 8-bit Y'CbCr (2vuy) over SDI on tested hardware, so passing higher-precision data here causes double quantisation.
+  - `BGRA` (fast preview): shape (height, width, 3) R'G'B' or (height, width, 4) BGRA; dtype `uint8` only. 8-bit R'G'B' is output as R'G'B' 4:4:4 over HDMI or as 8-bit Y'CbCr 4:2:2 over SDI. For higher-precision output, use one of `YUV10` / `RGB10` / `RGB12` below.
   - `YUV8`: shape (height, width, 3) R'G'B'; dtype `uint8`, `uint16`, `float32`, or `float64`.
   - `YUV10` / `RGB10` / `RGB12`: shape (height, width, 3) R'G'B'; dtype `uint16`, `float32`, or `float64`.
 - `display_mode`: Video resolution and frame rate

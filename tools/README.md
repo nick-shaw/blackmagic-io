@@ -137,7 +137,7 @@ Note: The buffer format variants (little/big-endian, different packing) are SDK 
 
 - macOS (tested)
 - Linux (untested, but should work)
-- Windows (build verified via MSVC + Windows SDK; same toolchain as the main library)
+- Windows (tested; built via MSVC + Windows SDK, same toolchain as the main library)
 
 ## Dependencies
 
