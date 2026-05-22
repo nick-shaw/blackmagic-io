@@ -1337,5 +1337,98 @@ class TestRGBtoBGRA:
         assert (bgra[..., 3] == 255).all(), "A channel"
 
 
+@pytest.mark.skipif(not CONVERSIONS_AVAILABLE, reason="Conversion functions not available")
+class TestPrepareFrameDataRangeDefaults:
+    """Per-format `output_narrow_range=None` default normalisation.
+
+    From 0.18.0b1 the high-level `display_static_frame` /
+    `display_solid_color` signature changed from
+    `output_narrow_range: bool = True` to
+    `output_narrow_range: Optional[bool] = None`, so each pixel format
+    can resolve `None` to its own canonical default. These tests pin
+    those defaults: True for YUV8 / YUV10 / RGB10, False for RGB12 —
+    matching the low-level wrappers in `blackmagic_io/__init__.py` and
+    the per-format defaults listed in the README's PixelFormat section.
+
+    Pre-0.18.0b1 callers who omitted `output_narrow_range` got True for
+    every format, silently overriding the canonical RGB12 default
+    (False). The RGB12 test below is the regression guard for that flip.
+    """
+
+    @staticmethod
+    def _make_stubbed_output(width, height):
+        from types import SimpleNamespace
+        from blackmagic_io import BlackmagicOutput
+        output = BlackmagicOutput()
+        output._current_settings = SimpleNamespace(width=width, height=height)
+        return output
+
+    def test_yuv8_none_default_matches_explicit_narrow(self):
+        from blackmagic_io import PixelFormat
+        rgb = np.full((1, 8, 3), 128, dtype=np.uint8)
+        output = self._make_stubbed_output(width=8, height=1)
+        via_none = output._prepare_frame_data(
+            rgb, PixelFormat.YUV8, matrix=Matrix.Rec709,
+            input_narrow_range=False, output_narrow_range=None,
+        )
+        via_explicit = output._prepare_frame_data(
+            rgb, PixelFormat.YUV8, matrix=Matrix.Rec709,
+            input_narrow_range=False, output_narrow_range=True,
+        )
+        np.testing.assert_array_equal(via_none, via_explicit)
+
+    def test_yuv10_none_default_matches_explicit_narrow(self):
+        from blackmagic_io import PixelFormat
+        # 24 = LCM(6 for v210 alignment, 8 for general alignment); a safe width.
+        rgb = np.full((1, 24, 3), 32768, dtype=np.uint16)
+        output = self._make_stubbed_output(width=24, height=1)
+        via_none = output._prepare_frame_data(
+            rgb, PixelFormat.YUV10, matrix=Matrix.Rec709,
+            input_narrow_range=False, output_narrow_range=None,
+        )
+        via_explicit = output._prepare_frame_data(
+            rgb, PixelFormat.YUV10, matrix=Matrix.Rec709,
+            input_narrow_range=False, output_narrow_range=True,
+        )
+        np.testing.assert_array_equal(via_none, via_explicit)
+
+    def test_rgb10_none_default_matches_explicit_narrow(self):
+        from blackmagic_io import PixelFormat
+        rgb = np.full((1, 8, 3), 32768, dtype=np.uint16)
+        output = self._make_stubbed_output(width=8, height=1)
+        via_none = output._prepare_frame_data(
+            rgb, PixelFormat.RGB10, matrix=None,
+            input_narrow_range=False, output_narrow_range=None,
+        )
+        via_explicit = output._prepare_frame_data(
+            rgb, PixelFormat.RGB10, matrix=None,
+            input_narrow_range=False, output_narrow_range=True,
+        )
+        np.testing.assert_array_equal(via_none, via_explicit)
+
+    def test_rgb12_none_default_matches_explicit_full_not_narrow(self):
+        from blackmagic_io import PixelFormat
+        rgb = np.full((1, 8, 3), 32768, dtype=np.uint16)
+        output = self._make_stubbed_output(width=8, height=1)
+        via_none = output._prepare_frame_data(
+            rgb, PixelFormat.RGB12, matrix=None,
+            input_narrow_range=False, output_narrow_range=None,
+        )
+        via_full = output._prepare_frame_data(
+            rgb, PixelFormat.RGB12, matrix=None,
+            input_narrow_range=False, output_narrow_range=False,
+        )
+        np.testing.assert_array_equal(via_none, via_full)
+
+        via_narrow = output._prepare_frame_data(
+            rgb, PixelFormat.RGB12, matrix=None,
+            input_narrow_range=False, output_narrow_range=True,
+        )
+        assert not np.array_equal(via_none, via_narrow), (
+            "RGB12 with output_narrow_range=None must default to full-range "
+            "encoding; got a buffer matching the narrow-range encoding"
+        )
+
+
 if __name__ == "__main__":
     pytest.main([__file__, "-v"])

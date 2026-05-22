@@ -24,7 +24,7 @@ import time
 import decklink_io
 import numpy as np
 import pytest
-from blackmagic_io import BlackmagicInput, PixelFormat, create_test_pattern
+from blackmagic_io import BlackmagicInput, BlackmagicOutput, DisplayMode, PixelFormat, create_test_pattern
 
 pytestmark = [pytest.mark.hardware, pytest.mark.hdmi]
 
@@ -391,6 +391,115 @@ def test_bgra_hdmi_loopback_uint16_via_wrapper():
     finally:
         output_device.stop_output()
         output_device.cleanup()
+
+
+def test_bgra_hdmi_display_static_frame_full_range_input():
+    """High-level `BlackmagicOutput.display_static_frame` BGRA + full-range input.
+
+    Exercises the range-aware `_prepare_frame_data` BGRA path from
+    0.18.0b1. Full-range input passes through unchanged before BGRA
+    packing, so the HDMI loopback should round-trip the source values
+    within ±1 (same tolerance as the raw `rgb_to_bgra` loopback above).
+    """
+    expected_rgb_value = 127
+
+    output = BlackmagicOutput()
+    assert output.initialize(OUTPUT_DEVICE_INDEX), \
+        "Failed to initialise output device"
+
+    try:
+        settings = output._device.get_video_settings(DISPLAY_MODE)
+        width, height = settings.width, settings.height
+        source = np.full((height, width, 3), expected_rgb_value, dtype=np.uint8)
+
+        assert output.display_static_frame(
+            source, DisplayMode.HD1080p25,
+            pixel_format=PixelFormat.BGRA,
+            input_narrow_range=False,
+        ), "display_static_frame returned False"
+
+        time.sleep(0.5)
+
+        with BlackmagicInput() as input_device:
+            assert input_device.initialize(
+                INPUT_DEVICE_INDEX,
+                input_connection=decklink_io.InputConnection.HDMI,
+                pixel_format=PixelFormat.BGRA,
+            ), "Failed to initialise BlackmagicInput on HDMI with BGRA"
+
+            captured = input_device.capture_frame_as_uint8(
+                input_narrow_range=False
+            )
+            assert captured is not None, "capture_frame_as_uint8 returned None"
+
+            samples = captured[100:105, 100:105, :].reshape(-1, 3)
+            for i, pixel in enumerate(samples):
+                for ch in range(3):
+                    diff = abs(int(pixel[ch]) - expected_rgb_value)
+                    assert diff <= PIXEL_TOLERANCE, (
+                        f"Full-range BGRA loopback drifted at sample {i} ch {ch}: "
+                        f"expected {expected_rgb_value}, got {int(pixel[ch])}"
+                    )
+    finally:
+        output.cleanup()
+
+
+def test_bgra_hdmi_display_static_frame_narrow_range_input():
+    """High-level `BlackmagicOutput.display_static_frame` BGRA + narrow-range input.
+
+    Exercises the new narrow→full expansion path added in 0.18.0b1. The
+    source carries narrow-range R'G'B' values; the library expands them
+    to full range before BGRA packing. HDMI passes the resulting
+    full-range bytes through to the wire, so the captured uint8 should
+    match the full-range counterpart of the source.
+
+    Source 125 (≈ midpoint of narrow [16, 235]) expands to full 127 per
+    `_adjust_range_uint8` (also verified by the unit test
+    `test_adjust_range_narrow_to_full_midrange` in test_bgra_layout.py).
+    """
+    narrow_rgb_value = 125
+    expected_full = 127
+
+    output = BlackmagicOutput()
+    assert output.initialize(OUTPUT_DEVICE_INDEX), \
+        "Failed to initialise output device"
+
+    try:
+        settings = output._device.get_video_settings(DISPLAY_MODE)
+        width, height = settings.width, settings.height
+        source = np.full((height, width, 3), narrow_rgb_value, dtype=np.uint8)
+
+        assert output.display_static_frame(
+            source, DisplayMode.HD1080p25,
+            pixel_format=PixelFormat.BGRA,
+            input_narrow_range=True,
+        ), "display_static_frame returned False"
+
+        time.sleep(0.5)
+
+        with BlackmagicInput() as input_device:
+            assert input_device.initialize(
+                INPUT_DEVICE_INDEX,
+                input_connection=decklink_io.InputConnection.HDMI,
+                pixel_format=PixelFormat.BGRA,
+            ), "Failed to initialise BlackmagicInput on HDMI with BGRA"
+
+            captured = input_device.capture_frame_as_uint8(
+                input_narrow_range=False
+            )
+            assert captured is not None, "capture_frame_as_uint8 returned None"
+
+            samples = captured[100:105, 100:105, :].reshape(-1, 3)
+            for i, pixel in enumerate(samples):
+                for ch in range(3):
+                    diff = abs(int(pixel[ch]) - expected_full)
+                    assert diff <= PIXEL_TOLERANCE, (
+                        f"Narrow→full expansion at sample {i} ch {ch}: "
+                        f"expected ~{expected_full} (narrow {narrow_rgb_value} "
+                        f"expanded to full), got {int(pixel[ch])}"
+                    )
+    finally:
+        output.cleanup()
 
 
 if __name__ == "__main__":
