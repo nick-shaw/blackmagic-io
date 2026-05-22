@@ -1339,20 +1339,29 @@ class TestRGBtoBGRA:
 
 @pytest.mark.skipif(not CONVERSIONS_AVAILABLE, reason="Conversion functions not available")
 class TestPrepareFrameDataRangeDefaults:
-    """Per-format `output_narrow_range=None` default normalisation.
+    """Per-format `output_narrow_range` defaults when the caller omits the arg.
 
     From 0.18.0b1 the high-level `display_static_frame` /
     `display_solid_color` signature changed from
     `output_narrow_range: bool = True` to
     `output_narrow_range: Optional[bool] = None`, so each pixel format
-    can resolve `None` to its own canonical default. These tests pin
-    those defaults: True for YUV8 / YUV10 / RGB10, False for RGB12 —
-    matching the low-level wrappers in `blackmagic_io/__init__.py` and
-    the per-format defaults listed in the README's PixelFormat section.
+    can resolve "unspecified" to its own canonical default. These tests
+    pin both layers of that contract:
+
+    1. The signature default itself stays as the "unspecified" sentinel
+       — exercised by calling `_prepare_frame_data` without the
+       `output_narrow_range` keyword, the way a real caller would.
+    2. The per-format resolution: True for YUV8 / YUV10 / RGB10, False
+       for RGB12 — matching the low-level wrappers in
+       `blackmagic_io/__init__.py` and the per-format defaults listed
+       in the README's PixelFormat section.
 
     Pre-0.18.0b1 callers who omitted `output_narrow_range` got True for
-    every format, silently overriding the canonical RGB12 default
-    (False). The RGB12 test below is the regression guard for that flip.
+    every format because `bool = True` was the only single-value default
+    the signature could express. The RGB12 test below is the regression
+    guard against that constraint reappearing — it would catch any
+    signature default that resolves to narrow on the RGB12 path,
+    including an accidental revert to `bool = True`.
     """
 
     @staticmethod
@@ -1363,70 +1372,71 @@ class TestPrepareFrameDataRangeDefaults:
         output._current_settings = SimpleNamespace(width=width, height=height)
         return output
 
-    def test_yuv8_none_default_matches_explicit_narrow(self):
+    def test_yuv8_default_matches_explicit_narrow(self):
         from blackmagic_io import PixelFormat
         rgb = np.full((1, 8, 3), 128, dtype=np.uint8)
         output = self._make_stubbed_output(width=8, height=1)
-        via_none = output._prepare_frame_data(
+        via_default = output._prepare_frame_data(
             rgb, PixelFormat.YUV8, matrix=Matrix.Rec709,
-            input_narrow_range=False, output_narrow_range=None,
+            input_narrow_range=False,
         )
         via_explicit = output._prepare_frame_data(
             rgb, PixelFormat.YUV8, matrix=Matrix.Rec709,
             input_narrow_range=False, output_narrow_range=True,
         )
-        np.testing.assert_array_equal(via_none, via_explicit)
+        np.testing.assert_array_equal(via_default, via_explicit)
 
-    def test_yuv10_none_default_matches_explicit_narrow(self):
+    def test_yuv10_default_matches_explicit_narrow(self):
         from blackmagic_io import PixelFormat
         # 24 = LCM(6 for v210 alignment, 8 for general alignment); a safe width.
         rgb = np.full((1, 24, 3), 32768, dtype=np.uint16)
         output = self._make_stubbed_output(width=24, height=1)
-        via_none = output._prepare_frame_data(
+        via_default = output._prepare_frame_data(
             rgb, PixelFormat.YUV10, matrix=Matrix.Rec709,
-            input_narrow_range=False, output_narrow_range=None,
+            input_narrow_range=False,
         )
         via_explicit = output._prepare_frame_data(
             rgb, PixelFormat.YUV10, matrix=Matrix.Rec709,
             input_narrow_range=False, output_narrow_range=True,
         )
-        np.testing.assert_array_equal(via_none, via_explicit)
+        np.testing.assert_array_equal(via_default, via_explicit)
 
-    def test_rgb10_none_default_matches_explicit_narrow(self):
+    def test_rgb10_default_matches_explicit_narrow(self):
         from blackmagic_io import PixelFormat
         rgb = np.full((1, 8, 3), 32768, dtype=np.uint16)
         output = self._make_stubbed_output(width=8, height=1)
-        via_none = output._prepare_frame_data(
+        via_default = output._prepare_frame_data(
             rgb, PixelFormat.RGB10, matrix=None,
-            input_narrow_range=False, output_narrow_range=None,
+            input_narrow_range=False,
         )
         via_explicit = output._prepare_frame_data(
             rgb, PixelFormat.RGB10, matrix=None,
             input_narrow_range=False, output_narrow_range=True,
         )
-        np.testing.assert_array_equal(via_none, via_explicit)
+        np.testing.assert_array_equal(via_default, via_explicit)
 
-    def test_rgb12_none_default_matches_explicit_full_not_narrow(self):
+    def test_rgb12_default_matches_explicit_full_not_narrow(self):
         from blackmagic_io import PixelFormat
         rgb = np.full((1, 8, 3), 32768, dtype=np.uint16)
         output = self._make_stubbed_output(width=8, height=1)
-        via_none = output._prepare_frame_data(
+        via_default = output._prepare_frame_data(
             rgb, PixelFormat.RGB12, matrix=None,
-            input_narrow_range=False, output_narrow_range=None,
+            input_narrow_range=False,
         )
         via_full = output._prepare_frame_data(
             rgb, PixelFormat.RGB12, matrix=None,
             input_narrow_range=False, output_narrow_range=False,
         )
-        np.testing.assert_array_equal(via_none, via_full)
+        np.testing.assert_array_equal(via_default, via_full)
 
         via_narrow = output._prepare_frame_data(
             rgb, PixelFormat.RGB12, matrix=None,
             input_narrow_range=False, output_narrow_range=True,
         )
-        assert not np.array_equal(via_none, via_narrow), (
-            "RGB12 with output_narrow_range=None must default to full-range "
-            "encoding; got a buffer matching the narrow-range encoding"
+        assert not np.array_equal(via_default, via_narrow), (
+            "RGB12 with no explicit output_narrow_range must default to "
+            "full-range encoding; got a buffer matching the narrow-range "
+            "encoding"
         )
 
 
