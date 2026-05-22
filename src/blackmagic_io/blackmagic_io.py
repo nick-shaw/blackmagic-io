@@ -5,6 +5,8 @@ A Python library for video I/O with Blackmagic DeckLink devices.
 Supports video output and input with automatic format conversion.
 """
 
+import warnings
+
 import numpy as np
 from typing import Optional, Tuple, List
 from enum import Enum
@@ -233,7 +235,7 @@ class BlackmagicOutput:
         self._current_settings = None
         self._current_matrix = Matrix.Rec709
         self._current_input_narrow_range = False
-        self._current_output_narrow_range = True
+        self._current_output_narrow_range: Optional[bool] = None
 
     def initialize(self, device_index: int = 0) -> bool:
         """
@@ -303,7 +305,7 @@ class BlackmagicOutput:
                            matrix: Optional[Matrix] = None,
                            hdr_metadata: Optional[dict] = None,
                            input_narrow_range: bool = False,
-                           output_narrow_range: bool = True) -> bool:
+                           output_narrow_range: Optional[bool] = None) -> bool:
         """
         Display a static frame continuously.
 
@@ -337,10 +339,18 @@ class BlackmagicOutput:
                               - Has no effect for float inputs (always interpreted as full range 0.0-1.0).
                               Default: False
             output_narrow_range: Whether to output narrow range values.
-                               - YUV10: If True, Y: 64-940, CbCr: 64-960. If False, full range 0-1023.
-                               - RGB10: If True, 64-940. If False, full range 0-1023.
-                               - RGB12: If True, 256-3760. If False, full range 0-4095.
-                               Default: True
+                               - BGRA: ignored (a UserWarning is issued if explicitly passed).
+                                 The SDK's hardware conversion produces narrow-range Y'CbCr
+                                 4:2:2 on SDI and full-range R'G'B' 4:4:4 on HDMI regardless
+                                 of this parameter. For controlled output range, use YUV10 /
+                                 RGB10 / RGB12.
+                               - YUV8: If True (default), Y: 16-235, CbCr: 16-240.
+                                 If False, full range 0-255.
+                               - YUV10: If True (default), Y: 64-940, CbCr: 64-960.
+                                 If False, full range 0-1023.
+                               - RGB10: If True (default), 64-940. If False, full range 0-1023.
+                               - RGB12: If True, 256-3760. If False (default), full range 0-4095.
+                               Default: None — each format applies its own default above.
 
         Returns:
             True if successful, False otherwise
@@ -362,7 +372,7 @@ class BlackmagicOutput:
 
         self._current_matrix = matrix
         self._current_input_narrow_range = input_narrow_range
-        self._current_output_narrow_range = output_narrow_range
+        self._current_output_narrow_range = None if pixel_format == PixelFormat.BGRA else output_narrow_range
 
         self._device.set_matrix(matrix.value)
 
@@ -407,7 +417,7 @@ class BlackmagicOutput:
                           matrix: Optional[Matrix] = None,
                           hdr_metadata: Optional[dict] = None,
                           input_narrow_range: bool = False,
-                          output_narrow_range: bool = True,
+                          output_narrow_range: Optional[bool] = None,
                           patch: Optional[Tuple[float, float, float, float]] = None,
                           background_color: Optional[Tuple] = None) -> bool:
         """
@@ -433,10 +443,18 @@ class BlackmagicOutput:
                               Has no effect for float inputs (always full range 0.0-1.0).
                               Default: False
             output_narrow_range: Whether to output narrow range values.
-                               - YUV10: If True, Y: 64-940, CbCr: 64-960. If False, full range 0-1023.
-                               - RGB10: If True, 64-940. If False, full range 0-1023.
-                               - RGB12: If True, 256-3760. If False, full range 0-4095.
-                               Default: True
+                               - BGRA: ignored (a UserWarning is issued if explicitly passed).
+                                 The SDK's hardware conversion produces narrow-range Y'CbCr
+                                 4:2:2 on SDI and full-range R'G'B' 4:4:4 on HDMI regardless
+                                 of this parameter. For controlled output range, use YUV10 /
+                                 RGB10 / RGB12.
+                               - YUV8: If True (default), Y: 16-235, CbCr: 16-240.
+                                 If False, full range 0-255.
+                               - YUV10: If True (default), Y: 64-940, CbCr: 64-960.
+                                 If False, full range 0-1023.
+                               - RGB10: If True (default), 64-940. If False, full range 0-1023.
+                               - RGB12: If True, 256-3760. If False (default), full range 0-4095.
+                               Default: None — each format applies its own default above.
             patch: Optional tuple (center_x, center_y, width, height) with normalized coordinates (0.0-1.0).
                   - center_x, center_y: Center position of the patch (0.5, 0.5 = center of screen)
                   - width, height: Patch dimensions (1.0, 1.0 = full screen)
@@ -571,7 +589,7 @@ class BlackmagicOutput:
                           pixel_format: PixelFormat,
                           matrix: Matrix = Matrix.Rec709,
                           input_narrow_range: bool = False,
-                          output_narrow_range: bool = True) -> np.ndarray:
+                          output_narrow_range: Optional[bool] = None) -> np.ndarray:
         """
         Prepare frame data for output, converting format if necessary.
 
@@ -580,7 +598,9 @@ class BlackmagicOutput:
             pixel_format: Target pixel format
             matrix: R'G'B' to Y'CbCr conversion matrix (only used for YUV10)
             input_narrow_range: For uint16 inputs, whether to interpret as narrow range
-            output_narrow_range: Whether to output narrow range values
+            output_narrow_range: Whether to output narrow range values. ``None``
+                resolves to the per-format default (True for YUV8/YUV10/RGB10,
+                False for RGB12). Ignored for BGRA with a warning.
 
         Returns:
             Processed frame data ready for output
@@ -601,13 +621,30 @@ class BlackmagicOutput:
                     "for float or uint16 input."
                 )
 
-            if frame_data.shape[2] == 3:
-                return _decklink.rgb_to_bgra(frame_data, settings.width, settings.height)
-            return frame_data
+            if output_narrow_range is not None:
+                warnings.warn(
+                    "output_narrow_range is ignored for the BGRA pixel format. "
+                    "The SDK's hardware conversion produces narrow-range Y'CbCr 4:2:2 "
+                    "on SDI and full-range R'G'B' 4:4:4 on HDMI regardless of this "
+                    "parameter. For controlled output range, use the YUV10 / RGB10 / "
+                    "RGB12 pixel formats.",
+                    UserWarning,
+                    stacklevel=3,
+                )
+
+            if frame_data.shape[2] == 4:
+                rgb = np.stack([frame_data[:, :, 2], frame_data[:, :, 1], frame_data[:, :, 0]], axis=2)
+            else:
+                rgb = frame_data
+            rgb_full = _adjust_range_uint8(rgb, input_narrow_range, output_narrow_range=False)
+            return _decklink.rgb_to_bgra(rgb_full, settings.width, settings.height)
 
         elif pixel_format == PixelFormat.YUV8:
             if frame_data.ndim != 3 or frame_data.shape[2] != 3:
                 raise ValueError("For YUV8 format, frame data must be HxWx3 (RGB)")
+
+            if output_narrow_range is None:
+                output_narrow_range = True
 
             internal_matrix = matrix.value
 
@@ -627,6 +664,9 @@ class BlackmagicOutput:
             if frame_data.ndim != 3 or frame_data.shape[2] != 3:
                 raise ValueError("For YUV10 format, frame data must be HxWx3 (RGB)")
 
+            if output_narrow_range is None:
+                output_narrow_range = True
+
             internal_matrix = matrix.value
 
             if frame_data.dtype == np.uint16:
@@ -642,6 +682,9 @@ class BlackmagicOutput:
             if frame_data.ndim != 3 or frame_data.shape[2] != 3:
                 raise ValueError("For RGB10 format, frame data must be HxWx3 (RGB)")
 
+            if output_narrow_range is None:
+                output_narrow_range = True
+
             if frame_data.dtype == np.uint16:
                 return _decklink.rgb_uint16_to_rgb10(frame_data, settings.width, settings.height,
                                                      input_narrow_range, output_narrow_range)
@@ -654,6 +697,9 @@ class BlackmagicOutput:
         elif pixel_format == PixelFormat.RGB12:
             if frame_data.ndim != 3 or frame_data.shape[2] != 3:
                 raise ValueError("For RGB12 format, frame data must be HxWx3 (RGB)")
+
+            if output_narrow_range is None:
+                output_narrow_range = False
 
             if frame_data.dtype == np.uint16:
                 return _decklink.rgb_uint16_to_rgb12(frame_data, settings.width, settings.height,
