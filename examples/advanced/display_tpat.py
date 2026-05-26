@@ -16,7 +16,7 @@ import json
 import sys
 import numpy as np
 
-import blackmagic_io as bmo
+import blackmagic_io as bmio
 from blackmagic_io import BlackmagicOutput, DisplayMode, PixelFormat
 from tpat.tpat import render_tpat
 
@@ -47,14 +47,14 @@ PIXEL_FORMATS = {
 }
 
 MATRICES = {
-    'rec709': bmo.Matrix.Rec709,
-    'rec2020': bmo.Matrix.Rec2020,
+    'rec709': bmio.Matrix.Rec709,
+    'rec2020': bmio.Matrix.Rec2020,
 }
 
 EOTFS = {
-    'sdr': bmo.Eotf.SDR,
-    'hlg': bmo.Eotf.HLG,
-    'pq': bmo.Eotf.PQ,
+    'sdr': bmio.Eotf.SDR,
+    'hlg': bmio.Eotf.HLG,
+    'pq': bmio.Eotf.PQ,
 }
 
 
@@ -164,7 +164,7 @@ def main():
             else:
                 matrix_str = 'rec709'
 
-            matrix = MATRICES.get(matrix_str, bmo.Matrix.Rec709)
+            matrix = MATRICES.get(matrix_str, bmio.Matrix.Rec709)
 
             if args.e is not None:
                 eotf_str = str(args.e).lower()
@@ -173,7 +173,7 @@ def main():
             else:
                 eotf_str = 'sdr'
 
-            eotf_value = EOTFS.get(eotf_str, bmo.Eotf.SDR)
+            eotf_value = EOTFS.get(eotf_str, bmio.Eotf.SDR)
             eotf = {'eotf': eotf_value}
 
             output_narrow_range_arg = (
