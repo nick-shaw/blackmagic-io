@@ -206,6 +206,12 @@ with BlackmagicInput() as input_device:
             if 'mastering_luminance' in hdr:
                 print(f"Mastering Luminance: {hdr['mastering_luminance']['max']:.1f} / "
                       f"{hdr['mastering_luminance']['min']:.4f} cd/m²")
+            if 'content_light' in hdr:
+                cl = hdr['content_light']
+                if 'max_cll' in cl:
+                    print(f"MaxCLL:  {cl['max_cll']} cd/m²")
+                if 'max_fall' in cl:
+                    print(f"MaxFALL: {cl['max_fall']} cd/m²")
 
         # Access R'G'B' data
         rgb = frame_data['rgb']  # float32 array (H×W×3)
