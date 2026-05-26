@@ -80,7 +80,17 @@ def test_hdmi_loopback(output_device, label, pixel_format, mean_tol, max_tol):
             input_connection=decklink_io.InputConnection.HDMI,
         ), f"Failed to initialise HDMI input for {label}"
 
-        captured = input_device.capture_frame_as_rgb(timeout_ms=CAPTURE_TIMEOUT_MS)
+        # The display calls above output narrow-range on the wire
+        # (`output_narrow_range=True`) for both YUV10 and RGB12. The capture
+        # side must match — for RGB12 specifically, the per-source-format
+        # default is `input_narrow_range=False` (12-bit R'G'B' convention is
+        # full), so without an explicit override the narrow wire would be
+        # mis-decoded as full. Pass `True` to match the deliberately-narrow
+        # output the test produces.
+        captured = input_device.capture_frame_as_rgb(
+            timeout_ms=CAPTURE_TIMEOUT_MS,
+            input_narrow_range=True,
+        )
         assert captured is not None, f"capture_frame_as_rgb returned None for {label}"
         assert captured.shape == rgb_pattern.shape, (
             f"{label}: captured shape {captured.shape} != source {rgb_pattern.shape}"
