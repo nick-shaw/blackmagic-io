@@ -960,9 +960,45 @@ class BlackmagicInput:
         """
         return self._input.get_available_input_connections(device_index)
 
+    def _resolve_capture_input_narrow_range(self,
+                                            captured_frame,
+                                            input_narrow_range: Optional[bool]) -> bool:
+        """Resolve ``input_narrow_range=None`` to a per-source-format default.
+
+        Mirror of the output-side per-format default resolution introduced for
+        ``output_narrow_range`` in 0.18.0b1. Applied after the source pixel
+        format is known (at capture time) rather than at the API boundary.
+        See ``scratch/notes/range-aware-capture-defaults-plan.md`` for the
+        full rationale and the BGRA edge cases.
+
+        Defaults:
+
+        - ``YUV8`` / ``YUV10`` / ``RGB10``: True (narrow — broadcast convention
+          for Y'CbCr; Blackmagic SDK convention for 10-bit R'G'B').
+        - ``RGB12``: False (full — Blackmagic SDK convention for 12-bit R'G'B').
+        - ``BGRA`` delivered as BGRA: True. Value is documentation-only on this
+          path: SDK delivers BGRA only from Y'CbCr sources with hardware range
+          expansion already applied, so the bytes are always full and the
+          library ignores ``input_narrow_range`` for byte-level decoding.
+        - ``BGRA`` requested but delivered as RGB10 (8-bit R'G'B' via HDMI):
+          False — 8-bit R'G'B' on HDMI is conventionally full range (DVI-D
+          "computer signal" heritage), symmetric with the library's own
+          BGRA output which the SDK transmits as full-range R'G'B' on HDMI.
+        """
+        if input_narrow_range is not None:
+            return input_narrow_range
+
+        pixel_format = captured_frame.format
+        if (self._requested_format == PixelFormat.BGRA
+                and pixel_format == _decklink.PixelFormat.RGB10):
+            return False
+        if pixel_format == _decklink.PixelFormat.RGB12:
+            return False
+        return True
+
     def capture_frame_as_uint8(self,
                               timeout_ms: int = 5000,
-                              input_narrow_range: bool = True,
+                              input_narrow_range: Optional[bool] = None,
                               output_narrow_range: bool = False) -> Optional[np.ndarray]:
         """Capture a frame and convert to R'G'B' uint8 array (faster than float).
 
@@ -971,7 +1007,13 @@ class BlackmagicInput:
 
         Args:
             timeout_ms: Capture timeout in milliseconds (default: 5000)
-            input_narrow_range: Whether input uses narrow range encoding (default: True)
+            input_narrow_range: Whether to interpret the wire signal as narrow
+                range. ``None`` (default) resolves to a per-source-format
+                default after format detection — True for Y'CbCr 8/10-bit and
+                10-bit R'G'B' (narrow conventions); False for 12-bit R'G'B'
+                (full convention) and for the BGRA-requested-but-RGB10-
+                delivered HDMI 8-bit R'G'B' path (full convention). See
+                ``_resolve_capture_input_narrow_range`` for details.
             output_narrow_range: If False (default), output uint8 values are
                 full range (0-255, "ready to display"). If True, output is
                 narrow-range R'G'B' (16-235 per channel) — useful when feeding
@@ -989,13 +1031,16 @@ class BlackmagicInput:
         if not self._input.capture_frame(captured_frame, timeout_ms):
             return None
 
+        resolved_input = self._resolve_capture_input_narrow_range(
+            captured_frame, input_narrow_range
+        )
         return self._convert_frame_to_int(captured_frame, bit_depth=8,
-                                          input_narrow_range=input_narrow_range,
+                                          input_narrow_range=resolved_input,
                                           output_narrow_range=output_narrow_range)
 
     def capture_frame_as_uint8_with_metadata(self,
                                             timeout_ms: int = 5000,
-                                            input_narrow_range: bool = True,
+                                            input_narrow_range: Optional[bool] = None,
                                             output_narrow_range: bool = False) -> Optional[dict]:
         """Capture a frame and convert to R'G'B' uint8 with metadata (fast preview with metadata).
 
@@ -1004,7 +1049,10 @@ class BlackmagicInput:
 
         Args:
             timeout_ms: Capture timeout in milliseconds (default: 5000)
-            input_narrow_range: Whether input uses narrow range encoding (default: True)
+            input_narrow_range: Whether to interpret the wire signal as narrow
+                range. ``None`` (default) resolves to a per-source-format
+                default; see ``capture_frame_as_uint8`` for the resolution
+                table. The returned dict records the **resolved** boolean.
             output_narrow_range: If False (default), output uint8 values are
                 full range (0-255). If True, output is narrow-range R'G'B'
                 (16-235 per channel).
@@ -1040,8 +1088,11 @@ class BlackmagicInput:
         if not self._input.capture_frame(captured_frame, timeout_ms):
             return None
 
+        resolved_input = self._resolve_capture_input_narrow_range(
+            captured_frame, input_narrow_range
+        )
         rgb_array = self._convert_frame_to_int(captured_frame, bit_depth=8,
-                                               input_narrow_range=input_narrow_range,
+                                               input_narrow_range=resolved_input,
                                                output_narrow_range=output_narrow_range)
         if rgb_array is None:
             return None
@@ -1064,7 +1115,7 @@ class BlackmagicInput:
             'mode': display_mode.name if display_mode else 'Unknown',
             'matrix': matrix.name,
             'eotf': eotf.name,
-            'input_narrow_range': input_narrow_range,
+            'input_narrow_range': resolved_input,
             'output_narrow_range': output_narrow_range
         }
 
@@ -1122,7 +1173,7 @@ class BlackmagicInput:
 
     def capture_frame_as_uint16(self,
                                 timeout_ms: int = 5000,
-                                input_narrow_range: bool = True,
+                                input_narrow_range: Optional[bool] = None,
                                 output_narrow_range: bool = False) -> Optional[np.ndarray]:
         """Capture a frame and convert to R'G'B' uint16 array (preserves bit depth).
 
@@ -1133,7 +1184,10 @@ class BlackmagicInput:
 
         Args:
             timeout_ms: Capture timeout in milliseconds (default: 5000)
-            input_narrow_range: Whether input uses narrow range encoding (default: True)
+            input_narrow_range: Whether to interpret the wire signal as narrow
+                range. ``None`` (default) resolves to a per-source-format
+                default; see ``capture_frame_as_uint8`` for the resolution
+                table.
             output_narrow_range: If False (default), output uint16 values are
                 full range (0-65535 scaled). If True, output is narrow-range
                 R'G'B' (10-bit narrow codes LSB-padded to 16-bit: 4096-60160).
@@ -1149,13 +1203,16 @@ class BlackmagicInput:
         if not self._input.capture_frame(captured_frame, timeout_ms):
             return None
 
+        resolved_input = self._resolve_capture_input_narrow_range(
+            captured_frame, input_narrow_range
+        )
         return self._convert_frame_to_int(captured_frame, bit_depth=16,
-                                          input_narrow_range=input_narrow_range,
+                                          input_narrow_range=resolved_input,
                                           output_narrow_range=output_narrow_range)
 
     def capture_frame_as_uint16_with_metadata(self,
                                               timeout_ms: int = 5000,
-                                              input_narrow_range: bool = True,
+                                              input_narrow_range: Optional[bool] = None,
                                               output_narrow_range: bool = False) -> Optional[dict]:
         """Capture a frame and convert to R'G'B' uint16 with metadata.
 
@@ -1164,7 +1221,10 @@ class BlackmagicInput:
 
         Args:
             timeout_ms: Capture timeout in milliseconds (default: 5000)
-            input_narrow_range: Whether input uses narrow range encoding (default: True)
+            input_narrow_range: Whether to interpret the wire signal as narrow
+                range. ``None`` (default) resolves to a per-source-format
+                default; see ``capture_frame_as_uint8`` for the resolution
+                table. The returned dict records the **resolved** boolean.
             output_narrow_range: If False (default), output uint16 values are
                 full range. If True, output is narrow-range R'G'B' (10-bit
                 narrow codes LSB-padded to 16-bit: 4096-60160).
@@ -1187,8 +1247,11 @@ class BlackmagicInput:
         if not self._input.capture_frame(captured_frame, timeout_ms):
             return None
 
+        resolved_input = self._resolve_capture_input_narrow_range(
+            captured_frame, input_narrow_range
+        )
         rgb_array = self._convert_frame_to_int(captured_frame, bit_depth=16,
-                                               input_narrow_range=input_narrow_range,
+                                               input_narrow_range=resolved_input,
                                                output_narrow_range=output_narrow_range)
         if rgb_array is None:
             return None
@@ -1211,7 +1274,7 @@ class BlackmagicInput:
             'mode': display_mode.name if display_mode else 'Unknown',
             'matrix': matrix.name,
             'eotf': eotf.name,
-            'input_narrow_range': input_narrow_range,
+            'input_narrow_range': resolved_input,
             'output_narrow_range': output_narrow_range
         }
 
@@ -1269,7 +1332,7 @@ class BlackmagicInput:
 
     def capture_frame_as_rgb(self,
                             timeout_ms: int = 5000,
-                            input_narrow_range: bool = True) -> Optional[np.ndarray]:
+                            input_narrow_range: Optional[bool] = None) -> Optional[np.ndarray]:
         """Capture a frame and convert to R'G'B' float array.
 
         Automatically detects pixel format and converts to R'G'B' float (0.0-1.0).
@@ -1277,11 +1340,17 @@ class BlackmagicInput:
 
         Args:
             timeout_ms: Capture timeout in milliseconds (default: 5000)
-            input_narrow_range: Whether input uses narrow range encoding (default: True)
-                - YUV8: True = 16-235/16-240 (standard)
-                - YUV10: True = 64-940/64-960 (standard)
-                - RGB10: True = 64-940 (convention)
-                - RGB12: False = 0-4095 (convention) - override to False for RGB12 full range
+            input_narrow_range: Whether to interpret the wire signal as narrow
+                range. ``None`` (default) resolves to a per-source-format
+                default after format detection:
+
+                - ``YUV8`` / ``YUV10``: True (narrow Y'CbCr — broadcast convention)
+                - ``RGB10``: True (Blackmagic 10-bit R'G'B' convention)
+                - ``RGB12``: False (Blackmagic 12-bit R'G'B' convention)
+                - ``BGRA`` requested but delivered as RGB10 (HDMI 8-bit R'G'B'):
+                  False (full-range convention for 8-bit R'G'B' on HDMI)
+
+                See ``_resolve_capture_input_narrow_range`` for full details.
 
         Returns:
             R'G'B' array (H×W×3), dtype float32, range 0.0-1.0, or None if capture failed
@@ -1294,16 +1363,22 @@ class BlackmagicInput:
         if not self._input.capture_frame(captured_frame, timeout_ms):
             return None
 
-        return self._convert_frame_to_rgb(captured_frame, input_narrow_range)
+        resolved_input = self._resolve_capture_input_narrow_range(
+            captured_frame, input_narrow_range
+        )
+        return self._convert_frame_to_rgb(captured_frame, resolved_input)
 
     def capture_frame_with_metadata(self,
                                    timeout_ms: int = 5000,
-                                   input_narrow_range: bool = True) -> Optional[dict]:
+                                   input_narrow_range: Optional[bool] = None) -> Optional[dict]:
         """Capture a frame with full metadata.
 
         Args:
             timeout_ms: Capture timeout in milliseconds (default: 5000)
-            input_narrow_range: Whether input uses narrow range encoding (default: True)
+            input_narrow_range: Whether to interpret the wire signal as narrow
+                range. ``None`` (default) resolves to a per-source-format
+                default; see ``capture_frame_as_rgb`` for the resolution
+                table. The returned dict records the **resolved** boolean.
 
         Returns:
             Dictionary with:
@@ -1336,7 +1411,10 @@ class BlackmagicInput:
         if not self._input.capture_frame(captured_frame, timeout_ms):
             return None
 
-        rgb_array = self._convert_frame_to_rgb(captured_frame, input_narrow_range)
+        resolved_input = self._resolve_capture_input_narrow_range(
+            captured_frame, input_narrow_range
+        )
+        rgb_array = self._convert_frame_to_rgb(captured_frame, resolved_input)
         if rgb_array is None:
             return None
 
@@ -1358,7 +1436,7 @@ class BlackmagicInput:
             'mode': display_mode.name if display_mode else 'Unknown',
             'matrix': matrix.name,
             'eotf': eotf.name,
-            'input_narrow_range': input_narrow_range
+            'input_narrow_range': resolved_input
         }
 
         if captured_frame.has_timecode:
