@@ -18,6 +18,7 @@ If upgrading from 0.17.x:
 - Low-level setters `setHdrMetadata` / `setHdrStaticMetadata` / `clearHdrMetadata` replaced by per-field `setMatrix` / `setEotf` / `setStaticMetadata` on `DeckLinkOutput`. The high-level `display_static_frame(matrix=..., hdr_metadata=...)` API is unchanged.
 - `display_static_frame()` and `display_solid_color()` now use `output_narrow_range: Optional[bool] = None` (previously `bool = True`). `None` resolves to the per-format default — True for YUV8 / YUV10 / RGB10, **False for RGB12** — matching the canonical low-level wrappers and the documented per-format defaults. RGB12 callers who omitted `output_narrow_range` previously got narrow (256-3760); they now get full (0-4095). Pass `output_narrow_range=True` explicitly to preserve the old behaviour.
 - `display_static_frame()` and `display_solid_color()` now honour `input_narrow_range` on the BGRA pixel-format path (previously silently ignored). Narrow-range input is expanded to full-range R'G'B' before packing. Passing `output_narrow_range` to a BGRA call now emits a `UserWarning` and is ignored — see HDMI Notes for the rationale.
+- `BlackmagicInput.capture_frame_as_uint8()` / `capture_frame_as_uint16()` / `capture_frame_as_rgb()` and their `_with_metadata` variants now use `input_narrow_range: Optional[bool] = None` (previously `bool = True`). `None` resolves to a per-source-format default after format detection — True for YUV8 / YUV10 / RGB10, **False for RGB12**, and False for the BGRA-requested-but-RGB10-delivered HDMI 8-bit R'G'B' path (symmetric with the library's own BGRA → HDMI output). RGB12 sources captured with `input_narrow_range` omitted previously had narrow input assumed (incorrect for the typical full-range 12-bit R'G'B' wire); they now have full input assumed. Pass `input_narrow_range=True` explicitly to preserve the old behaviour. The `_with_metadata` variants now record the **resolved** boolean in the returned dict's `'input_narrow_range'` field, not the user-supplied `None`.
 
 See [CHANGELOG.md](CHANGELOG.md) for the full rationale and rename mapping.
 
@@ -416,20 +417,25 @@ Immediately activates capture mode, which will:
 
 **Performance Note:** Requesting `PixelFormat.BGRA` enables real-time ~25fps preview by having the hardware deliver 8-bit BGRA frames directly, avoiding expensive colorspace conversions. This is ideal for monitoring and preview workflows. For quality capture workflows, use the default YUV10 format (or explicitly specify it) to capture full 10-bit precision, then use `capture_frame_as_rgb()` or `capture_frame_with_metadata()` for processing.
 
-**`capture_frame_as_uint8(timeout_ms=5000, input_narrow_range=True, output_narrow_range=False) -> Optional[np.ndarray]`**
+**`capture_frame_as_uint8(timeout_ms=5000, input_narrow_range=None, output_narrow_range=False) -> Optional[np.ndarray]`**
 Capture a single frame and convert to R'G'B' uint8 (faster than float conversion).
 - `timeout_ms`: Timeout in milliseconds (default: 5000)
-- `input_narrow_range`: Whether input uses narrow range encoding (default: True)
+- `input_narrow_range`: Whether to interpret the wire signal as narrow range. `None` (default) resolves to a per-source-format default after format detection:
+  - `YUV8` / `YUV10`: True (narrow Y'CbCr — broadcast convention)
+  - `RGB10`: True (Blackmagic 10-bit R'G'B' convention)
+  - `RGB12`: False (Blackmagic 12-bit R'G'B' convention)
+  - `BGRA` requested but delivered as RGB10 (HDMI 8-bit R'G'B'): False (full-range "computer signal" convention, symmetric with the library's own BGRA → HDMI output)
+  - `BGRA` delivered as BGRA: value is documentation-only on this path — SDK delivers BGRA only from Y'CbCr sources with hardware range expansion already applied, so the bytes are always full and the library ignores `input_narrow_range` for byte-level decoding
 - `output_narrow_range`: If False (default), output uint8 is full range (0-255, "ready to display"). If True, output is narrow-range R'G'B' (16-235 per channel) — useful when feeding the result to further video processing that expects narrow-range conventions.
 - Returns: R'G'B' uint8 array (H×W×3), or None if timeout/no signal
 - Automatically converts from any DeckLink pixel format to R'G'B'
 - Faster than `capture_frame_as_rgb()` due to uint8 output, ideal for preview workflows
 - When the capture was initialised with `pixel_format=PixelFormat.BGRA` and the SDK delivers 10-bit R'G'B' (the typical case for 8-bit R'G'B' sources on HDMI), the library automatically right-shifts each channel by 2 to recover the exact 8-bit values before applying any range conversion.
 
-**`capture_frame_as_uint8_with_metadata(timeout_ms=5000, input_narrow_range=True, output_narrow_range=False) -> Optional[dict]`**
+**`capture_frame_as_uint8_with_metadata(timeout_ms=5000, input_narrow_range=None, output_narrow_range=False) -> Optional[dict]`**
 Capture a frame as R'G'B' uint8 with format metadata (fast preview with metadata access).
 - `timeout_ms`: Timeout in milliseconds (default: 5000)
-- `input_narrow_range`: Whether input uses narrow range encoding (default: True)
+- `input_narrow_range`: Same per-source-format default semantics as `capture_frame_as_uint8()`. The returned dict's `'input_narrow_range'` field records the **resolved** boolean.
 - `output_narrow_range`: If False (default), output uint8 is full range (0-255). If True, output is narrow-range R'G'B' (16-235 per channel).
 - Returns: Dictionary with frame data and metadata, or None if timeout/no signal
 
@@ -448,29 +454,29 @@ Dictionary keys:
 
 This function combines the performance of `capture_frame_as_uint8()` with metadata access, making it ideal for real-time preview applications that need to detect signal changes (resolution, matrix, EOTF) without the overhead of float conversion.
 
-**`capture_frame_as_uint16(timeout_ms=5000, input_narrow_range=True, output_narrow_range=False) -> Optional[np.ndarray]`**
+**`capture_frame_as_uint16(timeout_ms=5000, input_narrow_range=None, output_narrow_range=False) -> Optional[np.ndarray]`**
 Capture a single frame and convert to R'G'B' uint16 (preserves native bit depth of the source).
 - `timeout_ms`: Timeout in milliseconds (default: 5000)
-- `input_narrow_range`: Whether input uses narrow range encoding (default: True)
+- `input_narrow_range`: Same per-source-format default semantics as `capture_frame_as_uint8()`.
 - `output_narrow_range`: If False (default), output uint16 is full range (0-65535 scaled). If True, output is narrow-range R'G'B' (10-bit narrow codes LSB-padded to 16-bit: 4096-60160).
 - Returns: R'G'B' uint16 array (H×W×3), or None if timeout/no signal
 - Higher-precision counterpart to `capture_frame_as_uint8()`. 10-bit (RGB10 / YUV10) and 12-bit (RGB12) sources keep their native precision in the uint16 result. 8-bit sources (BGRA, or RGB10-delivered-as-BGRA) are LSB-padded via `<< 8` — `0xff` maps to `0xff00`, so the underlying precision is still 8-bit even though the dtype is uint16.
 
-**`capture_frame_as_uint16_with_metadata(timeout_ms=5000, input_narrow_range=True, output_narrow_range=False) -> Optional[dict]`**
-Capture a frame as R'G'B' uint16 with format metadata. Higher-precision counterpart to `capture_frame_as_uint8_with_metadata()`; see that method for the per-key dictionary structure (only the `'rgb'` value's dtype changes from uint8 to uint16). See `capture_frame_as_uint16()` above for notes on bit-depth handling per source format.
+**`capture_frame_as_uint16_with_metadata(timeout_ms=5000, input_narrow_range=None, output_narrow_range=False) -> Optional[dict]`**
+Capture a frame as R'G'B' uint16 with format metadata. Higher-precision counterpart to `capture_frame_as_uint8_with_metadata()`; see that method for the per-key dictionary structure (only the `'rgb'` value's dtype changes from uint8 to uint16) and the `input_narrow_range` per-source-format defaults. See `capture_frame_as_uint16()` above for notes on bit-depth handling per source format.
 
-**`capture_frame_as_rgb(timeout_ms=5000, input_narrow_range=True) -> Optional[np.ndarray]`**
+**`capture_frame_as_rgb(timeout_ms=5000, input_narrow_range=None) -> Optional[np.ndarray]`**
 Capture a single frame and convert to R'G'B'.
 - `timeout_ms`: Timeout in milliseconds (default: 5000)
-- `input_narrow_range`: Whether input uses narrow range encoding (default: True)
-- Returns: R'G'B' float32 array (H×W×3) mapped to 0.0-1.0 (nominal black to nominal white per `input_narrow_range`), or None if timeout/no signal
+- `input_narrow_range`: Same per-source-format default semantics as `capture_frame_as_uint8()`.
+- Returns: R'G'B' float32 array (H×W×3) mapped to 0.0-1.0 (nominal black to nominal white per the resolved `input_narrow_range`), or None if timeout/no signal
 - Automatically converts from any DeckLink pixel format to R'G'B'
 - When the capture was initialised with `pixel_format=PixelFormat.BGRA` and the SDK delivers 10-bit R'G'B' (the typical case for 8-bit R'G'B' sources on HDMI), the library automatically right-shifts each channel by 2 to recover the exact 8-bit values before float conversion. This avoids the small precision error that comes from decoding LSB-padded 8-bit content as if it were native 10-bit.
 
-**`capture_frame_with_metadata(timeout_ms=5000, input_narrow_range=True) -> Optional[dict]`**
+**`capture_frame_with_metadata(timeout_ms=5000, input_narrow_range=None) -> Optional[dict]`**
 Capture a frame with format metadata.
 - `timeout_ms`: Timeout in milliseconds (default: 5000)
-- `input_narrow_range`: Whether input uses narrow range encoding (default: True)
+- `input_narrow_range`: Same per-source-format default semantics as `capture_frame_as_uint8()`. The returned dict's `'input_narrow_range'` field records the **resolved** boolean.
 - Returns: Dictionary with frame data and metadata, or None if timeout/no signal
 - BGRA-requested handling: same automatic right-shift as `capture_frame_as_rgb()` above.
 
@@ -1646,6 +1652,20 @@ Sub-blacks (codes 0-15) and super-whites (codes 236-255) in narrow-range input a
 For controlled output range — including narrow-range R'G'B' on HDMI — use `PixelFormat.YUV10` / `PixelFormat.RGB10` / `PixelFormat.RGB12` instead. These are higher-precision formats with transport-uniform range control.
 
 If you specifically need narrow-range R'G'B' on HDMI via BGRA (a niche workflow), the workaround is to lie about the input range: pass narrow-range bytes (already 16-235) with `input_narrow_range=False`. The library treats them as already-full and packs them unchanged; HDMI then transmits them as narrow R'G'B'. SDI receives doubly-narrowed Y'CbCr in that case — the cost of the lie.
+
+### Capture-side `input_narrow_range` defaults are per-source-format
+
+Symmetric with the output-side `output_narrow_range` per-format defaults documented above. From 0.18.0b1 the high-level capture API uses `input_narrow_range: Optional[bool] = None`, resolved at runtime after the source pixel format is known:
+
+- `YUV8` / `YUV10`: True (narrow Y'CbCr — broadcast convention).
+- `RGB10`: True (Blackmagic 10-bit R'G'B' is conventionally narrow per the SDK).
+- `RGB12`: False (Blackmagic 12-bit R'G'B' is conventionally full per the SDK).
+- BGRA requested but delivered as RGB10 (the 8-bit R'G'B' HDMI source path): **False**. The SDK transmits the library's own BGRA output as full-range R'G'B' on HDMI (see "BGRA output is transport-asymmetric on the wire" above), and 8-bit R'G'B' on HDMI is conventionally a full-range "computer signal" — the DVI-D heritage the SDK appears to honour in both directions. Capturing one symmetric to producing one means assuming full range. This intentionally diverges from the sibling 10-bit RGB10 default (which keeps narrow) — the source bit-depth is the discriminator: 8-bit-via-RGB10-padding is full, native 10-bit RGB10 is narrow.
+- BGRA delivered as BGRA: documentation-only. The SDK delivers BGRA from Y'CbCr sources only, having already applied hardware range expansion. The bytes the library receives are always full-range, so `input_narrow_range` doesn't gate byte-level decoding on this path; it describes the wire signal upstream of the SDK's conversion.
+
+The structural difference from the output side: on output, the caller picks `pixel_format` at the API boundary so the per-format default applies immediately; on capture, the source format is detected from the wire, so resolution happens inside `_convert_frame_to_int` / `_convert_frame_to_rgb` after format detection. The `_with_metadata` capture variants record the **resolved** boolean in the returned dict's `'input_narrow_range'` field, so callers can see what was actually applied.
+
+If the caller knows the wire signal's range and it differs from the per-format default (e.g. narrow-range RGB12 from a niche source, or full-range Y'CbCr from a GPU), pass `input_narrow_range` explicitly — the resolved default only kicks in when the argument is omitted or `None`.
 
 ### RGB range signalling on transmit (AVI InfoFrame Q)
 
