@@ -413,5 +413,81 @@ def test_display_solid_color_greyscale_bit_exact(
         output.cleanup()
 
 
+# --- Per-source-format input_narrow_range default resolution ----------
+# These tests pin the capture-side per-source-format defaults introduced
+# in 0.18.0b1, mirroring the output-side `TestPrepareFrameDataRangeDefaults`
+# in test_conversion_ranges.py. Pre-0.18.0b1 the capture API forced
+# `input_narrow_range=True` uniformly, silently overriding the canonical
+# RGB12-is-full convention used by the low-level wrappers. Now `None`
+# resolves to the per-source-format default at dispatch time.
+#
+# The metadata-dict-based check exercises two layers in one assertion:
+#   1. The signature default stays as the "unspecified" sentinel (None).
+#   2. The resolver maps None to the right per-source-format value.
+# If either layer regresses, the dict's `input_narrow_range` field will
+# disagree with the documented expected default below.
+#
+# RGB12 is the regression guard against the asymmetry being silently
+# re-introduced.
+
+
+# (label, pixel_format, expected resolved default)
+INPUT_RANGE_DEFAULTS = [
+    ("YUV8",  PixelFormat.YUV8,  True),
+    ("YUV10", PixelFormat.YUV10, True),
+    ("RGB10", PixelFormat.RGB10, True),
+    ("RGB12", PixelFormat.RGB12, False),
+]
+
+
+@pytest.mark.parametrize(
+    "label,pixel_format,expected_default",
+    INPUT_RANGE_DEFAULTS,
+    ids=[c[0] for c in INPUT_RANGE_DEFAULTS],
+)
+def test_input_narrow_range_default_resolution(label, pixel_format, expected_default):
+    """`input_narrow_range=None` resolves to the per-source-format default.
+
+    Outputs a mid-grey patch in the requested format with each format's
+    canonical default range, captures via SDI loopback with
+    `input_narrow_range` omitted, and asserts the metadata dict records
+    the documented per-format resolved default.
+    """
+    canonical_output_narrow = expected_default
+    color = (512, 512, 512)
+
+    output = BlackmagicOutput()
+    assert output.initialize(OUTPUT_DEVICE_INDEX), \
+        f"Failed to initialise output device for {label}"
+
+    try:
+        ok = output.display_solid_color(
+            color, DISPLAY_MODE,
+            pixel_format=pixel_format,
+            input_narrow_range=False,
+            output_narrow_range=canonical_output_narrow,
+        )
+        assert ok, f"display_solid_color returned False for {label}"
+
+        time.sleep(0.5)
+
+        with BlackmagicInput() as input_device:
+            assert input_device.initialize(
+                INPUT_DEVICE_INDEX,
+                input_connection=decklink_io.InputConnection.SDI,
+            ), f"Failed to initialise SDI input for {label}"
+
+            result = input_device.capture_frame_as_uint16_with_metadata()
+            assert result is not None, \
+                f"capture_frame_as_uint16_with_metadata returned None for {label}"
+
+            assert result["input_narrow_range"] is expected_default, (
+                f"{label}: expected input_narrow_range default {expected_default} "
+                f"(per-source-format resolution), got {result['input_narrow_range']}"
+            )
+    finally:
+        output.cleanup()
+
+
 if __name__ == "__main__":
     sys.exit(pytest.main([__file__, "-v", "-s"]))

@@ -502,5 +502,55 @@ def test_bgra_hdmi_display_static_frame_narrow_range_input():
         output.cleanup()
 
 
+def test_bgra_requested_rgb10_delivered_input_range_default_is_full():
+    """The BGRA-requested-but-RGB10-delivered branch defaults to full range.
+
+    Symmetric with the library's own BGRA output: the SDK transmits BGRA
+    bytes as full-range R'G'B' on HDMI, and on RGB sources the SDK
+    delivers 8-bit values LSB-padded in a 10-bit R'G'B' container. So
+    capturing an 8-bit R'G'B' HDMI source via `pixel_format=BGRA` should
+    default to `input_narrow_range=False` — interpreting the recovered
+    8-bit codes as full-range "computer signal" values, not as narrow
+    R'G'B'. This is the per-source-format default that diverges from the
+    sibling RGB10 path (which keeps narrow as the Blackmagic 10-bit
+    convention); the source bit-depth is the discriminator.
+    """
+    output = BlackmagicOutput()
+    assert output.initialize(OUTPUT_DEVICE_INDEX), \
+        "Failed to initialise output device"
+
+    try:
+        settings = output._device.get_video_settings(DISPLAY_MODE)
+        width, height = settings.width, settings.height
+        source = np.full((height, width, 3), 127, dtype=np.uint8)
+
+        assert output.display_static_frame(
+            source, DisplayMode.HD1080p25,
+            pixel_format=PixelFormat.BGRA,
+            input_narrow_range=False,
+        ), "display_static_frame returned False"
+
+        time.sleep(0.5)
+
+        with BlackmagicInput() as input_device:
+            assert input_device.initialize(
+                INPUT_DEVICE_INDEX,
+                input_connection=decklink_io.InputConnection.HDMI,
+                pixel_format=PixelFormat.BGRA,
+            ), "Failed to initialise BlackmagicInput on HDMI with BGRA"
+
+            result = input_device.capture_frame_as_uint8_with_metadata()
+            assert result is not None, \
+                "capture_frame_as_uint8_with_metadata returned None"
+
+            assert result["input_narrow_range"] is False, (
+                "BGRA-requested-RGB10-delivered branch must default to "
+                "input_narrow_range=False (full-range convention for 8-bit "
+                f"R'G'B' on HDMI); got {result['input_narrow_range']}"
+            )
+    finally:
+        output.cleanup()
+
+
 if __name__ == "__main__":
     sys.exit(pytest.main([__file__, "-v", "-s"]))
