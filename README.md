@@ -12,7 +12,7 @@ Written by Nick Shaw, www.antlerpost.com, with a lot of help from [Claude Code](
 
 If upgrading from 0.17.x:
 
-- Captured-frame metadata dict key `'colorspace'` is now `'matrix'`. Affects every variant of `capture_frame_*_with_metadata()`.
+- Captured-frame metadata dict key `'colorspace'` is now `'matrix'`, aligning the capture side with the `matrix=` parameter already used by `display_static_frame()` / `display_solid_color()`. Affects every variant of `capture_frame_*_with_metadata()`.
 - `captured_frame.colorspace` attribute on the low-level `CapturedFrame` struct is now `captured_frame.matrix`.
 - The `Gamut` enum has been split into `Matrix` (Y'CbCr matrix selection for YUV↔RGB conversion) and `Gamut` (HDR static-metadata signalling). YUV↔RGB conversion functions now take `Matrix`.
 - Low-level setters `setHdrMetadata` / `setHdrStaticMetadata` / `clearHdrMetadata` replaced by per-field `setMatrix` / `setEotf` / `setStaticMetadata` on `DeckLinkOutput`. The high-level `display_static_frame(matrix=..., hdr_metadata=...)` API is unchanged.
@@ -39,13 +39,13 @@ See [CHANGELOG.md](CHANGELOG.md) for the full rationale and rename mapping.
 - **Automatic Format Conversion**: Convert all DeckLink pixel formats to R'G'B' float, uint16 or uint8 (for fast preview path)
 - **Format Detection**: Automatic detection of signal properties (resolution, frame rate, pixel format / bit depth)
 - **Metadata Access**: Access to signal metadata (Y'CbCr matrix, EOTF, HDR static metadata when present)
-- **Range Interpretation**: Explicit user-specified narrow/full range parameters on every input and output conversion path, with correct mapping between range conventions. The DeckLink SDK does not surface source signal range via metadata, so the library defers to the caller rather than guessing.
+- **Range Interpretation**: Explicit user-specified narrow/full range parameters on every input and output conversion path, with correct mapping between range conventions. The DeckLink SDK does not surface source signal range via metadata, so the library defers to the caller, with defaults based on the conventions in the SDK documentation.
 - **Timecode Capture**: Automatic extraction of embedded timecode (RP188 VITC/LTC/HFRTC)
 - **HDMI EDID Configuration**: Advertises SDR, HDR PQ, and HDR HLG support over HDMI by default so HDR sources transmit HDR Static Metadata (the SDK default omits HLG); the advertised bitmask is configurable via `set_hdmi_input_dynamic_ranges()`
 
 ### General
 - **Device Enumeration**: List connected DeckLink devices with their names and capabilities
-- **Cross-Platform**: Works on Windows, macOS, and Linux. Full hardware coverage on macOS; Windows hardware-tested for SDI loopback (HDMI and HDR-metadata paths awaiting suitable Windows test hardware); Linux build verified via CI but hardware-untested.
+- **Cross-Platform**: Works on Windows, macOS, and Linux. Hardware-test coverage is most extensive on macOS (SDI, HDMI, and HDR-metadata paths); on Windows, only the SDI loopback path is currently hardware-tested; Linux is build-verified via CI but hardware-untested.
 
 ## Requirements
 
@@ -308,7 +308,7 @@ Display a static frame continuously.
   - `YUV10` / `RGB10` / `RGB12`: shape (height, width, 3) R'G'B'; dtype `uint16`, `float32`, or `float64`.
 - `display_mode`: Video resolution and frame rate
 - `pixel_format`: Pixel format (default: YUV10, automatically uses BGRA for uint8 data)
-- `matrix`: Optional R'G'B' to Y'CbCr conversion matrix (`Matrix.Rec601`, `Matrix.Rec709` or `Matrix.Rec2020`). Only used with Y'CbCr output formats (YUV8 / YUV10). If not specified, auto-detects based on resolution: SD modes (NTSC, PAL) use Rec.601, HD and higher use Rec.709
+- `matrix`: Optional R'G'B' to Y'CbCr conversion matrix (`Matrix.Rec601`, `Matrix.Rec709` or `Matrix.Rec2020`). Only affects output code values with Y'CbCr output formats (YUV8 / YUV10); signalled in the SDI VPID and HDMI InfoFrame for all pixel formats. If not specified, auto-detects based on resolution: SD modes (NTSC, PAL) use Rec.601, HD and higher use Rec.709
 - `hdr_metadata`: Optional HDR metadata dict with keys:
   - `'eotf'`: Eotf enum (SDR, PQ, or HLG)
   - `'static_metadata'`: Optional HdrStaticMetadata object with explicit display primaries, white point, mastering luminance, and content light level fields
@@ -323,7 +323,7 @@ Display a solid colour continuously.
   - Float values (0.0-1.0): Interpreted as normalized full range values
 - `display_mode`: Video resolution and frame rate
 - `pixel_format`: Pixel format (default: YUV10)
-- `matrix`: R'G'B' to Y'CbCr conversion matrix (Rec601, Rec709 or Rec2020). Only applies when pixel_format is YUV8 or YUV10. If not specified, auto-detects based on resolution: SD modes (NTSC, PAL) use Rec.601, HD and higher use Rec.709
+- `matrix`: Optional R'G'B' to Y'CbCr conversion matrix (`Matrix.Rec601`, `Matrix.Rec709` or `Matrix.Rec2020`). Only affects output code values with Y'CbCr output formats (YUV8 / YUV10); signalled in the SDI VPID and HDMI InfoFrame for all pixel formats. If not specified, auto-detects based on resolution: SD modes (NTSC, PAL) use Rec.601, HD and higher use Rec.709
 - `hdr_metadata`: Optional HDR metadata dict with 'eotf' (and optional 'static_metadata') keys
 - `input_narrow_range`: Whether to interpret integer `color` values as narrow range (float is always interpreted as full range). Default: False
 - `output_narrow_range`: Whether to output a narrow range signal. Default: `None` — each format applies its own default (True for YUV8 / YUV10 / RGB10, False for RGB12). Ignored for BGRA (a warning is issued if explicitly passed).
@@ -594,7 +594,7 @@ class VideoSettings:
     eotf: Eotf             # Transfer function (SDR / PQ / HLG)
 ```
 
-**Note:** What the Blackmagic SDK refers to as the "color space" (BMDColorspace) is in fact the matrix used for R'G'B' to Y'CbCr conversion, not the gamut of the image data. For example, ARRI Wide Gamut data would typically be converted using a Rec.709 matrix.
+**Note:** The Blackmagic SDK uses the term "colorspace" (`BMDColorspace`) for the Y'CbCr matrix tag (Rec.601 / Rec.709 / Rec.2020) signalled on the wire. The gamut (primaries) of the image data is conveyed separately by the SDK as chromaticity coordinates in the HDR static metadata. For clarity, this library uses the term `matrix` since, for example, ARRI LogC3 data is commonly converted using a Rec.709 matrix, but does not use Rec.709 primaries.
 
 **`HdrStaticMetadata`**
 
