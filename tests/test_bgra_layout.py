@@ -313,5 +313,45 @@ def test_bgra_no_warning_when_output_narrow_range_omitted():
         )
 
 
+# --- Frame width/height validation against configured display mode ------
+# `_prepare_frame_data` raises ValueError when the frame_data's height or
+# width doesn't match the settings configured by the most recent
+# display_static_frame call. This catches the case where update_frame is
+# called with a differently-sized array — without the check, the per-format
+# C++ converter would either read out of bounds or consume only the
+# configured area without surfacing an error at the Python boundary.
+
+
+def test_prepare_frame_data_rejects_wrong_height():
+    rgb = np.zeros((4, 8, 3), dtype=np.uint8)
+    output = _make_stubbed_output(width=8, height=2)
+    with pytest.raises(ValueError, match="does not match the configured display mode"):
+        output._prepare_frame_data(
+            rgb, PixelFormat.BGRA, matrix=None,
+            input_narrow_range=False, output_narrow_range=None,
+        )
+
+
+def test_prepare_frame_data_rejects_wrong_width():
+    rgb = np.zeros((2, 16, 3), dtype=np.uint8)
+    output = _make_stubbed_output(width=8, height=2)
+    with pytest.raises(ValueError, match="does not match the configured display mode"):
+        output._prepare_frame_data(
+            rgb, PixelFormat.BGRA, matrix=None,
+            input_narrow_range=False, output_narrow_range=None,
+        )
+
+
+def test_prepare_frame_data_accepts_matching_shape():
+    rgb = np.zeros((2, 8, 3), dtype=np.uint8)
+    output = _make_stubbed_output(width=8, height=2)
+    # Should not raise. Returned buffer is a valid BGRA array.
+    result = output._prepare_frame_data(
+        rgb, PixelFormat.BGRA, matrix=None,
+        input_narrow_range=False, output_narrow_range=None,
+    )
+    assert result.shape == (2, 8, 4)
+
+
 if __name__ == "__main__":
     sys.exit(pytest.main([__file__, "-v"]))

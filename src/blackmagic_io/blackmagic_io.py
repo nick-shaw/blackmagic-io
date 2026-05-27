@@ -533,10 +533,17 @@ class BlackmagicOutput:
     def update_frame(self, frame_data: np.ndarray) -> bool:
         """
         Update the currently displayed frame with new data.
-        
+
+        The pixel format, matrix, and range parameters from the most recent
+        ``display_static_frame()`` call are reused. The new array must
+        match the original's height and width, and use a dtype that is
+        valid for the configured pixel format (see ``display_static_frame``
+        for per-format accepted dtypes). A ``ValueError`` is raised on
+        height/width / dtype / channel-count mismatch.
+
         Args:
             frame_data: NumPy array containing new image data
-            
+
         Returns:
             True if successful, False otherwise
         """
@@ -609,6 +616,28 @@ class BlackmagicOutput:
             raise TypeError("frame_data must be a NumPy array")
 
         settings = self._current_settings
+
+        # Width/height must match the configured display mode. Catches the
+        # case where update_frame() is called with an array sized for a
+        # different mode than the one display_static_frame() configured.
+        # Without this check the per-format C++ converter would either read
+        # out of bounds (smaller input) or consume only the configured area
+        # (larger input), with no error surfaced at the Python boundary.
+        # Guarded on settings being non-None so the existing dtype / shape
+        # rejection tests that exercise _prepare_frame_data on an
+        # uninitialised BlackmagicOutput continue to surface their original
+        # ValueErrors rather than hitting an AttributeError here.
+        if (settings is not None
+                and frame_data.ndim >= 2
+                and frame_data.shape[:2] != (settings.height, settings.width)):
+            raise ValueError(
+                f"frame_data shape (height={frame_data.shape[0]}, "
+                f"width={frame_data.shape[1]}) does not match the "
+                f"configured display mode (height={settings.height}, "
+                f"width={settings.width}). For update_frame, the new "
+                f"array must have the same height and width as the "
+                f"original display_static_frame call."
+            )
 
         if pixel_format == PixelFormat.BGRA:
             if frame_data.ndim != 3 or frame_data.shape[2] not in (3, 4):

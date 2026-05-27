@@ -335,7 +335,7 @@ Display a solid colour continuously.
 - Returns: True if successful
 
 **`update_frame(frame_data) -> bool`**
-Update currently displayed frame with new data.
+Update currently displayed frame with new data. The pixel format, matrix, and range parameters from the most recent `display_static_frame()` call are reused. The new array must match the original's height and width and use a dtype that is valid for the configured pixel format (see `display_static_frame()` for per-format accepted dtypes). Raises `ValueError` on height/width / dtype / channel-count mismatch.
 - `frame_data`: New frame data as NumPy array
 - Returns: True if successful
 
