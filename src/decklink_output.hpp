@@ -62,16 +62,21 @@ public:
     // Per-field signal-metadata setters. The matrix names the Y'CbCr coefficient
     // set (Rec.601/709/2020) used for encoding and signalled on the wire
     // (VPID for SDI, AVI InfoFrame for HDMI). The EOTF identifies the transfer
-    // function; setting it to non-SDR triggers HDR Static Metadata InfoFrame
-    // transmission on the next emitted frame. setStaticMetadata overrides the
+    // function; setting it to non-SDR enables HDR Static Metadata transmission,
+    // setting back to SDR suppresses it. setStaticMetadata overrides the
     // primaries / white point / mastering-luminance defaults that setMatrix
     // fills based on the matrix name; only meaningful for PQ output (the SDK
-    // zeroes the InfoFrame for HLG and SDR).
+    // suppresses HDR static metadata for HLG and SDR).
     //
-    // HDMI note: BMD's HDMI driver caches the HDR Static Metadata InfoFrame, so
-    // a subsequent displayFrame() call is required for HDMI consumers to see
-    // updated values mid-stream. SDI carries metadata per-frame and updates on
-    // the next frame without any extra step.
+    // Every wire-frame the DeckLink emits carries the metadata from the last
+    // committed frame. Video data and metadata (matrix tag, EOTF, HDR static
+    // metadata) live in hardware registers / buffers that are updated
+    // atomically by displayFrame(); the output continuously re-emits whatever
+    // is currently in them until the next commit. So setMatrix / setEotf /
+    // setStaticMetadata stage changes in internal state but don't reach the
+    // wire until the next displayFrame() call. Applies to both SDI and HDMI.
+    // The frame contents do not need to change — calling displayFrame() with
+    // the existing buffer commits any pending metadata changes alongside it.
     void setMatrix(Matrix matrix);
     void setEotf(Eotf eotf);
     void setStaticMetadata(const HdrStaticMetadata& staticMetadata);

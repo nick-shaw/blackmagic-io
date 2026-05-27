@@ -2145,16 +2145,17 @@ PYBIND11_MODULE(decklink_io, m) {
              "signalled on the wire (VPID for SDI, AVI InfoFrame for HDMI). Also "
              "default-fills HDR Static Metadata primaries / white point / mastering "
              "luminance from the matrix name; only meaningful for PQ output (the "
-             "SDK zeroes the InfoFrame for HLG and SDR). Call set_static_metadata "
-             "afterwards to override the defaults.",
+             "SDK suppresses HDR static metadata for HLG and SDR). Call "
+             "set_static_metadata afterwards to override the defaults.",
              py::arg("matrix"))
         .def("set_eotf", &DeckLinkOutput::setEotf,
-             "Set the EOTF. Setting to non-SDR triggers HDR Static Metadata "
-             "InfoFrame transmission on the next emitted frame. HDMI note: "
-             "BMD's HDMI driver caches the HDR Static Metadata InfoFrame, so a "
-             "subsequent display_frame() call is required for HDMI consumers to "
-             "see updated values mid-stream. SDI carries metadata per-frame and "
-             "updates on the next frame without any extra step.",
+             "Set the EOTF. Setting to non-SDR enables HDR Static Metadata "
+             "transmission; setting back to SDR suppresses it. Metadata is "
+             "committed to the wire atomically with the video buffer at "
+             "display_frame() time — every wire-frame carries the metadata "
+             "from the last committed frame, so changing the EOTF mid-stream "
+             "requires a subsequent display_frame() to push the new state. "
+             "Applies to both SDI and HDMI.",
              py::arg("eotf"))
         .def("set_static_metadata", &DeckLinkOutput::setStaticMetadata,
              "Set HDR Static Metadata (per SMPTE ST 2086 / CEA-861.3 Type 1) with "

@@ -914,7 +914,7 @@ class BlackmagicInput:
             device_index: Index of device to use (default: 0)
             input_connection: Optional InputConnection enum to select specific input
                 (e.g., InputConnection.SDI, InputConnection.HDMI). If None, uses
-                the device's current/default input.
+                the device's current input.
             pixel_format: Optional PixelFormat to request from hardware.
                 Use PixelFormat.BGRA for fast preview. If None, defaults to YUV10.
 
@@ -1219,7 +1219,9 @@ class BlackmagicInput:
                 table.
             output_narrow_range: If False (default), output uint16 values are
                 full range (0-65535 scaled). If True, output is narrow-range
-                R'G'B' (10-bit narrow codes LSB-padded to 16-bit: 4096-60160).
+                R'G'B' in canonical 16-bit form (nominal black 4096, nominal
+                white 60160; 8/10/12-bit narrow codes LSB-padded to 16-bit)
+                with sub-black and super-white preserved if present.
 
         Returns:
             R'G'B' array (H×W×3), dtype uint16, or None if capture failed
@@ -1255,8 +1257,10 @@ class BlackmagicInput:
                 default; see ``capture_frame_as_uint8`` for the resolution
                 table. The returned dict records the **resolved** boolean.
             output_narrow_range: If False (default), output uint16 values are
-                full range. If True, output is narrow-range R'G'B' (10-bit
-                narrow codes LSB-padded to 16-bit: 4096-60160).
+                full range. If True, output is narrow-range R'G'B' in canonical
+                16-bit form (nominal black 4096, nominal white 60160;
+                8/10/12-bit narrow codes LSB-padded to 16-bit) with sub-black
+                and super-white preserved if present.
 
         Returns:
             Dictionary with:
@@ -1364,7 +1368,7 @@ class BlackmagicInput:
                             input_narrow_range: Optional[bool] = None) -> Optional[np.ndarray]:
         """Capture a frame and convert to R'G'B' float array.
 
-        Automatically detects pixel format and converts to R'G'B' float (0.0-1.0).
+        Automatically detects pixel format and converts to R'G'B' float (normalised 0.0-1.0).
         Uses matrix metadata from the captured frame for Y'CbCr conversion.
 
         Args:
