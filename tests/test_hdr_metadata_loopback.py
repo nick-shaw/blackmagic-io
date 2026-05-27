@@ -236,3 +236,98 @@ def test_hdr_metadata_roundtrip(
             input_device.stop_capture()
     finally:
         output_device.stop_output()
+
+
+def test_metadata_snapshot_persists_until_display_frame(decklink_devices):
+    """Mid-stream metadata changes only reach the wire after ``display_frame()``.
+
+    Verifies the SDK's snapshot behaviour for HDR / matrix metadata:
+    ``set_matrix()`` / ``set_eotf()`` / ``set_static_metadata()`` update
+    internal state, but the wire signal keeps carrying the snapshot from
+    the most recent ``display_frame()`` call until the next one is made.
+    Applies to both SDI and HDMI (parametrised via the ``decklink_devices``
+    fixture); the README's earlier HDMI-vs-SDI distinction was wrong, as
+    SDI also requires the explicit refresh.
+
+    Phases:
+
+    1. **Baseline.** Push a frame with ``SDR + Rec.709``. Capture and
+       confirm the wire reports those values.
+    2. **Setters without ``display_frame()``.** Call
+       ``set_matrix(Rec.2020)`` and ``set_eotf(PQ)``. Capture again and
+       assert the wire **still** reports ``SDR + Rec.709`` — the previous
+       snapshot persists.
+    3. **Refresh.** Call ``display_frame()`` with the same frame data.
+       Capture again and assert the wire now reports ``PQ + Rec.2020``.
+
+    If phase 2 fails (wire updated without refresh), the snapshot
+    semantics are wrong for that transport. If phase 3 fails (wire
+    didn't update after refresh), the refresh recommendation is wrong.
+    """
+    output_device, input_device, transport = decklink_devices
+
+    _configure_output_metadata(
+        output_device,
+        matrix=decklink_io.Matrix.Rec709,
+        eotf=decklink_io.Eotf.SDR,
+        static_metadata_kwargs=None,
+    )
+    settings = output_device.get_video_settings(DISPLAY_MODE)
+    settings.format = PIXEL_FORMAT
+    assert output_device.setup_output(settings), \
+        f"Failed to setup output for {transport}"
+
+    try:
+        # Phase 1: baseline. Push frame with the initial metadata.
+        _push_frame(output_device, settings.width, settings.height)
+        time.sleep(0.5)
+
+        assert input_device.start_capture(), \
+            f"Failed to start capture for {transport}"
+        try:
+            baseline = _capture_frame(input_device)
+            assert baseline.matrix == decklink_io.Matrix.Rec709, (
+                f"{transport} baseline matrix: expected Rec709, "
+                f"got {baseline.matrix}"
+            )
+            assert baseline.eotf == decklink_io.Eotf.SDR, (
+                f"{transport} baseline EOTF: expected SDR, got {baseline.eotf}"
+            )
+
+            # Phase 2: change metadata WITHOUT calling display_frame().
+            # Wire should still carry the baseline snapshot.
+            output_device.set_matrix(decklink_io.Matrix.Rec2020)
+            output_device.set_eotf(decklink_io.Eotf.PQ)
+            time.sleep(0.5)  # let several wire-frames flow
+
+            after_setter = _capture_frame(input_device)
+            assert after_setter.matrix == decklink_io.Matrix.Rec709, (
+                f"{transport}: matrix changed on the wire without a "
+                f"display_frame() call — expected sticky Rec709, "
+                f"got {after_setter.matrix}. The snapshot semantics "
+                f"described in the README do not hold on this transport."
+            )
+            assert after_setter.eotf == decklink_io.Eotf.SDR, (
+                f"{transport}: EOTF changed on the wire without a "
+                f"display_frame() call — expected sticky SDR, "
+                f"got {after_setter.eotf}."
+            )
+
+            # Phase 3: push the same frame to commit the new metadata.
+            _push_frame(output_device, settings.width, settings.height)
+            time.sleep(0.5)
+
+            after_push = _capture_frame(input_device)
+            assert after_push.matrix == decklink_io.Matrix.Rec2020, (
+                f"{transport}: matrix did not update on the wire after "
+                f"display_frame() — expected Rec2020, "
+                f"got {after_push.matrix}."
+            )
+            assert after_push.eotf == decklink_io.Eotf.PQ, (
+                f"{transport}: EOTF did not update on the wire after "
+                f"display_frame() — expected PQ, got {after_push.eotf}."
+            )
+        finally:
+            input_device.stop_capture()
+    finally:
+        output_device.stop_output()
