@@ -15,7 +15,7 @@ import pytest
 from blackmagic_io import create_test_pattern
 
 
-pytestmark = [pytest.mark.hardware, pytest.mark.sdi]
+pytestmark = [pytest.mark.hardware, pytest.mark.sdi, pytest.mark.loopback]
 
 
 DISPLAY_MODE = decklink_io.DisplayMode.HD1080p25

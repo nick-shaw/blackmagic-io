@@ -26,7 +26,7 @@ import numpy as np
 import pytest
 from blackmagic_io import BlackmagicInput, BlackmagicOutput, DisplayMode, PixelFormat, create_test_pattern
 
-pytestmark = [pytest.mark.hardware, pytest.mark.hdmi]
+pytestmark = [pytest.mark.hardware, pytest.mark.hdmi, pytest.mark.loopback]
 
 OUTPUT_DEVICE_INDEX = 0
 INPUT_DEVICE_INDEX = 0

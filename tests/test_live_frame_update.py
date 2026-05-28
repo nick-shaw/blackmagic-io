@@ -24,7 +24,7 @@ import pytest
 from blackmagic_io import BlackmagicInput, BlackmagicOutput, DisplayMode, PixelFormat
 
 
-pytestmark = [pytest.mark.hardware, pytest.mark.sdi]
+pytestmark = [pytest.mark.hardware, pytest.mark.sdi, pytest.mark.loopback]
 
 
 OUTPUT_DEVICE_INDEX = 0

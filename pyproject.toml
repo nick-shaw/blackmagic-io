@@ -49,6 +49,7 @@ markers = [
     "hardware: test requires a DeckLink device (skipped in CI; run manually with hardware connected)",
     "sdi: hardware test requires an SDI input connection on the DeckLink device",
     "hdmi: hardware test requires an HDMI input connection on the DeckLink device",
+    "loopback: hardware test requires the DeckLink's output to be wired to its input (excluded for output-only or no-loopback setups)",
 ]
 
 [tool.scikit-build]

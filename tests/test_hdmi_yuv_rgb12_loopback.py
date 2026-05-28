@@ -25,7 +25,7 @@ from blackmagic_io import (
 )
 
 
-pytestmark = [pytest.mark.hardware, pytest.mark.hdmi]
+pytestmark = [pytest.mark.hardware, pytest.mark.hdmi, pytest.mark.loopback]
 
 
 OUTPUT_DEVICE_INDEX = 0

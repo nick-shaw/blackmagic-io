@@ -1768,6 +1768,7 @@ pytest tests/ -m "hardware"            # hardware loopback tests only
 pytest tests/ -m "hardware and sdi"       # SDI signal-path tests only
 pytest tests/ -m "hardware and hdmi"      # HDMI signal-path tests only
 pytest tests/ -m "hardware and not hdmi"  # SDI + transport-agnostic hardware tests (device enumeration, resolutions); excludes HDMI
+pytest tests/ -m "hardware and not loopback"  # detection / enumeration / initialisation only — for output-only devices or no-loopback setups
 ```
 
 The non-hardware tests run anywhere — they exercise the C++ conversion functions, byte ordering, range helpers, and similar pure-software paths. CI runs these on every push across macOS, Linux, and Windows.

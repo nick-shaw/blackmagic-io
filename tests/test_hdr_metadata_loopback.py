@@ -22,7 +22,7 @@ import pytest
 from blackmagic_io import create_test_pattern
 
 
-pytestmark = pytest.mark.hardware
+pytestmark = [pytest.mark.hardware, pytest.mark.loopback]
 
 
 OUTPUT_DEVICE_INDEX = 0
