@@ -29,7 +29,7 @@ struct HdrMetadata {
     double maxContentLightLevel;
     double maxFrameAverageLightLevel;
     DeckLinkOutput::Eotf eotf;
-    DeckLinkOutput::Gamut colorimetry;
+    DeckLinkOutput::Matrix matrix;
 
     static ChromaticityCoordinates rec709() {
         return {0.64, 0.33, 0.30, 0.60, 0.15, 0.06, 0.3127, 0.3290};
@@ -40,23 +40,23 @@ struct HdrMetadata {
     }
 
     static HdrMetadata defaultSdr() {
-        return {rec709(), 100, 0.0001, 100, 50, DeckLinkOutput::Eotf::SDR, DeckLinkOutput::Gamut::Rec709};
+        return {rec709(), 100, 0.0001, 100, 50, DeckLinkOutput::Eotf::SDR, DeckLinkOutput::Matrix::Rec709};
     }
 
     static HdrMetadata defaultHlg() {
-        return {rec2020(), 1000, 0.0001, 1000, 50, DeckLinkOutput::Eotf::HLG, DeckLinkOutput::Gamut::Rec2020};
+        return {rec2020(), 1000, 0.0001, 1000, 50, DeckLinkOutput::Eotf::HLG, DeckLinkOutput::Matrix::Rec2020};
     }
 
     static HdrMetadata defaultPq() {
-        return {rec2020(), 1000, 0.0001, 1000, 50, DeckLinkOutput::Eotf::PQ, DeckLinkOutput::Gamut::Rec2020};
+        return {rec2020(), 1000, 0.0001, 1000, 50, DeckLinkOutput::Eotf::PQ, DeckLinkOutput::Matrix::Rec2020};
     }
 
-    static HdrMetadata custom(DeckLinkOutput::Gamut colorimetry, DeckLinkOutput::Eotf eotf,
+    static HdrMetadata custom(DeckLinkOutput::Matrix matrix, DeckLinkOutput::Eotf eotf,
                              const ChromaticityCoordinates& primaries,
                              double maxMasteringLuminance, double minMasteringLuminance,
                              double maxContentLightLevel, double maxFrameAverageLightLevel) {
         return {primaries, maxMasteringLuminance, minMasteringLuminance,
-                maxContentLightLevel, maxFrameAverageLightLevel, eotf, colorimetry};
+                maxContentLightLevel, maxFrameAverageLightLevel, eotf, matrix};
     }
 };
 

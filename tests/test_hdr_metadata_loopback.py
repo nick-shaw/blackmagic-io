@@ -1,6 +1,6 @@
 """HDR static metadata loopback test, parametrised over HDMI and SDI.
 
-Iterates EOTF + colorimetry combinations through both transports, configures
+Iterates EOTF + matrix combinations through both transports, configures
 the output's HDR static metadata, captures a frame on the corresponding input,
 and verifies the metadata round-trip.
 
@@ -22,7 +22,7 @@ import pytest
 from blackmagic_io import create_test_pattern
 
 
-pytestmark = pytest.mark.hardware
+pytestmark = [pytest.mark.hardware, pytest.mark.loopback]
 
 
 OUTPUT_DEVICE_INDEX = 0
@@ -48,32 +48,34 @@ LUMINANCE_TOLERANCE = 1.0
 MIN_LUMINANCE_TOLERANCE = 0.001
 
 
-# (transport_name, input_connection)
+# (transport_name, input_connection) — per-param marks let users filter via
+# `pytest -m "hardware and sdi"` etc. so SDI-only and HDMI-only cards don't
+# emit failures for the unavailable transport.
 TRANSPORTS = [
-    ("HDMI", decklink_io.InputConnection.HDMI),
-    ("SDI",  decklink_io.InputConnection.SDI),
+    pytest.param(("HDMI", decklink_io.InputConnection.HDMI), marks=pytest.mark.hdmi, id="HDMI"),
+    pytest.param(("SDI",  decklink_io.InputConnection.SDI),  marks=pytest.mark.sdi,  id="SDI"),
 ]
 
 
-# (case_name, gamut, eotf, static_metadata_kwargs_or_None, expect_full_mastering)
+# (case_name, matrix, eotf, static_metadata_kwargs_or_None, expect_full_mastering)
 TEST_CASES = [
     (
         "SDR Rec.709 (no HDR metadata)",
-        decklink_io.Gamut.Rec709,
+        decklink_io.Matrix.Rec709,
         decklink_io.Eotf.SDR,
         None,
         False,
     ),
     (
         "SDR Rec.2020 (matrix signalling without HDR EOTF)",
-        decklink_io.Gamut.Rec2020,
+        decklink_io.Matrix.Rec2020,
         decklink_io.Eotf.SDR,
         None,
         False,
     ),
     (
         "PQ Rec.2020 + full mastering display",
-        decklink_io.Gamut.Rec2020,
+        decklink_io.Matrix.Rec2020,
         decklink_io.Eotf.PQ,
         dict(
             primaries=PRIMARIES_REC2020,
@@ -87,7 +89,7 @@ TEST_CASES = [
     ),
     (
         "PQ Rec.709 + full mastering display",
-        decklink_io.Gamut.Rec709,
+        decklink_io.Matrix.Rec709,
         decklink_io.Eotf.PQ,
         dict(
             primaries=PRIMARIES_REC709,
@@ -101,7 +103,7 @@ TEST_CASES = [
     ),
     (
         "HLG Rec.2020",
-        decklink_io.Gamut.Rec2020,
+        decklink_io.Matrix.Rec2020,
         decklink_io.Eotf.HLG,
         None,
         False,
@@ -126,16 +128,11 @@ def _make_static_metadata(primaries, white, max_lum, min_lum, max_cll, max_fall)
     return md
 
 
-def _configure_output_metadata(output_device, gamut, eotf, static_metadata_kwargs):
-    if eotf == decklink_io.Eotf.SDR and gamut == decklink_io.Gamut.Rec709:
-        output_device.clear_hdr_metadata()
-        return
-    if static_metadata_kwargs is None:
-        output_device.set_hdr_metadata(gamut, eotf)
-        return
-    output_device.set_hdr_static_metadata(
-        gamut, eotf, _make_static_metadata(**static_metadata_kwargs),
-    )
+def _configure_output_metadata(output_device, matrix, eotf, static_metadata_kwargs):
+    output_device.set_matrix(matrix)
+    output_device.set_eotf(eotf)
+    if static_metadata_kwargs is not None:
+        output_device.set_static_metadata(_make_static_metadata(**static_metadata_kwargs))
 
 
 def _push_frame(output_device, width, height):
@@ -187,11 +184,7 @@ def _assert_full_mastering(frame, kwargs):
     assert abs(frame.max_frame_average_light_level - kwargs["max_fall"]) <= LUMINANCE_TOLERANCE
 
 
-@pytest.fixture(
-    scope="module",
-    params=TRANSPORTS,
-    ids=[t[0] for t in TRANSPORTS],
-)
+@pytest.fixture(scope="module", params=TRANSPORTS)
 def decklink_devices(request):
     transport_name, input_connection = request.param
     output_device = decklink_io.DeckLinkOutput()
@@ -208,17 +201,17 @@ def decklink_devices(request):
 
 
 @pytest.mark.parametrize(
-    "case_name, gamut, eotf, static_metadata_kwargs, expect_full_mastering",
+    "case_name, matrix, eotf, static_metadata_kwargs, expect_full_mastering",
     TEST_CASES,
     ids=[c[0] for c in TEST_CASES],
 )
 def test_hdr_metadata_roundtrip(
-    decklink_devices, case_name, gamut, eotf, static_metadata_kwargs, expect_full_mastering,
+    decklink_devices, case_name, matrix, eotf, static_metadata_kwargs, expect_full_mastering,
 ):
-    """Round-trip HDR static metadata through one transport (HDMI or SDI) for one EOTF + colorimetry combination."""
+    """Round-trip HDR static metadata through one transport (HDMI or SDI) for one EOTF + matrix combination."""
     output_device, input_device, _transport = decklink_devices
 
-    _configure_output_metadata(output_device, gamut, eotf, static_metadata_kwargs)
+    _configure_output_metadata(output_device, matrix, eotf, static_metadata_kwargs)
 
     settings = output_device.get_video_settings(DISPLAY_MODE)
     settings.format = PIXEL_FORMAT
@@ -233,12 +226,107 @@ def test_hdr_metadata_roundtrip(
             frame = _capture_frame(input_device)
 
             assert frame.eotf == eotf, f"EOTF: expected {eotf}, got {frame.eotf}"
-            assert frame.colorspace == gamut, (
-                f"Colorspace: expected {gamut}, got {frame.colorspace}"
+            assert frame.matrix == matrix, (
+                f"Matrix: expected {matrix}, got {frame.matrix}"
             )
 
             if expect_full_mastering:
                 _assert_full_mastering(frame, static_metadata_kwargs)
+        finally:
+            input_device.stop_capture()
+    finally:
+        output_device.stop_output()
+
+
+def test_metadata_snapshot_persists_until_display_frame(decklink_devices):
+    """Mid-stream metadata changes only reach the wire after ``display_frame()``.
+
+    Verifies the SDK's snapshot behaviour for HDR / matrix metadata:
+    ``set_matrix()`` / ``set_eotf()`` / ``set_static_metadata()`` update
+    internal state, but the wire signal keeps carrying the snapshot from
+    the most recent ``display_frame()`` call until the next one is made.
+    Applies to both SDI and HDMI (parametrised via the ``decklink_devices``
+    fixture); the README's earlier HDMI-vs-SDI distinction was wrong, as
+    SDI also requires the explicit refresh.
+
+    Phases:
+
+    1. **Baseline.** Push a frame with ``SDR + Rec.709``. Capture and
+       confirm the wire reports those values.
+    2. **Setters without ``display_frame()``.** Call
+       ``set_matrix(Rec.2020)`` and ``set_eotf(PQ)``. Capture again and
+       assert the wire **still** reports ``SDR + Rec.709`` — the previous
+       snapshot persists.
+    3. **Refresh.** Call ``display_frame()`` with the same frame data.
+       Capture again and assert the wire now reports ``PQ + Rec.2020``.
+
+    If phase 2 fails (wire updated without refresh), the snapshot
+    semantics are wrong for that transport. If phase 3 fails (wire
+    didn't update after refresh), the refresh recommendation is wrong.
+    """
+    output_device, input_device, transport = decklink_devices
+
+    _configure_output_metadata(
+        output_device,
+        matrix=decklink_io.Matrix.Rec709,
+        eotf=decklink_io.Eotf.SDR,
+        static_metadata_kwargs=None,
+    )
+    settings = output_device.get_video_settings(DISPLAY_MODE)
+    settings.format = PIXEL_FORMAT
+    assert output_device.setup_output(settings), \
+        f"Failed to setup output for {transport}"
+
+    try:
+        # Phase 1: baseline. Push frame with the initial metadata.
+        _push_frame(output_device, settings.width, settings.height)
+        time.sleep(0.5)
+
+        assert input_device.start_capture(), \
+            f"Failed to start capture for {transport}"
+        try:
+            baseline = _capture_frame(input_device)
+            assert baseline.matrix == decklink_io.Matrix.Rec709, (
+                f"{transport} baseline matrix: expected Rec709, "
+                f"got {baseline.matrix}"
+            )
+            assert baseline.eotf == decklink_io.Eotf.SDR, (
+                f"{transport} baseline EOTF: expected SDR, got {baseline.eotf}"
+            )
+
+            # Phase 2: change metadata WITHOUT calling display_frame().
+            # Wire should still carry the baseline snapshot.
+            output_device.set_matrix(decklink_io.Matrix.Rec2020)
+            output_device.set_eotf(decklink_io.Eotf.PQ)
+            time.sleep(0.5)  # let several wire-frames flow
+
+            after_setter = _capture_frame(input_device)
+            assert after_setter.matrix == decklink_io.Matrix.Rec709, (
+                f"{transport}: matrix changed on the wire without a "
+                f"display_frame() call — expected sticky Rec709, "
+                f"got {after_setter.matrix}. The snapshot semantics "
+                f"described in the README do not hold on this transport."
+            )
+            assert after_setter.eotf == decklink_io.Eotf.SDR, (
+                f"{transport}: EOTF changed on the wire without a "
+                f"display_frame() call — expected sticky SDR, "
+                f"got {after_setter.eotf}."
+            )
+
+            # Phase 3: push the same frame to commit the new metadata.
+            _push_frame(output_device, settings.width, settings.height)
+            time.sleep(0.5)
+
+            after_push = _capture_frame(input_device)
+            assert after_push.matrix == decklink_io.Matrix.Rec2020, (
+                f"{transport}: matrix did not update on the wire after "
+                f"display_frame() — expected Rec2020, "
+                f"got {after_push.matrix}."
+            )
+            assert after_push.eotf == decklink_io.Eotf.PQ, (
+                f"{transport}: EOTF did not update on the wire after "
+                f"display_frame() — expected PQ, got {after_push.eotf}."
+            )
         finally:
             input_device.stop_capture()
     finally:

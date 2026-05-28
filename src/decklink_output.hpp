@@ -13,6 +13,7 @@ class DeckLinkOutput {
 public:
     using PixelFormat = DeckLink::PixelFormat;
     using DisplayMode = DeckLink::DisplayMode;
+    using Matrix = DeckLink::Matrix;
     using Gamut = DeckLink::Gamut;
     using Eotf = DeckLink::Eotf;
     using VideoSettings = DeckLink::VideoSettings;
@@ -58,15 +59,27 @@ public:
     VideoSettings getVideoSettings(DisplayMode mode);
     bool isPixelFormatSupported(DisplayMode mode, PixelFormat format);
 
-    // Set HDR static metadata. Stores the values; the next displayFrame()
-    // call attaches them to the emitted frame. HDMI note: BMD's HDMI driver
-    // caches the HDR Static Metadata InfoFrame; calling displayFrame() again
-    // (with updated metadata) is required for HDMI consumers to see the new
-    // values. SDI carries metadata per-frame so SDI consumers see updates
-    // immediately on the next frame without any extra step.
-    void setHdrMetadata(Gamut colorimetry, Eotf eotf);
-    void setHdrStaticMetadata(Gamut colorimetry, Eotf eotf, const HdrStaticMetadata& staticMetadata);
-    void clearHdrMetadata();
+    // Per-field signal-metadata setters. The matrix names the Y'CbCr coefficient
+    // set (Rec.601/709/2020) used for encoding and signalled on the wire
+    // (VPID for SDI, AVI InfoFrame for HDMI). The EOTF identifies the transfer
+    // function; setting it to non-SDR enables HDR Static Metadata transmission,
+    // setting back to SDR suppresses it. setStaticMetadata overrides the
+    // primaries / white point / mastering-luminance defaults that setMatrix
+    // fills based on the matrix name; only meaningful for PQ output (the SDK
+    // suppresses HDR static metadata for HLG and SDR).
+    //
+    // Every wire-frame the DeckLink emits carries the metadata from the last
+    // committed frame. Video data and metadata (matrix tag, EOTF, HDR static
+    // metadata) live in hardware registers / buffers that are updated
+    // atomically by displayFrame(); the output continuously re-emits whatever
+    // is currently in them until the next commit. So setMatrix / setEotf /
+    // setStaticMetadata stage changes in internal state but don't reach the
+    // wire until the next displayFrame() call. Applies to both SDI and HDMI.
+    // The frame contents do not need to change — calling displayFrame() with
+    // the existing buffer commits any pending metadata changes alongside it.
+    void setMatrix(Matrix matrix);
+    void setEotf(Eotf eotf);
+    void setStaticMetadata(const HdrStaticMetadata& staticMetadata);
     OutputInfo getCurrentOutputInfo();
     std::vector<DisplayModeInfo> getSupportedDisplayModes();
 
@@ -83,8 +96,8 @@ private:
     BMDTimeValue m_frameDuration;
     BMDTimeScale m_timeScale;
 
-    bool m_useHdrMetadata;
-    Gamut m_hdrColorimetry;
+    bool m_signalMetadata;
+    Matrix m_matrix;
     Eotf m_hdrEotf;
     HdrStaticMetadata m_hdrStaticMetadata;
 

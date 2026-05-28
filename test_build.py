@@ -15,7 +15,7 @@ from pathlib import Path
 def run_command(cmd, description, check=True):
     """Run a shell command and report results."""
     print(f"\n{'=' * 70}")
-    print(f"▶ {description}")
+    print(f"> {description}")
     print(f"  Command: {cmd}")
     print('=' * 70)
 
@@ -30,14 +30,14 @@ def run_command(cmd, description, check=True):
         print(result.stdout)
 
     if result.returncode != 0:
-        print(f"\n✗ FAILED with exit code {result.returncode}")
+        print(f"\n[FAIL] FAILED with exit code {result.returncode}")
         if result.stderr:
             print("Error output:")
             print(result.stderr)
         if check:
             return False
     else:
-        print(f"✓ SUCCESS")
+        print(f"[PASS] SUCCESS")
 
     return True
 
@@ -58,25 +58,25 @@ def main():
         "python check_version.py",
         "Step 1/5: Check version consistency"
     ):
-        print("\n✗ Build test failed at version check")
+        print("\n[FAIL] Build test failed at version check")
         return 1
 
     # Step 2: Clean previous builds
     print(f"\n{'=' * 70}")
-    print("▶ Step 2/5: Clean previous build artifacts")
+    print("> Step 2/5: Clean previous build artifacts")
     print('=' * 70)
     if dist_dir.exists():
         shutil.rmtree(dist_dir)
-        print("✓ Cleaned dist/ directory")
+        print("[PASS] Cleaned dist/ directory")
     else:
-        print("✓ No previous build artifacts to clean")
+        print("[PASS] No previous build artifacts to clean")
 
     # Step 3: Install build dependencies
     if not run_command(
         f"{sys.executable} -m pip install --upgrade build",
         "Step 3/5: Install build dependencies"
     ):
-        print("\n✗ Build test failed at dependency installation")
+        print("\n[FAIL] Build test failed at dependency installation")
         return 1
 
     # Step 4: Build package
@@ -84,29 +84,31 @@ def main():
         f"{sys.executable} -m build",
         "Step 4/5: Build package (wheel + sdist)"
     ):
-        print("\n✗ Build test failed at package build")
+        print("\n[FAIL] Build test failed at package build")
         return 1
 
     # Step 5: Test installation and import
     print(f"\n{'=' * 70}")
-    print("▶ Step 5/5: Test package installation and import")
+    print("> Step 5/5: Test package installation and import")
     print('=' * 70)
 
     # Find the wheel file
     wheel_files = list(dist_dir.glob("*.whl"))
     if not wheel_files:
-        print("✗ No wheel file found in dist/")
+        print("[FAIL] No wheel file found in dist/")
         return 1
 
     wheel_file = wheel_files[0]
     print(f"Found wheel: {wheel_file.name}")
 
-    # Install the wheel
+    # Install the wheel. Use double quotes around the path: on Windows cmd.exe
+    # single quotes are literal characters, not shell grouping, so single-quoting
+    # the path makes pip see it as part of the filename and fail to find it.
     if not run_command(
-        f"{sys.executable} -m pip install '{wheel_file}' --force-reinstall",
+        f'{sys.executable} -m pip install "{wheel_file}" --force-reinstall',
         "Installing wheel"
     ):
-        print("\n✗ Build test failed at wheel installation")
+        print("\n[FAIL] Build test failed at wheel installation")
         return 1
 
     # Test import
@@ -114,12 +116,12 @@ def main():
         f"{sys.executable} -c \"import blackmagic_io; print(f'Successfully imported blackmagic_io version {{blackmagic_io.__version__}}')\"",
         "Testing import"
     ):
-        print("\n✗ Build test failed at import test")
+        print("\n[FAIL] Build test failed at import test")
         return 1
 
     # Success summary
     print(f"\n{'=' * 70}")
-    print("✓ ALL TESTS PASSED!")
+    print("[PASS] ALL TESTS PASSED!")
     print('=' * 70)
     print("\nBuild artifacts created:")
     for item in sorted(dist_dir.iterdir()):

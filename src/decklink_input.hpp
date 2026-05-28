@@ -14,6 +14,7 @@ class DeckLinkInput {
 public:
     using PixelFormat = DeckLink::PixelFormat;
     using DisplayMode = DeckLink::DisplayMode;
+    using Matrix = DeckLink::Matrix;
     using Gamut = DeckLink::Gamut;
     using Eotf = DeckLink::Eotf;
     using VideoSettings = DeckLink::VideoSettings;
@@ -27,7 +28,7 @@ public:
         int rowBytes;
         PixelFormat format;
         DisplayMode mode;
-        Gamut colorspace;
+        Matrix matrix;
         Eotf eotf;
         bool hasMetadata;
         bool valid;

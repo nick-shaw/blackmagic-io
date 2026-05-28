@@ -25,15 +25,15 @@ from blackmagic_io import (  # noqa: E402  (import after pytest.importorskip)
     yuv10_to_rgb_float,
     unpack_2vuy,
     unpack_v210,
-    Gamut,
+    Matrix,
 )
 
 
-# Map our Gamut enum to colour-science's WEIGHTS_YCBCR keys.
-GAMUT_TO_WEIGHTS_KEY = {
-    Gamut.Rec601:  "ITU-R BT.601",
-    Gamut.Rec709:  "ITU-R BT.709",
-    Gamut.Rec2020: "ITU-R BT.2020",
+# Map our Matrix enum to colour-science's WEIGHTS_YCBCR keys.
+MATRIX_TO_WEIGHTS_KEY = {
+    Matrix.Rec601:  "ITU-R BT.601",
+    Matrix.Rec709:  "ITU-R BT.709",
+    Matrix.Rec2020: "ITU-R BT.2020",
 }
 
 # Reference RGB triples covering every primary plus three grey points.
@@ -46,7 +46,7 @@ REFERENCE_RGB = [
     ("blue",     [0.0, 0.0, 1.0]),
 ]
 
-MATRICES = [Gamut.Rec601, Gamut.Rec709, Gamut.Rec2020]
+MATRICES = [Matrix.Rec601, Matrix.Rec709, Matrix.Rec2020]
 RANGES = [True, False]   # narrow, full
 
 
@@ -54,9 +54,9 @@ RANGES = [True, False]   # narrow, full
 # colour-science wrappers
 # --------------------------------------------------------------------------
 
-def _cs_encode(rgb_float, gamut, narrow, bits):
+def _cs_encode(rgb_float, matrix, narrow, bits):
     """RGB -> integer (Y, Cb, Cr) code values via colour-science."""
-    K = colour.WEIGHTS_YCBCR[GAMUT_TO_WEIGHTS_KEY[gamut]]
+    K = colour.WEIGHTS_YCBCR[MATRIX_TO_WEIGHTS_KEY[matrix]]
     rgb = np.asarray(rgb_float, dtype=np.float64)
     ycbcr = colour.RGB_to_YCbCr(
         rgb,
@@ -67,9 +67,9 @@ def _cs_encode(rgb_float, gamut, narrow, bits):
     return tuple(int(round(float(v))) for v in ycbcr)
 
 
-def _cs_decode(ycbcr_ints, gamut, narrow, bits):
+def _cs_decode(ycbcr_ints, matrix, narrow, bits):
     """Integer (Y, Cb, Cr) -> float RGB via colour-science."""
-    K = colour.WEIGHTS_YCBCR[GAMUT_TO_WEIGHTS_KEY[gamut]]
+    K = colour.WEIGHTS_YCBCR[MATRIX_TO_WEIGHTS_KEY[matrix]]
     ycbcr = np.asarray(ycbcr_ints, dtype=np.float64)
     rgb = colour.YCbCr_to_RGB(
         ycbcr,
@@ -85,16 +85,16 @@ def _cs_decode(ycbcr_ints, gamut, narrow, bits):
 # --------------------------------------------------------------------------
 
 @pytest.mark.parametrize("narrow", RANGES, ids=lambda n: "narrow" if n else "full")
-@pytest.mark.parametrize("gamut", MATRICES, ids=lambda g: g.name)
+@pytest.mark.parametrize("matrix", MATRICES, ids=lambda g: g.name)
 @pytest.mark.parametrize("name,rgb", REFERENCE_RGB)
-def test_yuv8_encode_parity(name, rgb, gamut, narrow):
+def test_yuv8_encode_parity(name, rgb, matrix, narrow):
     """rgb_float_to_yuv8 must match colour.RGB_to_YCbCr at out_bits=8."""
     width, height = 16, 4
     rgb_frame = np.tile(np.asarray(rgb, dtype=np.float32), (height, width, 1))
 
     buf = rgb_float_to_yuv8(
         rgb_frame, width, height,
-        matrix=gamut,
+        matrix=matrix,
         output_narrow_range=narrow,
     )
     unpacked = unpack_2vuy(buf, width, height)
@@ -103,7 +103,7 @@ def test_yuv8_encode_parity(name, rgb, gamut, narrow):
     cb_ours = int(unpacked["cb"][cy, cx])
     cr_ours = int(unpacked["cr"][cy, cx])
 
-    y_ref, cb_ref, cr_ref = _cs_encode(rgb, gamut, narrow, bits=8)
+    y_ref, cb_ref, cr_ref = _cs_encode(rgb, matrix, narrow, bits=8)
 
     assert y_ours  == y_ref,  f"Y mismatch: ours={y_ours}, colour={y_ref}"
     assert cb_ours == cb_ref, f"Cb mismatch: ours={cb_ours}, colour={cb_ref}"
@@ -111,11 +111,11 @@ def test_yuv8_encode_parity(name, rgb, gamut, narrow):
 
 
 @pytest.mark.parametrize("narrow", RANGES, ids=lambda n: "narrow" if n else "full")
-@pytest.mark.parametrize("gamut", MATRICES, ids=lambda g: g.name)
+@pytest.mark.parametrize("matrix", MATRICES, ids=lambda g: g.name)
 @pytest.mark.parametrize("name,rgb", REFERENCE_RGB)
-def test_yuv8_decode_parity(name, rgb, gamut, narrow):
+def test_yuv8_decode_parity(name, rgb, matrix, narrow):
     """yuv8_to_rgb_float must match colour.YCbCr_to_RGB on the same codes."""
-    y, cb, cr = _cs_encode(rgb, gamut, narrow, bits=8)
+    y, cb, cr = _cs_encode(rgb, matrix, narrow, bits=8)
     y  = max(0, min(255, y))
     cb = max(0, min(255, cb))
     cr = max(0, min(255, cr))
@@ -127,13 +127,13 @@ def test_yuv8_decode_parity(name, rgb, gamut, narrow):
 
     rgb_ours_arr = yuv8_to_rgb_float(
         buf, width, height,
-        matrix=gamut,
+        matrix=matrix,
         input_narrow_range=narrow,
     )
     cy, cx = height // 2, width // 2
     r_ours, g_ours, b_ours = (float(x) for x in rgb_ours_arr[cy, cx])
 
-    r_ref, g_ref, b_ref = _cs_decode((y, cb, cr), gamut, narrow, bits=8)
+    r_ref, g_ref, b_ref = _cs_decode((y, cb, cr), matrix, narrow, bits=8)
 
     tol = 1e-4
     assert abs(r_ours - r_ref) < tol, f"R mismatch: ours={r_ours}, colour={r_ref}"
@@ -146,9 +146,9 @@ def test_yuv8_decode_parity(name, rgb, gamut, narrow):
 # --------------------------------------------------------------------------
 
 @pytest.mark.parametrize("narrow", RANGES, ids=lambda n: "narrow" if n else "full")
-@pytest.mark.parametrize("gamut", MATRICES, ids=lambda g: g.name)
+@pytest.mark.parametrize("matrix", MATRICES, ids=lambda g: g.name)
 @pytest.mark.parametrize("name,rgb", REFERENCE_RGB)
-def test_yuv10_encode_parity(name, rgb, gamut, narrow):
+def test_yuv10_encode_parity(name, rgb, matrix, narrow):
     """rgb_float_to_yuv10 must match colour.RGB_to_YCbCr at out_bits=10."""
     # Width 48 = v210 alignment boundary so encoder and unpack defaults agree.
     width, height = 48, 4
@@ -156,7 +156,7 @@ def test_yuv10_encode_parity(name, rgb, gamut, narrow):
 
     buf = rgb_float_to_yuv10(
         rgb_frame, width, height,
-        matrix=gamut,
+        matrix=matrix,
         output_narrow_range=narrow,
     )
     unpacked = unpack_v210(buf, width, height)
@@ -165,7 +165,7 @@ def test_yuv10_encode_parity(name, rgb, gamut, narrow):
     cb_ours = int(unpacked["cb"][cy, cx])
     cr_ours = int(unpacked["cr"][cy, cx])
 
-    y_ref, cb_ref, cr_ref = _cs_encode(rgb, gamut, narrow, bits=10)
+    y_ref, cb_ref, cr_ref = _cs_encode(rgb, matrix, narrow, bits=10)
 
     assert y_ours  == y_ref,  f"Y mismatch: ours={y_ours}, colour={y_ref}"
     assert cb_ours == cb_ref, f"Cb mismatch: ours={cb_ours}, colour={cb_ref}"
@@ -173,11 +173,11 @@ def test_yuv10_encode_parity(name, rgb, gamut, narrow):
 
 
 @pytest.mark.parametrize("narrow", RANGES, ids=lambda n: "narrow" if n else "full")
-@pytest.mark.parametrize("gamut", MATRICES, ids=lambda g: g.name)
+@pytest.mark.parametrize("matrix", MATRICES, ids=lambda g: g.name)
 @pytest.mark.parametrize("name,rgb", REFERENCE_RGB)
-def test_yuv10_decode_parity(name, rgb, gamut, narrow):
+def test_yuv10_decode_parity(name, rgb, matrix, narrow):
     """yuv10_to_rgb_float must match colour.YCbCr_to_RGB on the same codes."""
-    y, cb, cr = _cs_encode(rgb, gamut, narrow, bits=10)
+    y, cb, cr = _cs_encode(rgb, matrix, narrow, bits=10)
     y  = max(0, min(1023, y))
     cb = max(0, min(1023, cb))
     cr = max(0, min(1023, cr))
@@ -201,13 +201,13 @@ def test_yuv10_decode_parity(name, rgb, gamut, narrow):
 
     rgb_ours_arr = yuv10_to_rgb_float(
         buf, width, height,
-        matrix=gamut,
+        matrix=matrix,
         input_narrow_range=narrow,
     )
     cy, cx = height // 2, width // 2
     r_ours, g_ours, b_ours = (float(x) for x in rgb_ours_arr[cy, cx])
 
-    r_ref, g_ref, b_ref = _cs_decode((y, cb, cr), gamut, narrow, bits=10)
+    r_ref, g_ref, b_ref = _cs_decode((y, cb, cr), matrix, narrow, bits=10)
 
     tol = 1e-4
     assert abs(r_ours - r_ref) < tol, f"R mismatch: ours={r_ours}, colour={r_ref}"

@@ -3,18 +3,17 @@
 Example: HDR Output with Simplified API
 
 Demonstrates the simplified display_static_frame() API with matrix and hdr_metadata
-parameters, eliminating the need to call set_hdr_metadata() separately.
+parameters, eliminating the need to call the low-level set_matrix() / set_eotf() /
+set_static_metadata() setters separately.
 """
 
-import sys
 import numpy as np
-sys.path.insert(0, '../src')
 
-import blackmagic_io as bmo
+import blackmagic_io as bmio
 
 def main():
     # Create output instance
-    output = bmo.BlackmagicOutput()
+    output = bmio.BlackmagicOutput()
 
     # Initialize device
     if not output.initialize(device_index=0):
@@ -36,9 +35,9 @@ def main():
     # pixel_format defaults to YUV10 for float32 data
     success = output.display_static_frame(
         frame,
-        bmo.DisplayMode.HD1080p25,
-        matrix=bmo.Matrix.Rec2020,           # Use Rec.2020 matrix for conversion
-        hdr_metadata={'eotf': bmo.Eotf.PQ}   # HDR PQ with default metadata
+        bmio.DisplayMode.HD1080p25,
+        matrix=bmio.Matrix.Rec2020,           # Use Rec.2020 matrix for conversion
+        hdr_metadata={'eotf': bmio.Eotf.PQ}   # HDR PQ with default metadata
     )
 
     if success:
@@ -59,7 +58,7 @@ def main():
 
 def example_with_static_metadata():
     """Example providing explicit HDR Static Metadata values"""
-    output = bmo.BlackmagicOutput()
+    output = bmio.BlackmagicOutput()
 
     if not output.initialize(device_index=0):
         print("Failed to initialize DeckLink device")
@@ -70,8 +69,7 @@ def example_with_static_metadata():
     frame = np.ones((height, width, 3), dtype=np.float32) * 0.5
 
     # Build HDR Static Metadata (per SMPTE ST 2086 / CEA-861.3 Type 1)
-    import decklink_io as dl
-    static_metadata = dl.HdrStaticMetadata()
+    static_metadata = bmio.HdrStaticMetadata()
     static_metadata.display_primaries_red_x = 0.68
     static_metadata.display_primaries_red_y = 0.32
     static_metadata.display_primaries_green_x = 0.265
@@ -89,10 +87,10 @@ def example_with_static_metadata():
     # pixel_format defaults to YUV10 for float32 data
     success = output.display_static_frame(
         frame,
-        bmo.DisplayMode.HD1080p25,
-        matrix=bmo.Matrix.Rec2020,
+        bmio.DisplayMode.HD1080p25,
+        matrix=bmio.Matrix.Rec2020,
         hdr_metadata={
-            'eotf': bmo.Eotf.PQ,
+            'eotf': bmio.Eotf.PQ,
             'static_metadata': static_metadata
         }
     )

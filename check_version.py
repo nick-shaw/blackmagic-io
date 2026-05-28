@@ -64,9 +64,9 @@ def check_versions():
 
         if version:
             versions[file_path] = version
-            print(f"✓ {description:50s} {version}")
+            print(f"[PASS] {description:50s} {version}")
         else:
-            error_msg = f"✗ Could not find version in {file_path}"
+            error_msg = f"[FAIL] Could not find version in {file_path}"
             print(error_msg)
             errors.append(error_msg)
 
@@ -77,9 +77,9 @@ def check_versions():
         if match:
             changelog_version = match.group(1)
             versions["CHANGELOG.md"] = changelog_version
-            print(f"✓ {'CHANGELOG.md latest version':50s} {changelog_version}")
+            print(f"[PASS] {'CHANGELOG.md latest version':50s} {changelog_version}")
         else:
-            error_msg = "✗ Could not find latest version in CHANGELOG.md"
+            error_msg = "[FAIL] Could not find latest version in CHANGELOG.md"
             print(error_msg)
             errors.append(error_msg)
 
@@ -106,12 +106,12 @@ def check_versions():
         if file_path == "CMakeLists.txt":
             if version != base_version:
                 inconsistencies.append(
-                    f"  ✗ {file_path}: {version} (expected base version: {base_version})"
+                    f"  [FAIL] {file_path}: {version} (expected base version: {base_version})"
                 )
         elif file_path != "pyproject.toml":
             if version != pyproject_version:
                 inconsistencies.append(
-                    f"  ✗ {file_path}: {version} (expected: {pyproject_version})"
+                    f"  [FAIL] {file_path}: {version} (expected: {pyproject_version})"
                 )
 
     if inconsistencies:
@@ -127,7 +127,7 @@ def check_versions():
             print(f"  {error}")
         return 1
 
-    print("\n✓ All versions are consistent!")
+    print("\n[PASS] All versions are consistent!")
     return 0
 
 

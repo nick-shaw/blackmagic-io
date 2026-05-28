@@ -24,8 +24,8 @@ python tpat_bmd.py <tpat_file> <display_mode> [options]
 
 ### Optional Arguments
 
-- `-p {YUV10,RGB10,RGB12}` - Pixel format (default: YUV10)
-- `-r {full,narrow}` - Signal range (overrides T-PAT file if specified)
+- `-p {YUV10,RGB10,RGB12,BGRA}` - Pixel format (default: YUV10)
+- `-r {full,narrow}` - Signal range (overrides T-PAT file if specified). Has no effect for `-p BGRA`: the SDK fixes the BGRA wire output to narrow Y'CbCr 4:2:2 on SDI and full R'G'B' 4:4:4 on HDMI regardless. Use `RGB10` / `RGB12` for controlled output range.
 - `-m {Rec709,Rec2020}` - Y'CbCr matrix (overrides T-PAT file if specified)
 - `-e {SDR,HLG,PQ}` - EOTF (overrides T-PAT file if specified)
 

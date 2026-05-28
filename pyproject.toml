@@ -7,7 +7,7 @@ build-backend = "scikit_build_core.build"
 
 [project]
 name = "blackmagic-io"
-version = "0.17.0b5"
+version = "0.18.0b1"
 description = "Python library for video I/O with Blackmagic DeckLink devices"
 readme = "README.md"
 requires-python = ">=3.8"
@@ -47,6 +47,9 @@ Issues = "https://github.com/nick-shaw/blackmagic-io/issues"
 [tool.pytest.ini_options]
 markers = [
     "hardware: test requires a DeckLink device (skipped in CI; run manually with hardware connected)",
+    "sdi: hardware test requires an SDI input connection on the DeckLink device",
+    "hdmi: hardware test requires an HDMI input connection on the DeckLink device",
+    "loopback: hardware test requires the DeckLink's output to be wired to its input (excluded for output-only or no-loopback setups)",
 ]
 
 [tool.scikit-build]

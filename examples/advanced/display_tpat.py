@@ -2,7 +2,13 @@
 """
 A python utility for rendering a Test Pattern Descriptor file to Blackmagic Decklink output.
 
-Usage: python display_tpat.py <tpat_file> <display_mode> [-p <pixel_format>] [-r <range>] [-m <matrix>] [-e <eotf>]
+Usage: python display_tpat.py <tpat_file> <display_mode> [-p {yuv10,rgb10,rgb12,bgra}] [-r <range>] [-m <matrix>] [-e <eotf>]
+
+The `bgra` pixel format is intended for fast preview-quality work: the
+16-bit promoted image is downshifted to uint8 before output. The `-r`
+flag has no effect on the BGRA wire output (the SDK's hardware
+conversion produces narrow Y'CbCr 4:2:2 on SDI and full R'G'B' 4:4:4 on
+HDMI regardless). For controlled output range, use yuv10 / rgb10 / rgb12.
 """
 
 import argparse
@@ -10,7 +16,7 @@ import json
 import sys
 import numpy as np
 
-import blackmagic_io as bmo
+import blackmagic_io as bmio
 from blackmagic_io import BlackmagicOutput, DisplayMode, PixelFormat
 from tpat.tpat import render_tpat
 
@@ -37,24 +43,25 @@ PIXEL_FORMATS = {
     'yuv10': PixelFormat.YUV10,
     'rgb10': PixelFormat.RGB10,
     'rgb12': PixelFormat.RGB12,
+    'bgra': PixelFormat.BGRA,
 }
 
 MATRICES = {
-    'rec709': bmo.Matrix.Rec709,
-    'rec2020': bmo.Matrix.Rec2020,
+    'rec709': bmio.Matrix.Rec709,
+    'rec2020': bmio.Matrix.Rec2020,
 }
 
 EOTFS = {
-    'sdr': bmo.Eotf.SDR,
-    'hlg': bmo.Eotf.HLG,
-    'pq': bmo.Eotf.PQ,
+    'sdr': bmio.Eotf.SDR,
+    'hlg': bmio.Eotf.HLG,
+    'pq': bmio.Eotf.PQ,
 }
 
 
 def main():
     """Main function for the tpat_bmd utility."""
     displaymode_options = list(DISPLAY_MODES.keys())
-    pixelformat_options = ['yuv10', 'rgb10', 'rgb12']
+    pixelformat_options = ['yuv10', 'rgb10', 'rgb12', 'bgra']
     range_options = ['full', 'narrow']
     matrix_options = ['rec709', 'rec2020']
     eotf_options = ['sdr', 'hlg', 'pq']
@@ -97,23 +104,58 @@ def main():
             tpat_data = json.load(f)
 
         (image, bits, name) = render_tpat(args.tpat_in)
-        if bits < 32:
-            image = image.astype(np.uint16) << (16 - bits)
+
+        # The TPAT's range tag declares what its encoded code values mean
+        # (interpretation/input range). `-r` declares the desired output range.
+        # When the TPAT has a range tag, `-r` overrides only the output; the
+        # interpretation stays as the TPAT says. When the TPAT has no tag,
+        # `-r` (or the default) provides both.
+        tpat_narrow = (
+            str(tpat_data['range']).lower() == 'narrow'
+            if 'range' in tpat_data else None
+        )
+        if args.r is not None:
+            output_narrow_range = str(args.r).lower() == 'narrow'
+            input_narrow_range = (
+                tpat_narrow if tpat_narrow is not None else output_narrow_range
+            )
+        else:
+            input_narrow_range = tpat_narrow if tpat_narrow is not None else True
+            output_narrow_range = input_narrow_range
+
+        pixel_format = PIXEL_FORMATS.get(
+            str(args.p).lower(),
+            PixelFormat.YUV10
+        )
+
+        # Promote N-bit integer codes to uint16 in the canonical representation
+        # for the declared input range. Narrow uses `<< (16 - bits)` (narrow at
+        # N-bit IS narrow at 16-bit scaled by 2^(16-bits), exact). Full uses
+        # bit-replication, which maps the per-bit-depth maximum to 65535 exactly
+        # and produces correct values through RGB10 `>> 6`, RGB12 `>> 4`, and
+        # YUV float `* / 65535` consumers. Unconditional `<< (16 - bits)` would
+        # be wrong for full input via YUV and RGB12.
+        if bits < 16:
+            image = image.astype(np.uint16)
+            shift = 16 - bits
+            if input_narrow_range:
+                image = image << shift
+            else:
+                image = (image << shift) | (image >> (2 * bits - 16))
+        elif bits < 32:
+            image = image.astype(np.uint16)
+
+        if pixel_format == PixelFormat.BGRA:
+            # BGRA wants uint8. The preceding promotion bit-replicates (full) or
+            # left-shifts (narrow) 8→16, so `>> 8` recovers the original 8-bit
+            # values precisely for 8-bit TPAT sources. For 10/12/16-bit sources
+            # `>> 8` produces the canonical reduction (v >> 2, v >> 4, v >> 8
+            # respectively) — no precision loss beyond the bit-depth downsample.
+            image = (image >> 8).astype(np.uint8)
+
         with BlackmagicOutput() as output:
 
             display_mode = DISPLAY_MODES[args.display_mode]
-
-            pixel_format = PIXEL_FORMATS.get(
-                str(args.p).lower(),
-                PixelFormat.YUV10
-            )
-
-            if args.r is not None:
-                narrow_range = str(args.r).lower() == 'narrow'
-            elif 'range' in tpat_data:
-                narrow_range = str(tpat_data['range']).lower() == 'narrow'
-            else:
-                narrow_range = True
 
             if args.m is not None:
                 matrix_str = str(args.m).lower()
@@ -122,7 +164,7 @@ def main():
             else:
                 matrix_str = 'rec709'
 
-            matrix = MATRICES.get(matrix_str, bmo.Matrix.Rec709)
+            matrix = MATRICES.get(matrix_str, bmio.Matrix.Rec709)
 
             if args.e is not None:
                 eotf_str = str(args.e).lower()
@@ -131,17 +173,20 @@ def main():
             else:
                 eotf_str = 'sdr'
 
-            eotf_value = EOTFS.get(eotf_str, bmo.Eotf.SDR)
+            eotf_value = EOTFS.get(eotf_str, bmio.Eotf.SDR)
             eotf = {'eotf': eotf_value}
 
+            output_narrow_range_arg = (
+                None if pixel_format == PixelFormat.BGRA else output_narrow_range
+            )
             output.display_static_frame(
                 image,
                 display_mode,
                 pixel_format,
                 matrix=matrix,
                 hdr_metadata=eotf,
-                input_narrow_range=narrow_range,
-                output_narrow_range=narrow_range
+                input_narrow_range=input_narrow_range,
+                output_narrow_range=output_narrow_range_arg,
             )
 
             print("Displaying:", name)

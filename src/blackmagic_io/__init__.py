@@ -68,6 +68,12 @@ try:
         unpack_rgb12 as _unpack_rgb12,
     )
 
+    def _unwrap_matrix(matrix):
+        """Accept either the wrapper Matrix enum or the raw _decklink.Matrix."""
+        if isinstance(matrix, Matrix):
+            return matrix.value
+        return matrix
+
     # Wrap conversion functions to ensure C-contiguous arrays
     def rgb_to_bgra(rgb_array, width, height):
         """Convert RGB numpy array to BGRA format.
@@ -85,9 +91,9 @@ try:
         rgb_array = np.ascontiguousarray(rgb_array)
         return _rgb_to_bgra(rgb_array, width, height)
 
-    def rgb_uint8_to_yuv8(rgb_array, width, height, matrix=Gamut.Rec709,
+    def rgb_uint8_to_yuv8(rgb_array, width, height, matrix=_Matrix.Rec709,
                           input_narrow_range=False, output_narrow_range=True):
-        """Convert RGB uint8 numpy array to 8-bit YUV 2vuy format.
+        """Convert RGB uint8 numpy array to 8-bit Y'CbCr (2vuy).
 
         Automatically converts input array to C-contiguous layout if needed.
 
@@ -95,7 +101,7 @@ try:
             rgb_array: HxWx3 RGB array (uint8)
             width: Image width
             height: Image height
-            matrix: Color matrix (Rec601, Rec709, or Rec2020)
+            matrix: Y'CbCr matrix (Rec601, Rec709, or Rec2020)
             input_narrow_range: If True, input is narrow range (16-235); if False, full range (0-255)
             output_narrow_range: If True, output is narrow range (Y: 16-235, CbCr: 16-240; clamped to [0, 255], so super-blacks/super-whites are preserved); if False, full range
 
@@ -103,10 +109,10 @@ try:
             Flat uint8 array in 2vuy format
         """
         rgb_array = np.ascontiguousarray(rgb_array)
-        return _rgb_uint8_to_yuv8(rgb_array, width, height, matrix, input_narrow_range, output_narrow_range)
+        return _rgb_uint8_to_yuv8(rgb_array, width, height, _unwrap_matrix(matrix), input_narrow_range, output_narrow_range)
 
-    def rgb_uint16_to_yuv8(rgb_array, width, height, matrix=Gamut.Rec709, input_narrow_range=False, output_narrow_range=True):
-        """Convert RGB uint16 numpy array to 8-bit YUV 2vuy format.
+    def rgb_uint16_to_yuv8(rgb_array, width, height, matrix=_Matrix.Rec709, input_narrow_range=False, output_narrow_range=True):
+        """Convert RGB uint16 numpy array to 8-bit Y'CbCr (2vuy).
 
         Automatically converts input array to C-contiguous layout if needed.
 
@@ -114,10 +120,10 @@ try:
             rgb_array: HxWx3 RGB array (uint16)
             width: Image width
             height: Image height
-            matrix: Color matrix (Rec601, Rec709, or Rec2020)
+            matrix: Y'CbCr matrix (Rec601, Rec709, or Rec2020)
             input_narrow_range: If True, input is narrow range (64-940 @10-bit, i.e., 4096-60160 @16-bit).
                               If False, input is full range (0-65535). Default: False
-            output_narrow_range: If True, output YUV is narrow range (Y: 16-235, CbCr: 16-240;
+            output_narrow_range: If True, output Y'CbCr is narrow range (Y: 16-235, CbCr: 16-240;
                                clamped to [0, 255], so super-blacks/super-whites are preserved).
                                If False, output is full range (0-255). Default: True
 
@@ -125,10 +131,10 @@ try:
             Flat uint8 array in 2vuy format
         """
         rgb_array = np.ascontiguousarray(rgb_array)
-        return _rgb_uint16_to_yuv8(rgb_array, width, height, matrix, input_narrow_range, output_narrow_range)
+        return _rgb_uint16_to_yuv8(rgb_array, width, height, _unwrap_matrix(matrix), input_narrow_range, output_narrow_range)
 
-    def rgb_float_to_yuv8(rgb_array, width, height, matrix=Gamut.Rec709, output_narrow_range=True):
-        """Convert RGB float numpy array to 8-bit YUV 2vuy format.
+    def rgb_float_to_yuv8(rgb_array, width, height, matrix=_Matrix.Rec709, output_narrow_range=True):
+        """Convert RGB float numpy array to 8-bit Y'CbCr (2vuy).
 
         Automatically converts input array to C-contiguous layout if needed.
 
@@ -138,8 +144,8 @@ try:
             rgb_array: HxWx3 RGB array (float, 0.0-1.0 full range)
             width: Image width
             height: Image height
-            matrix: Color matrix (Rec601, Rec709, or Rec2020)
-            output_narrow_range: If True, output YUV is narrow range (Y: 16-235, CbCr: 16-240;
+            matrix: Y'CbCr matrix (Rec601, Rec709, or Rec2020)
+            output_narrow_range: If True, output Y'CbCr is narrow range (Y: 16-235, CbCr: 16-240;
                                clamped to [0, 255], so super-blacks/super-whites are preserved).
                                If False, output is full range (0-255). Default: True
 
@@ -147,10 +153,10 @@ try:
             Flat uint8 array in 2vuy format
         """
         rgb_array = np.ascontiguousarray(rgb_array)
-        return _rgb_float_to_yuv8(rgb_array, width, height, matrix, output_narrow_range)
+        return _rgb_float_to_yuv8(rgb_array, width, height, _unwrap_matrix(matrix), output_narrow_range)
 
-    def rgb_uint16_to_yuv10(rgb_array, width, height, matrix=Gamut.Rec709, input_narrow_range=False, output_narrow_range=True):
-        """Convert RGB uint16 numpy array to 10-bit YUV v210 format.
+    def rgb_uint16_to_yuv10(rgb_array, width, height, matrix=_Matrix.Rec709, input_narrow_range=False, output_narrow_range=True):
+        """Convert RGB uint16 numpy array to 10-bit Y'CbCr (v210).
 
         Automatically converts input array to C-contiguous layout if needed.
 
@@ -158,20 +164,20 @@ try:
             rgb_array: HxWx3 RGB array (uint16)
             width: Image width
             height: Image height
-            matrix: Color matrix (Rec601, Rec709, or Rec2020)
+            matrix: Y'CbCr matrix (Rec601, Rec709, or Rec2020)
             input_narrow_range: If True, input is narrow range (64-940 @10-bit, i.e., 4096-60160 @16-bit).
                               If False, input is full range (0-65535). Default: False
-            output_narrow_range: If True, output YUV is narrow range (Y: 64-940, CbCr: 64-960).
+            output_narrow_range: If True, output Y'CbCr is narrow range (Y: 64-940, CbCr: 64-960).
                                If False, output is full range (0-1023). Default: True
 
         Returns:
             Flat uint8 array in v210 format
         """
         rgb_array = np.ascontiguousarray(rgb_array)
-        return _rgb_uint16_to_yuv10(rgb_array, width, height, matrix, input_narrow_range, output_narrow_range)
+        return _rgb_uint16_to_yuv10(rgb_array, width, height, _unwrap_matrix(matrix), input_narrow_range, output_narrow_range)
 
-    def rgb_float_to_yuv10(rgb_array, width, height, matrix=Gamut.Rec709, output_narrow_range=True):
-        """Convert RGB float numpy array to 10-bit YUV v210 format.
+    def rgb_float_to_yuv10(rgb_array, width, height, matrix=_Matrix.Rec709, output_narrow_range=True):
+        """Convert RGB float numpy array to 10-bit Y'CbCr (v210).
 
         Automatically converts input array to C-contiguous layout if needed.
 
@@ -183,15 +189,15 @@ try:
             rgb_array: HxWx3 RGB array (float, 0.0-1.0 full range)
             width: Image width
             height: Image height
-            matrix: Color matrix (Rec601, Rec709, or Rec2020)
-            output_narrow_range: If True, output YUV is narrow range (Y: 64-940, CbCr: 64-960).
+            matrix: Y'CbCr matrix (Rec601, Rec709, or Rec2020)
+            output_narrow_range: If True, output Y'CbCr is narrow range (Y: 64-940, CbCr: 64-960).
                                If False, output is full range (0-1023). Default: True
 
         Returns:
             Flat uint8 array in v210 format
         """
         rgb_array = np.ascontiguousarray(rgb_array)
-        return _rgb_float_to_yuv10(rgb_array, width, height, matrix, output_narrow_range)
+        return _rgb_float_to_yuv10(rgb_array, width, height, _unwrap_matrix(matrix), output_narrow_range)
 
     def rgb_uint16_to_rgb10(rgb_array, width, height, input_narrow_range=True, output_narrow_range=True):
         """Convert RGB uint16 numpy array to 10-bit RGB r210 format.
@@ -272,14 +278,14 @@ try:
         return _rgb_float_to_rgb12(rgb_array, width, height, output_narrow_range)
 
     # Unpacking functions (format -> RGB)
-    def yuv10_to_rgb_uint16(yuv_array, width, height, matrix=Gamut.Rec709, input_narrow_range=True, output_narrow_range=False, row_bytes=None):
-        """Convert 10-bit YUV (v210) to RGB uint16.
+    def yuv10_to_rgb_uint16(yuv_array, width, height, matrix=_Matrix.Rec709, input_narrow_range=True, output_narrow_range=False, row_bytes=None):
+        """Convert 10-bit Y'CbCr (v210) to RGB uint16.
 
         Args:
             yuv_array: Flat uint8 array in v210 format
             width: Image width
             height: Image height
-            matrix: Color matrix (Rec601, Rec709, or Rec2020)
+            matrix: Y'CbCr matrix (Rec601, Rec709, or Rec2020)
             input_narrow_range: If True, input is narrow range (Y: 64-940, UV: 64-960). Default: True
             output_narrow_range: If True, output is narrow range (4096-60160 @16-bit). Default: False
             row_bytes: Bytes per row in the source buffer. Pass ``captured_frame.row_bytes`` for
@@ -290,17 +296,17 @@ try:
             HxWx3 RGB array (uint16)
         """
         yuv_array = np.ascontiguousarray(yuv_array)
-        return _yuv10_to_rgb_uint16(yuv_array, width, height, matrix, input_narrow_range, output_narrow_range,
+        return _yuv10_to_rgb_uint16(yuv_array, width, height, _unwrap_matrix(matrix), input_narrow_range, output_narrow_range,
                                     -1 if row_bytes is None else row_bytes)
 
-    def yuv10_to_rgb_float(yuv_array, width, height, matrix=Gamut.Rec709, input_narrow_range=True, row_bytes=None):
-        """Convert 10-bit YUV (v210) to RGB float.
+    def yuv10_to_rgb_float(yuv_array, width, height, matrix=_Matrix.Rec709, input_narrow_range=True, row_bytes=None):
+        """Convert 10-bit Y'CbCr (v210) to RGB float.
 
         Args:
             yuv_array: Flat uint8 array in v210 format
             width: Image width
             height: Image height
-            matrix: Color matrix (Rec601, Rec709, or Rec2020)
+            matrix: Y'CbCr matrix (Rec601, Rec709, or Rec2020)
             input_narrow_range: If True, input is narrow range (Y: 64-940, UV: 64-960). Default: True
             row_bytes: Bytes per row in the source buffer. Pass ``captured_frame.row_bytes`` for
                 captured frames whose stride may include padding. If None, defaults to
@@ -310,17 +316,17 @@ try:
             HxWx3 RGB array (float, 0.0-1.0 full range)
         """
         yuv_array = np.ascontiguousarray(yuv_array)
-        return _yuv10_to_rgb_float(yuv_array, width, height, matrix, input_narrow_range,
+        return _yuv10_to_rgb_float(yuv_array, width, height, _unwrap_matrix(matrix), input_narrow_range,
                                    -1 if row_bytes is None else row_bytes)
 
-    def yuv8_to_rgb_uint16(yuv_array, width, height, matrix=Gamut.Rec709, input_narrow_range=True, output_narrow_range=False, row_bytes=None):
-        """Convert 8-bit YUV (2vuy) to RGB uint16.
+    def yuv8_to_rgb_uint16(yuv_array, width, height, matrix=_Matrix.Rec709, input_narrow_range=True, output_narrow_range=False, row_bytes=None):
+        """Convert 8-bit Y'CbCr (2vuy) to RGB uint16.
 
         Args:
             yuv_array: Flat uint8 array in 2vuy format
             width: Image width
             height: Image height
-            matrix: Color matrix (Rec601, Rec709, or Rec2020)
+            matrix: Y'CbCr matrix (Rec601, Rec709, or Rec2020)
             input_narrow_range: If True, input is narrow range (Y: 16-235, UV: 16-240). Default: True
             output_narrow_range: If True, output is narrow range (4096-60160 @16-bit). Default: False
             row_bytes: Bytes per row in the source buffer. Pass ``captured_frame.row_bytes`` for
@@ -330,17 +336,17 @@ try:
             HxWx3 RGB array (uint16)
         """
         yuv_array = np.ascontiguousarray(yuv_array)
-        return _yuv8_to_rgb_uint16(yuv_array, width, height, matrix, input_narrow_range, output_narrow_range,
+        return _yuv8_to_rgb_uint16(yuv_array, width, height, _unwrap_matrix(matrix), input_narrow_range, output_narrow_range,
                                    -1 if row_bytes is None else row_bytes)
 
-    def yuv8_to_rgb_float(yuv_array, width, height, matrix=Gamut.Rec709, input_narrow_range=True, row_bytes=None):
-        """Convert 8-bit YUV (2vuy) to RGB float.
+    def yuv8_to_rgb_float(yuv_array, width, height, matrix=_Matrix.Rec709, input_narrow_range=True, row_bytes=None):
+        """Convert 8-bit Y'CbCr (2vuy) to RGB float.
 
         Args:
             yuv_array: Flat uint8 array in 2vuy format
             width: Image width
             height: Image height
-            matrix: Color matrix (Rec601, Rec709, or Rec2020)
+            matrix: Y'CbCr matrix (Rec601, Rec709, or Rec2020)
             input_narrow_range: If True, input is narrow range (Y: 16-235, UV: 16-240). Default: True
             row_bytes: Bytes per row in the source buffer. Pass ``captured_frame.row_bytes`` for
                 captured frames whose stride may include padding. If None, defaults to ``width * 2``.
@@ -349,7 +355,7 @@ try:
             HxWx3 RGB array (float, 0.0-1.0 full range)
         """
         yuv_array = np.ascontiguousarray(yuv_array)
-        return _yuv8_to_rgb_float(yuv_array, width, height, matrix, input_narrow_range,
+        return _yuv8_to_rgb_float(yuv_array, width, height, _unwrap_matrix(matrix), input_narrow_range,
                                   -1 if row_bytes is None else row_bytes)
 
     def rgb10_to_uint16(rgb_array, width, height, input_narrow_range=True, output_narrow_range=False, row_bytes=None):
@@ -430,7 +436,7 @@ try:
 
     # Unpacking functions (format -> components)
     def unpack_v210(yuv_array, width, height, row_bytes=None):
-        """Unpack 10-bit YUV (v210) to separate Y, Cb, Cr arrays.
+        """Unpack 10-bit Y'CbCr (v210) to separate Y, Cb, Cr arrays.
 
         Args:
             yuv_array: Flat uint8 array in v210 format
@@ -448,7 +454,7 @@ try:
                             -1 if row_bytes is None else row_bytes)
 
     def unpack_2vuy(yuv_array, width, height, row_bytes=None):
-        """Unpack 8-bit YUV (2vuy) to separate Y, Cb, Cr arrays.
+        """Unpack 8-bit Y'CbCr (2vuy) to separate Y, Cb, Cr arrays.
 
         Args:
             yuv_array: Flat uint8 array in 2vuy format
@@ -503,7 +509,7 @@ except ImportError:
     # C++ extension not built yet
     pass
 
-__version__ = "0.17.0b5"
+__version__ = "0.18.0b1"
 __author__ = "Nick Shaw"
 
 __all__ = [

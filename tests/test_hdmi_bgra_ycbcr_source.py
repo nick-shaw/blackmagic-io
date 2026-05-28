@@ -31,7 +31,7 @@ import numpy as np
 import pytest
 from blackmagic_io import BlackmagicInput, PixelFormat, create_test_pattern
 
-pytestmark = pytest.mark.hardware
+pytestmark = [pytest.mark.hardware, pytest.mark.hdmi, pytest.mark.loopback]
 
 OUTPUT_DEVICE_INDEX = 0
 INPUT_DEVICE_INDEX = 0
@@ -43,14 +43,14 @@ DISPLAY_MODE = decklink_io.DisplayMode.HD1080p25
 PIXEL_TOLERANCE = 3
 
 
-def _build_yuv10_frame(settings, gamut):
+def _build_yuv10_frame(settings, matrix):
     """Build a 75% colour-bars pattern as narrow-range YUV10 v210."""
     rgb_pattern = create_test_pattern(
         settings.width, settings.height, pattern="bars"
     ) * 0.75
     frame_data = decklink_io.rgb_float_to_yuv10(
         rgb_pattern, settings.width, settings.height,
-        matrix=gamut,
+        matrix=matrix,
         output_narrow_range=True,
     )
     # Expected BGRA: source RGB float scaled to 8-bit full range. The SDK's
@@ -60,32 +60,29 @@ def _build_yuv10_frame(settings, gamut):
 
 
 @pytest.mark.parametrize(
-    "gamut, name",
+    "matrix, name",
     [
-        (decklink_io.Gamut.Rec709, "Rec709"),
-        (decklink_io.Gamut.Rec2020, "Rec2020"),
+        (decklink_io.Matrix.Rec709, "Rec709"),
+        (decklink_io.Matrix.Rec2020, "Rec2020"),
     ],
 )
-def test_bgra_from_ycbcr_source(gamut, name):
+def test_bgra_from_ycbcr_source(matrix, name):
     """Output narrow-range YUV10 (Rec.709 / Rec.2020), capture as BGRA."""
     output_device = decklink_io.DeckLinkOutput()
     assert output_device.initialize(OUTPUT_DEVICE_INDEX), \
         "Failed to initialize output device"
 
     try:
-        # Signal matrix metadata. SDR Rec.709 is the default — clear any
-        # prior HDR metadata. For Rec.2020 SDR, set matrix explicitly.
-        if gamut == decklink_io.Gamut.Rec709:
-            output_device.clear_hdr_metadata()
-        else:
-            output_device.set_hdr_metadata(gamut, decklink_io.Eotf.SDR)
+        # Signal matrix metadata explicitly; SDR EOTF.
+        output_device.set_matrix(matrix)
+        output_device.set_eotf(decklink_io.Eotf.SDR)
 
         settings = output_device.get_video_settings(DISPLAY_MODE)
         settings.format = decklink_io.PixelFormat.YUV10
         assert output_device.setup_output(settings), \
             "Failed to setup YUV10 output"
 
-        expected_rgb_uint8, frame_data = _build_yuv10_frame(settings, gamut)
+        expected_rgb_uint8, frame_data = _build_yuv10_frame(settings, matrix)
         assert output_device.set_frame_data(frame_data), \
             "Failed to set YUV10 frame data"
         assert output_device.display_frame(), \

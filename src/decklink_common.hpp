@@ -145,6 +145,12 @@ enum class DisplayMode {
     Mode2560x1600p60 = bmdMode2560x1600p60
 };
 
+enum class Matrix {
+    Rec601,
+    Rec709,
+    Rec2020
+};
+
 enum class Gamut {
     Rec601,
     Rec709,
@@ -173,7 +179,7 @@ struct VideoSettings {
     int width = 1920;
     int height = 1080;
     double framerate = 25.0;
-    Gamut colorimetry = Gamut::Rec709;
+    Matrix matrix = Matrix::Rec709;
     Eotf eotf = Eotf::SDR;
 };
 
