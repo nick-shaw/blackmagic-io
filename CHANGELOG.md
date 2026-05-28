@@ -7,7 +7,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-## [0.18.0b1] - 2026-05-21
+## [0.18.0b1] - 2026-05-28
 
 ### Added
 - `loopback` pytest marker, applied to all hardware tests that wire the device's output to its input for verification. Combined with the existing `hardware` / `sdi` / `hdmi` markers, this lets users with output-only hardware (or no loopback connection) filter the suite with `pytest -m "hardware and not loopback"` to run only the transport-agnostic enumeration / initialisation tests. Documented in the README's "Running the Tests" section alongside the other marker invocations.
