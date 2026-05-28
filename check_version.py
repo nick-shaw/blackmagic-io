@@ -73,15 +73,30 @@ def check_versions():
     changelog_path = project_root / "CHANGELOG.md"
     if changelog_path.exists():
         content = changelog_path.read_text()
-        match = re.search(CHANGELOG_PATTERN, content)
-        if match:
-            changelog_version = match.group(1)
-            versions["CHANGELOG.md"] = changelog_version
-            print(f"[PASS] {'CHANGELOG.md latest version':50s} {changelog_version}")
+        # Look at the first section header. If it's `[Unreleased]`, treat
+        # that as the in-development placeholder (Keep a Changelog
+        # convention) — informational, not a failure, and skipped from the
+        # version-comparison block below. Otherwise fall back to matching
+        # the first dated version section.
+        first_section = re.search(r'##\s+\[([^\]]+)\]', content)
+        if first_section and first_section.group(1) == "Unreleased":
+            print(
+                f"[NOTE] {'CHANGELOG.md top section is [Unreleased]':50s} "
+                f"pending release (rename to dated [version] at release time)"
+            )
         else:
-            error_msg = "[FAIL] Could not find latest version in CHANGELOG.md"
-            print(error_msg)
-            errors.append(error_msg)
+            match = re.search(CHANGELOG_PATTERN, content)
+            if match:
+                changelog_version = match.group(1)
+                versions["CHANGELOG.md"] = changelog_version
+                print(f"[PASS] {'CHANGELOG.md latest version':50s} {changelog_version}")
+            else:
+                error_msg = (
+                    "[FAIL] CHANGELOG.md: no dated `## [version] - YYYY-MM-DD` "
+                    "section and no `## [Unreleased]` placeholder found"
+                )
+                print(error_msg)
+                errors.append(error_msg)
 
     print("\n" + "=" * 70)
 
