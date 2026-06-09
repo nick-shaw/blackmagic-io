@@ -39,6 +39,21 @@ dependencies = [
     "pybind11>=2.6.0",
 ]
 
+# Optional, opt-in only: `pip install blackmagic-io[examples]`. Not installed
+# by a plain `pip install blackmagic-io`. Covers the third-party packages the
+# scripts in examples/ use (the advanced TPAT example additionally needs the
+# git submodule, which is not a pip dependency). opencv-python carries its own
+# numpy upper-bound, which pip resolves against the core numpy range when this
+# extra is installed.
+[project.optional-dependencies]
+examples = [
+    "opencv-python",
+    "imageio",
+    "tifffile",
+    "pillow",
+    "jsonschema",
+]
+
 [project.urls]
 Homepage = "https://github.com/nick-shaw/blackmagic-io"
 Repository = "https://github.com/nick-shaw/blackmagic-io"
