@@ -7,6 +7,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+- `examples` optional-dependency extra: `pip install "blackmagic-io[examples]"` (or `pip install -e ".[examples]"` from a clone) installs the third-party packages the example scripts use (opencv-python, imageio, tifffile, pillow, jsonschema). A plain `pip install blackmagic-io` does not pull them in.
+- `BMIO_OUTPUT_DEVICE` / `BMIO_INPUT_DEVICE` environment variables to select the output and input DeckLink device indices for the hardware loopback tests. Both default to 0 (a single duplex device); set them to run on a two-device rig — separate output-only and input-only devices. Documented in the README's "Running the Tests" section.
+- README: a known-issue note that some older Blackmagic Desktop Video versions mis-order SMPTE ST 2086 display primaries over SDI (value-dependent; resolved in current Desktop Video), plus a clarification that the vendored SDK version is a build-time constraint only — the resulting build runs against current Desktop Video runtime drivers.
+- README "Running the Tests": a device-capability note — loopback tests assume the capture device matches the output in bit depth, range, and metadata support; capability-limited inputs (e.g. a preview-grade 8-bit HDMI input that clamps to 1–254, or an input that doesn't surface HDR static metadata) fail the corresponding tests by design, not a library defect.
+- `tests/test_hdr_metadata_loopback.py`: a PQ + Rec.2020 + P3-D65 mastering-display case (the dominant real-world HDR10 combination), and a frame-settling capture helper that flushes transitional frames so a mid-suite colorspace/EOTF change no longer races the capture.
+
+### Fixed
+- HDR Static Metadata is now signalled **only for PQ**. Previously every EOTF advertised HDR metadata and answered the mastering-display keys (display primaries, white point, mastering luminance, MaxCLL, MaxFALL), so SDR and HLG signals could carry mastering-display values — most visibly an SDR signal over HDMI arriving with stale or default primaries. Now SDR signals the matrix only, HLG signals EOTF + matrix with no mastering metadata, and PQ carries the full set as before; EOTF and matrix signalling are unchanged. A regression test asserts SDR signals carry no HDR static metadata.
+
 ## [0.18.0b1] - 2026-05-28
 
 ### Added

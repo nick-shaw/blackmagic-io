@@ -92,6 +92,7 @@
     "strcasecmp",
     "stricmp",
     "subsampling",
+    "tifffile",
     "timecode",
     "timecodes",
     "TMDS",

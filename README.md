@@ -111,12 +111,14 @@ pip install --force-reinstall -e .
 
 ### 3. Install Optional Dependencies
 
-For examples and additional functionality:
+The example scripts need a few extra packages, available as the `examples` extra:
 ```bash
-pip install opencv-python imageio pillow jsonschema
+pip install "blackmagic-io[examples]"     # installed from PyPI
+pip install -e ".[examples]"              # from a clone (editable)
 ```
+This pulls in opencv-python, imageio, tifffile, pillow, and jsonschema. (The advanced TPAT example additionally needs the git submodule — see the submodule step above.)
 
-**Note:** While imageio / PIL can load 16-bit TIFF files correctly, 16-bit PNG files are often converted to 8-bit during loading due to PIL limitations. For reliable 16-bit workflows, use TIFF format.
+**Note:** imageio loads and saves 16-bit TIFF correctly via the tifffile backend; 16-bit PNG files are often converted to 8-bit during loading by the PIL backend. For reliable 16-bit workflows, use TIFF format.
 
 ## Quick Start
 
