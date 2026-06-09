@@ -46,6 +46,13 @@ PRIMARIES_REC709 = dict(
     green_x=0.300, green_y=0.600,
     blue_x=0.150, blue_y=0.060,
 )
+# P3-D65 (Display P3) — the primaries real HDR mastering displays actually use,
+# so the most important set to verify round-trips correctly.
+PRIMARIES_P3_D65 = dict(
+    red_x=0.680, red_y=0.320,
+    green_x=0.265, green_y=0.690,
+    blue_x=0.150, blue_y=0.060,
+)
 WHITE_D65 = dict(white_x=0.3127, white_y=0.3290)
 
 PRIMARY_TOLERANCE = 0.001
@@ -84,6 +91,23 @@ TEST_CASES = [
         decklink_io.Eotf.PQ,
         dict(
             primaries=PRIMARIES_REC2020,
+            white=WHITE_D65,
+            max_lum=1000.0,
+            min_lum=0.005,
+            max_cll=800.0,
+            max_fall=400.0,
+        ),
+        True,
+    ),
+    (
+        # PQ in a Rec.2020 container with a P3-D65 mastering display — how the
+        # vast majority of HDR10 is signalled, and the most important case to
+        # confirm round-trips correctly (round-trips on both 14.3 and 16.0.1).
+        "PQ Rec.2020 + P3-D65 mastering display",
+        decklink_io.Matrix.Rec2020,
+        decklink_io.Eotf.PQ,
+        dict(
+            primaries=PRIMARIES_P3_D65,
             white=WHITE_D65,
             max_lum=1000.0,
             min_lum=0.005,
