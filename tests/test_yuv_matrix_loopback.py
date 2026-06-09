@@ -34,8 +34,7 @@ from blackmagic_io import (
 pytestmark = [pytest.mark.hardware, pytest.mark.sdi, pytest.mark.loopback]
 
 
-OUTPUT_DEVICE_INDEX = 0
-INPUT_DEVICE_INDEX = 0
+from _device_config import OUTPUT_DEVICE_INDEX, INPUT_DEVICE_INDEX
 CAPTURE_TIMEOUT_MS = 10000
 
 # (label, display_mode, pixel_format, matrix, expected_matrix_name,

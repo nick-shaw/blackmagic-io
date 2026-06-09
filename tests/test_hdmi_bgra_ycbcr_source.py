@@ -33,8 +33,7 @@ from blackmagic_io import BlackmagicInput, PixelFormat, create_test_pattern
 
 pytestmark = [pytest.mark.hardware, pytest.mark.hdmi, pytest.mark.loopback]
 
-OUTPUT_DEVICE_INDEX = 0
-INPUT_DEVICE_INDEX = 0
+from _device_config import OUTPUT_DEVICE_INDEX, INPUT_DEVICE_INDEX
 DISPLAY_MODE = decklink_io.DisplayMode.HD1080p25
 
 # 4:2:2 chroma subsampling + matrix conversion + 8-bit quantisation. Bar

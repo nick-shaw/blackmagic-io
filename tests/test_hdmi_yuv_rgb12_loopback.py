@@ -28,8 +28,7 @@ from blackmagic_io import (
 pytestmark = [pytest.mark.hardware, pytest.mark.hdmi, pytest.mark.loopback]
 
 
-OUTPUT_DEVICE_INDEX = 0
-INPUT_DEVICE_INDEX = 0
+from _device_config import OUTPUT_DEVICE_INDEX, INPUT_DEVICE_INDEX
 DISPLAY_MODE = DisplayMode.HD1080p25
 CAPTURE_TIMEOUT_MS = 10000
 

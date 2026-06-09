@@ -25,8 +25,7 @@ from blackmagic_io import create_test_pattern
 pytestmark = [pytest.mark.hardware, pytest.mark.loopback]
 
 
-OUTPUT_DEVICE_INDEX = 0
-INPUT_DEVICE_INDEX = 0
+from _device_config import OUTPUT_DEVICE_INDEX, INPUT_DEVICE_INDEX
 DISPLAY_MODE = decklink_io.DisplayMode.HD1080p25
 PIXEL_FORMAT = decklink_io.PixelFormat.RGB10
 CAPTURE_TIMEOUT_MS = 10000

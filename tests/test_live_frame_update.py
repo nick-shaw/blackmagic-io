@@ -27,8 +27,7 @@ from blackmagic_io import BlackmagicInput, BlackmagicOutput, DisplayMode, PixelF
 pytestmark = [pytest.mark.hardware, pytest.mark.sdi, pytest.mark.loopback]
 
 
-OUTPUT_DEVICE_INDEX = 0
-INPUT_DEVICE_INDEX = 0
+from _device_config import OUTPUT_DEVICE_INDEX, INPUT_DEVICE_INDEX
 DISPLAY_MODE = DisplayMode.HD1080p25
 
 

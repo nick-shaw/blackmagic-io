@@ -1775,13 +1775,28 @@ pytest tests/ -m "hardware and not loopback"  # detection / enumeration / initia
 
 The non-hardware tests run anywhere — they exercise the C++ conversion functions, byte ordering, range helpers, and similar pure-software paths. CI runs these on every push across macOS, Linux, and Windows.
 
-The hardware loopback tests require:
+The hardware loopback tests need **simultaneous playback and capture**, so they require (with Blackmagic Desktop Video installed) either:
 
-- A DeckLink device (any model) with Blackmagic Desktop Video installed.
-- An **SDI BNC cable** looped from `SDI OUT` → `SDI IN`, for the SDI-marked tests.
-- An **HDMI cable** looped from `HDMI OUT` → `HDMI IN`, for the HDMI-marked tests.
+- A single **full-duplex** DeckLink device — one that can play back and capture at the same time; or
+- Two devices, one output-capable and one input-capable, selected via the environment variables in *Selecting input and output devices* below.
+
+A playback-only or capture-only device on its own cannot loop back. You also need the loopback cable for each transport under test:
+
+- An **SDI BNC cable** from `SDI OUT` to `SDI IN` — on the one device, or from the output device to the input device — for the SDI-marked tests.
+- An **HDMI cable** from `HDMI OUT` to `HDMI IN` (likewise), for the HDMI-marked tests.
 
 Each hardware test file is marked with `sdi` or `hdmi` so the suite can be filtered to match the cards/cables available — useful for cards that don't have both transports, or for partial-loopback rigs. `test_hdr_metadata_loopback.py` parametrises over both transports, with per-parametrise marks, so the HDMI half and SDI half can be selected independently via the same `-m` filter. Without the required cable a hardware test will time out waiting for a capture, so it's worth confirming the right cables are in place — or filtering with `-m` — before invoking the full suite.
+
+### Selecting input and output devices
+
+By default the loopback tests use **device index 0 for both output and input** — the common single duplex-device rig, with `OUT` looped back to `IN` on the same card. For a **two-device rig** — e.g. an output-only playback/monitor device and an input-only capture device — loop the cable from the output device's `OUT` to the input device's `IN`, and set the device indices via environment variables:
+
+```bash
+# output on device 1, capture on device 0 (applies to both SDI and HDMI tests)
+BMIO_OUTPUT_DEVICE=1 BMIO_INPUT_DEVICE=0 pytest tests/ -m hardware
+```
+
+Each variable is a DeckLink device index, exactly as passed to `initialize()`; unset defaults to `0`, so single-device rigs need no configuration. The indices are transport-independent — they select the physical device, not the connector. To find the index for each device, run `pytest tests/test_device_detection.py::test_device_enumeration -s` (or call `get_device_list()`), which prints the devices in enumeration order.
 
 ## Contributing
 

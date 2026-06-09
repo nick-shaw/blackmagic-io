@@ -14,6 +14,8 @@ import pytest
 
 from blackmagic_io import create_test_pattern
 
+from _device_config import OUTPUT_DEVICE_INDEX, INPUT_DEVICE_INDEX
+
 
 pytestmark = [pytest.mark.hardware, pytest.mark.sdi, pytest.mark.loopback]
 
@@ -34,8 +36,8 @@ PIXEL_FORMATS = [
 def decklink_devices():
     output_device = decklink_io.DeckLinkOutput()
     input_device = decklink_io.DeckLinkInput()
-    assert output_device.initialize(0), "Failed to initialise output device"
-    assert input_device.initialize(0), "Failed to initialise input device"
+    assert output_device.initialize(OUTPUT_DEVICE_INDEX), "Failed to initialise output device"
+    assert input_device.initialize(INPUT_DEVICE_INDEX), "Failed to initialise input device"
     yield output_device, input_device
     input_device.cleanup()
     output_device.cleanup()
