@@ -30,6 +30,11 @@ INPUT_DEVICE_INDEX = 0
 DISPLAY_MODE = decklink_io.DisplayMode.HD1080p25
 PIXEL_FORMAT = decklink_io.PixelFormat.RGB10
 CAPTURE_TIMEOUT_MS = 10000
+# After a colorspace/EOTF change the SDI payload ID (VPID) can lag the
+# HDR-metadata EOTF by a frame or two, so the first captured frame may carry
+# the new EOTF but the previous colorspace. Flush a few frames until the
+# signalling settles before asserting (see _capture_settled_frame).
+SETTLE_FRAME_BUDGET = 10
 
 PRIMARIES_REC2020 = dict(
     red_x=0.708, red_y=0.292,
@@ -151,6 +156,24 @@ def _capture_frame(input_device):
     return frame
 
 
+def _capture_settled_frame(input_device, expected_eotf, expected_matrix):
+    """Capture until EOTF and matrix match expected, flushing transitional frames.
+
+    Right after a config change the wire can briefly report the new EOTF with the
+    previous colorspace (VPID lag), which is more likely to be caught under full-
+    suite load. Polling for a settled frame removes that ordering-dependent flake.
+    It does not mask genuine mismatches: if the signalling never settles within
+    the budget, the last captured frame is returned so the caller's assertions
+    still fire.
+    """
+    frame = None
+    for _ in range(SETTLE_FRAME_BUDGET):
+        frame = _capture_frame(input_device)
+        if frame.eotf == expected_eotf and frame.matrix == expected_matrix:
+            break
+    return frame
+
+
 def _assert_full_mastering(frame, kwargs):
     primaries = kwargs["primaries"]
     white = kwargs["white"]
@@ -223,7 +246,7 @@ def test_hdr_metadata_roundtrip(
 
         assert input_device.start_capture(), "Failed to start capture"
         try:
-            frame = _capture_frame(input_device)
+            frame = _capture_settled_frame(input_device, eotf, matrix)
 
             assert frame.eotf == eotf, f"EOTF: expected {eotf}, got {frame.eotf}"
             assert frame.matrix == matrix, (
