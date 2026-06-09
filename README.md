@@ -72,7 +72,7 @@ SDK v14.1 headers for all platforms are included in the repository - no separate
 
 The build system (CMake + scikit-build-core) automatically uses the correct platform-specific headers.
 
-**⚠️ Important:** This library was built against SDK v14.1 to maintain compatibility with older macOS versions. If you need to download the SDK separately, ensure you get v14.1 from the [Blackmagic Design developer site](https://www.blackmagicdesign.com/developer/). Newer versions (v15.0+) may cause API compatibility issues and build failures.
+**⚠️ Important:** This library was built against SDK v14.1 to maintain compatibility with older macOS versions. If you need to download the SDK separately, ensure you get v14.1 from the [Blackmagic Design developer site](https://www.blackmagicdesign.com/developer/). Newer versions (v15.0+) may cause API compatibility issues and build failures. This constraint applies only to the **build-time SDK headers** — the resulting build runs correctly against current Blackmagic Desktop Video **runtime** drivers (verified on Desktop Video 16.0.1); you are not pinned to the 14.x driver.
 
 ### 2. Install the Library
 
@@ -85,6 +85,8 @@ pip install blackmagic-io
 This installs the latest beta. `pip` normally skips pre-releases, but falls back to them when no stable version is available — and every published version of this library is currently a beta (`0.18.0bN`). Once a stable `0.18.0` (or later) is published, `pip install blackmagic-io` will resolve to that stable version, and getting a future beta will require `pip install --pre blackmagic-io`. Pre-built wheels are available for Python 3.8–3.14 on macOS, Linux, and Windows; pip falls back to a source build on unsupported Pythons (which requires a C++ compiler — Xcode Command Line Tools on macOS, build-essential on Linux, or MSVC on Windows).
 
 To use the library at runtime you also need Blackmagic Desktop Video installed on your system (separate from this Python package) — the runtime DeckLink driver and framework are provided by Desktop Video, available from [blackmagicdesign.com/support](https://www.blackmagicdesign.com/support).
+
+> **Known issue — SDI HDR display primaries on older Desktop Video:** Desktop Video 14.3 (14.1 unaffected; resolved in current releases, verified on 16.0.1) transposes the three SMPTE ST 2086 display-primary pairs on the **SDI** HDR-metadata path, depending on the primary values. In practice the impact is minimal: P3-D65 primaries — what real mastering displays actually use — round-trip correctly, and the gamuts that mis-order (e.g. nominal Rec.2020) are typically placeholder/default values rather than a measured display. White point and mastering luminance are unaffected, as is the HDMI path. If captured SDI HDR display primaries appear transposed, update Desktop Video.
 
 **Option B (for contributors or for modifying the source): from a clone**
 
