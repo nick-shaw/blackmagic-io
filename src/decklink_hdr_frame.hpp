@@ -73,7 +73,15 @@ public:
     virtual long GetHeight() override { return m_frame->GetHeight(); }
     virtual long GetRowBytes() override { return m_frame->GetRowBytes(); }
     virtual BMDPixelFormat GetPixelFormat() override { return m_frame->GetPixelFormat(); }
-    virtual BMDFrameFlags GetFlags() override { return m_frame->GetFlags() | bmdFrameContainsHDRMetadata; }
+    // Advertise HDR metadata only for HDR EOTFs (PQ / HLG). SDR carries none, so
+    // withhold the flag and the driver omits the HDR Static Metadata InfoFrame.
+    virtual BMDFrameFlags GetFlags() override {
+        BMDFrameFlags flags = m_frame->GetFlags();
+        if (m_metadata.eotf != DeckLinkOutput::Eotf::SDR) {
+            flags |= bmdFrameContainsHDRMetadata;
+        }
+        return flags;
+    }
     virtual HRESULT GetBytes(void** buffer) override { return m_frame->GetBytes(buffer); }
     virtual HRESULT GetTimecode(BMDTimecodeFormat format, IDeckLinkTimecode** timecode) override {
         return m_frame->GetTimecode(format, timecode);

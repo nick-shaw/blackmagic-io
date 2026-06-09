@@ -230,6 +230,30 @@ def _assert_full_mastering(frame, kwargs):
     assert abs(frame.max_frame_average_light_level - kwargs["max_fall"]) <= LUMINANCE_TOLERANCE
 
 
+def _assert_no_static_metadata(frame):
+    """An SDR signal carries no HDR static metadata at all.
+
+    With PQ-only gating, SDR sets no HDR-metadata flag, so there is no HDR
+    Static Metadata InfoFrame (HDMI) / ST 2108 packet (SDI) — EOTF and matrix
+    still signal, but no mastering-display fields are present.
+
+    HLG is deliberately NOT checked this way: on HDMI the InfoFrame must still
+    be present to carry the EOTF=HLG identifier (mastering fields zeroed by the
+    SDK), so has_display_primaries is True there; on SDI it's absent. That split
+    is SDK/transport-determined, not our gating — so HLG is only checked for
+    EOTF + matrix.
+
+    Requires a flag-respecting capture device; devices that cache and re-emit a
+    stale InfoFrame (some HDMI outputs) can show stale values and fail here — a
+    device-firmware limitation, not a code failure.
+    """
+    assert not frame.has_display_primaries, "Display primaries present on an SDR signal"
+    assert not frame.has_white_point, "White point present on an SDR signal"
+    assert not frame.has_mastering_luminance, "Mastering luminance present on an SDR signal"
+    assert not frame.has_max_cll, "MaxCLL present on an SDR signal"
+    assert not frame.has_max_fall, "MaxFALL present on an SDR signal"
+
+
 @pytest.fixture(scope="module", params=TRANSPORTS)
 def decklink_devices(request):
     transport_name, input_connection = request.param
@@ -278,6 +302,8 @@ def test_hdr_metadata_roundtrip(
 
             if expect_full_mastering:
                 _assert_full_mastering(frame, static_metadata_kwargs)
+            elif eotf == decklink_io.Eotf.SDR:
+                _assert_no_static_metadata(frame)
         finally:
             input_device.stop_capture()
     finally:

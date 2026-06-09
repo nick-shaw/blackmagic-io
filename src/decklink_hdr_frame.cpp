@@ -81,6 +81,10 @@ HRESULT DeckLinkHdrVideoFrame::GetInt(BMDDeckLinkFrameMetadataID metadataID, int
 {
     switch (metadataID) {
         case bmdDeckLinkFrameMetadataHDRElectroOpticalTransferFunc:
+            // No HDR EOTF identifier for SDR (SDR is the absence of HDR).
+            if (m_metadata.eotf == DeckLinkOutput::Eotf::SDR) {
+                return E_INVALIDARG;
+            }
             *value = static_cast<int64_t>(m_metadata.eotf);
             break;
 
@@ -102,6 +106,14 @@ HRESULT DeckLinkHdrVideoFrame::GetInt(BMDDeckLinkFrameMetadataID metadataID, int
 
 HRESULT DeckLinkHdrVideoFrame::GetFloat(BMDDeckLinkFrameMetadataID metadataID, double* value)
 {
+    // HDR static metadata (mastering primaries / white point / mastering
+    // luminance / MaxCLL / MaxFALL) is meaningful only for PQ. SDR carries none;
+    // HLG is display-adaptive and does not use mastering-display metadata. Refuse
+    // the keys otherwise, so no HDR Static Metadata InfoFrame is built for them.
+    if (m_metadata.eotf != DeckLinkOutput::Eotf::PQ) {
+        return E_INVALIDARG;
+    }
+
     switch (metadataID) {
         case bmdDeckLinkFrameMetadataHDRDisplayPrimariesRedX:
             *value = m_metadata.referencePrimaries.RedX;
