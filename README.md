@@ -1798,6 +1798,17 @@ BMIO_OUTPUT_DEVICE=1 BMIO_INPUT_DEVICE=0 pytest tests/ -m hardware
 
 Each variable is a DeckLink device index, exactly as passed to `initialize()`; unset defaults to `0`, so single-device rigs need no configuration. The indices are transport-independent — they select the physical device, not the connector. To find the index for each device, run `pytest tests/test_device_detection.py::test_device_enumeration -s` (or call `get_device_list()`), which prints the devices in enumeration order.
 
+### Device capability and expected failures
+
+The loopback tests assume the capture device's input path matches the output in bit depth, range, and metadata support. Capability-limited devices will fail some tests — that's the hardware, not the library:
+
+- **Preview-quality HDMI inputs** capture at 8-bit (a 10/12-bit HDMI source is negotiated or read down to RGB8) and may clamp to the **1–254** reserved-value range. On such a device the HDMI full-range and 10/12-bit round-trip tests fail — the captured extremes simply can't carry full 10/12-bit values.
+- **Inputs that don't surface HDR static metadata** — some report the colorspace/matrix but not the EOTF, primaries, white point, or mastering luminance — fail the `test_hdr_metadata_loopback.py` cases that assert those fields.
+
+A concrete example is the **Blackmagic UltraStudio Recorder 3G**: its HDMI input is preview-grade (captures 8-bit, clamped to 1–254) and it reports the matrix but not HDR static metadata — so on a Recorder 3G the HDMI full-range, 10/12-bit, and HDR-metadata round-trip tests are all expected to fail, while its SDI capture works normally.
+
+Filter with `-m` (e.g. drop `hdmi`, or deselect the HDR-metadata file) to skip what a limited device can't exercise. A capable full-duplex device — or a capable output paired with a capable input — is needed for the full suite to pass.
+
 ## Contributing
 
 1. Fork the repository
